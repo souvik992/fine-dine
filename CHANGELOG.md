@@ -7,3 +7,4 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-02 P1-02 Fastify server on :7420 with /v1/health, verified SQLite pragmas, data-dir lock, checksummed migration runner (new 0002_migration_checksums), business-day bootstrap, graceful shutdown
 - 2026-11-02 P1-03 Shared money/tax/bill-calc (from Tiffin core): BigInt-safe rounding, largest-remainder allocation, exclusive/inclusive GST, per-line-rate service charge, configurable round-off tie; property tests
 - 2026-11-02 P1-04 Command pipeline: shared envelope schema, PosError, executeCommand (IMMEDIATE tx, idempotent replay with request hash, version check, rights hook, audit/event_log/print_job/outbox, post-commit publish), registry, POST /v1/commands, order snapshot query
+- 2026-11-02 P1-05 Admin Upsert* commands (area, table, printer, station, category, addon group, menu item), deriveTableState, GET /v1/floor and /v1/menu (price lists, since), idempotent dev seed over HTTP

@@ -18,6 +18,8 @@ Endpoint: `GET /v1/stream` (WebSocket). Auth: first message `{ "type": "hello", 
 | `kot.status` | `station:<id>`, `order:<id>` | kotId, status | captain, desktop |
 | `print.status` | `printers` | printerId, status, queued | desktop |
 | `menu.changed` | `menu` | menuVersion, itemIds | all |
+| `floor.changed` | `floor` | areaId?, tableId? (layout/config changed; refetch `/v1/floor`) | desktop, captain |
+| `printer.changed` | `printers` | printerId | desktop |
 | `online.order` | `online` | orderId, source | desktop (Phase 4) |
 | `day.changed` | `system` | businessDate | all |
 | `license.warning` | `system` | daysLeft | desktop |

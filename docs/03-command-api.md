@@ -90,17 +90,29 @@ Rules in `docs/08-billing-gst.md`.
 | GET | Returns |
 | --- | --- |
 | `/v1/health` | ok, version, schemaVersion, businessDate, timeZone, serverTime, uptimeSec (licence status: P2-09). `ok` is false while no business date is open |
-| `/v1/floor` | areas[], tables[] with derived state, elapsed, amount, captain |
+| `/v1/floor` | `FloorSnapshot`: serverTime, areas[], tables[] (state via `deriveTableState`, orderId, orderVersion, covers, captainId, since, elapsedMin, amountPaise) |
 | `/v1/orders/:id` | order snapshot (items, KOTs, bills, payments, version) |
 | `/v1/orders?state=open` | open orders |
-| `/v1/menu?since=<version>` | full or delta menu for the device's area context |
+| `/v1/menu?areaId=&since=<version>` | `MenuSnapshot` (active items; the area's price list overrides base/variant prices) or `{ menuVersion, unchanged: true }` when `since` is current |
 | `/v1/reports/:name?from=&to=` | report rows (see `docs/10-roadmap.md` P4 list) |
 | `/v1/audit?from=&to=&leakage=1` | audit events |
 | `/v1/printers` | printer list + status |
 
 ## Admin endpoints (also commands, admin right)
-`UpsertArea`, `UpsertTable`, `UpsertCategory`, `UpsertMenuItem`, `UpsertStation`, `UpsertPrinter`,
-`UpsertUser`, `UpsertRole`, `PairDevice`, `RevokeDevice`, `SetConfig`.
+`UpsertArea`, `UpsertTable`, `UpsertCategory`, `UpsertMenuItem`, `UpsertAddonGroup`, `UpsertStation`,
+`UpsertPrinter`, `UpsertUser`, `UpsertRole`, `PairDevice`, `RevokeDevice`, `SetConfig`.
+
+Built in P1-05 (payload schemas in `packages/shared/src/schemas/commands/admin.ts`): every `Upsert*` takes the
+record `id` (ULID) and inserts or updates it; result `{ id, created }`. Right `admin`; allowed while the day is
+closed; audited as `<entity>.create|update` with before/after. Rules:
+- References must exist (`NOT_FOUND` with `details.field`). Table labels are unique per area and short codes
+  unique per outlet (case-insensitive) → `INVALID_STATE`. A table with an open order cannot be blocked/reserved.
+- Nothing is deleted: variants and addons left out of a payload are kept; deactivate an item with `active: false`.
+  Link sets (`UpsertStation.printerIds`, `UpsertMenuItem.addonGroupIds`) are replaced as a whole.
+- Menu changes bump the `counter` row `menu_version` and emit `menu.changed`; area/table changes emit
+  `floor.changed`; printer changes emit `printer.changed`. (Known gap: an unchanged upsert still bumps the
+  version and writes an audit row.)
+- `UpsertAddonGroup` (not in the original list) is needed because addon groups are shared across items.
 
 ## Order snapshot shape (abridged)
 ```ts

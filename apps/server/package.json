@@ -9,7 +9,7 @@
     "build": "tsc -b && node scripts/copy-assets.mjs",
     "clean": "tsc -b --clean",
     "start": "node dist/index.js",
-    "seed": "tsx scripts/seed-dev.ts",
+    "seed": "tsx src/seed/cli.ts",
     "test": "vitest run --root ../.. apps/server/"
   },
   "dependencies": {

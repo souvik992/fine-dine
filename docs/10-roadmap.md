@@ -30,10 +30,11 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
     rights hook, audit + event_log rows, post-commit publish), command registry, `POST /v1/commands`.
   - Accept: tests for DUPLICATE replay, VERSION_CONFLICT, VALIDATION, rollback on handler throw (no partial rows).
 
-- [ ] **P1-05 Menu + areas + tables admin (seed)**
+- [x] **P1-05 Menu + areas + tables admin (seed)**
   - Read first: `02-domain-model.md`
   - Build: admin commands `UpsertArea/Table/Category/MenuItem/Station/Printer`; `scripts/seed-dev.ts` with
     2 areas, 12 tables, 3 stations, 30 items incl. variants/addons; `GET /v1/menu`, `GET /v1/floor`.
+    (Seed lives in `apps/server/src/seed/` and runs over HTTP: `npm run seed -w @dinepos/server`.)
   - Accept: seed runs idempotently; floor returns 12 FREE tables.
 
 - [ ] **P1-06 Order commands: OpenTable, AddItems, Update/RemoveHeldItem, FireKOT**

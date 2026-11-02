@@ -1,4 +1,5 @@
 // Wire types shared by the server and every client (docs/03-command-api.md).
+import type { TableState } from './table-state.js';
 
 export const ERROR_CODES = [
   'VALIDATION',
@@ -99,3 +100,106 @@ export interface CommandFailure {
 }
 
 export type CommandResponse<R = unknown> = CommandSuccess<R> | CommandFailure;
+
+// ---------- floor (GET /v1/floor) ----------
+
+export interface FloorArea {
+  id: string;
+  name: string;
+  sort: number;
+}
+
+export interface FloorTable {
+  id: string;
+  areaId: string;
+  label: string;
+  seats?: number;
+  layoutX?: number;
+  layoutY?: number;
+  /** Derived with deriveTableState, never stored. */
+  state: TableState;
+  orderId?: string;
+  orderVersion?: number;
+  covers?: number;
+  captainId?: string;
+  /** When the current order was opened. */
+  since?: string;
+  elapsedMin?: number;
+  /** Running total of the open order. */
+  amountPaise?: number;
+}
+
+export interface FloorSnapshot {
+  serverTime: string;
+  areas: FloorArea[];
+  tables: FloorTable[];
+}
+
+// ---------- menu (GET /v1/menu) ----------
+
+export interface MenuStation {
+  id: string;
+  name: string;
+  hasKds: boolean;
+}
+
+export interface MenuCategory {
+  id: string;
+  name: string;
+  parentId?: string;
+  stationId?: string;
+  sort: number;
+}
+
+export interface MenuAddon {
+  id: string;
+  name: string;
+  pricePaise: number;
+}
+
+export interface MenuAddonGroup {
+  id: string;
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  addons: MenuAddon[];
+}
+
+export interface MenuVariant {
+  id: string;
+  name: string;
+  pricePaise: number;
+  sort: number;
+}
+
+export interface MenuItem {
+  id: string;
+  categoryId: string;
+  name: string;
+  shortCode?: string;
+  veg: boolean;
+  pricePaise: number;
+  taxRateBp: number;
+  hsnSac?: string;
+  stationId?: string;
+  available: boolean;
+  sort: number;
+  variants: MenuVariant[];
+  addonGroupIds: string[];
+}
+
+export interface MenuSnapshot {
+  menuVersion: number;
+  /** Area whose price list was applied, if any. */
+  areaId?: string;
+  stations: MenuStation[];
+  categories: MenuCategory[];
+  addonGroups: MenuAddonGroup[];
+  items: MenuItem[];
+}
+
+/** `GET /v1/menu?since=<menuVersion>` when nothing changed. */
+export interface MenuUnchanged {
+  menuVersion: number;
+  unchanged: true;
+}

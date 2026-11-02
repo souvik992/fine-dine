@@ -9,6 +9,7 @@ import { allowAllRights, type RightsPolicy } from './core/rights.js';
 import type { Db } from './db/connection.js';
 import { commandRoutes } from './routes/commands.js';
 import { healthRoutes } from './routes/health.js';
+import { queryRoutes } from './routes/queries.js';
 
 export interface AppDeps {
   db: Db;
@@ -69,6 +70,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   );
 
   healthRoutes(app, { db, timeZone, now, startedAt });
+  queryRoutes(app, { db, timeZone, now });
   commandRoutes(
     app,
     {

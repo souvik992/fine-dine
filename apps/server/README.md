@@ -88,6 +88,12 @@ Migrations: `src/db/migrations/NNNN_name.sql`, numbered without gaps, each in it
 SHA-256 checksums (LF-normalised) go in `schema_migration_checksum`; an edited applied migration or a database
 newer than the build stops startup. `npm run build` copies the SQL into `dist/`.
 
+## Dev seed (P1-05)
+With the server running: `npm run seed -w @dinepos/server` (`DINEPOS_URL` to target another port). It sends the
+demo outlet (`src/seed/dev-seed.ts`: 2 areas, 12 tables, 3 stations, 4 fake printers, 30 items) as normal admin
+commands over HTTP, so the server stays the only DB writer. Ids derive from stable keys, so re-running is safe.
+Refuses to run with `NODE_ENV=production`.
+
 ## Dev
 `npm run dev -w @dinepos/server` → `tsx watch src/index.ts` with `apps/server/data/dev.db`, fake printers.
 `npm run build -w @dinepos/server && npm run start -w @dinepos/server` runs the compiled server.
