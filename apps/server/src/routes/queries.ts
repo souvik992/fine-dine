@@ -2,6 +2,7 @@ import { ulidSchema } from '@dinepos/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { PosError } from '../core/errors.js';
+import { getConfig } from '../core/outlet-config.js';
 import type { Db } from '../db/connection.js';
 import { getFloor } from '../queries/floor.js';
 import { getMenu } from '../queries/menu.js';
@@ -31,6 +32,12 @@ export function queryRoutes(app: FastifyInstance, deps: QueryDeps): void {
     const order = getOrderSnapshot(deps.db, req.params.id);
     if (!order) throw new PosError('NOT_FOUND', 'Order not found.', { orderId: req.params.id });
     void reply.header('cache-control', 'no-store').send(order);
+    return reply;
+  });
+
+  // Outlet and billing settings (nothing secret is stored here).
+  app.get('/v1/config', (_req, reply) => {
+    void reply.header('cache-control', 'no-store').send(getConfig(deps.db));
     return reply;
   });
 

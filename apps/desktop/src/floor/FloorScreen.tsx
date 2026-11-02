@@ -1,11 +1,12 @@
 import type { FloorSnapshot, FloorTable } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
-import { RefreshCw, Search, Settings } from 'lucide-react';
+import { MoonStar, RefreshCw, Search, Settings } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { HealthDots } from '../components/HealthDots.js';
 import { findTable, moveFocus, STATE_META, stateCounts, tablesInArea, type Arrow } from './floor-model.js';
+import { DayEndDialog } from './DayEndDialog.js';
 import { SeatDialog } from './SeatDialog.js';
 import { TableTile } from './TableTile.js';
 
@@ -38,6 +39,7 @@ export function FloorScreen({ onSettings, onOpenOrder }: { onSettings: () => voi
   const [search, setSearch] = useState('');
   const [searchError, setSearchError] = useState<string | null>(null);
   const [seating, setSeating] = useState<FloorTable | null>(null);
+  const [closingDay, setClosingDay] = useState(false);
   const grid = useRef<HTMLDivElement>(null);
   const tileRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const searchBox = useRef<HTMLInputElement>(null);
@@ -67,7 +69,7 @@ export function FloorScreen({ onSettings, onOpenOrder }: { onSettings: () => voi
   // Typing a letter or digit anywhere on the floor jumps to the table search (docs/09: type "T7" + Enter).
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (seating || e.ctrlKey || e.altKey || e.metaKey) return;
+      if (seating || closingDay || e.ctrlKey || e.altKey || e.metaKey) return;
       if (document.activeElement === searchBox.current) return;
       if (/^[a-z0-9]$/i.test(e.key)) {
         searchBox.current?.focus();
@@ -75,7 +77,7 @@ export function FloorScreen({ onSettings, onOpenOrder }: { onSettings: () => voi
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [seating]);
+  }, [seating, closingDay]);
 
   const submitSearch = () => {
     if (!data) return;
@@ -149,6 +151,9 @@ export function FloorScreen({ onSettings, onOpenOrder }: { onSettings: () => voi
         <time className="w-14 text-right text-sm font-semibold tabular-nums" dateTime={now.toISOString()}>
           {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })}
         </time>
+        <button className="btn h-10" onClick={() => setClosingDay(true)} disabled={!data} title="Close the business day and print the Z-report">
+          <MoonStar className="h-4 w-4" /> Day end
+        </button>
         <button className="btn h-10 w-10 px-0" onClick={onSettings} aria-label="Settings" title="Settings">
           <Settings className="h-5 w-5" />
         </button>
@@ -199,6 +204,7 @@ export function FloorScreen({ onSettings, onOpenOrder }: { onSettings: () => voi
         )}
       </main>
 
+      {closingDay && data ? <DayEndDialog floor={data} onClose={() => setClosingDay(false)} /> : null}
       {seating ? <SeatDialog table={seating} onClose={() => setSeating(null)} onSeated={onOpenOrder} /> : null}
     </div>
   );

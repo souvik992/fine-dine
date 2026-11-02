@@ -93,6 +93,11 @@ export class EscPos {
     const w = this.width();
     const l = sanitize(left);
     const r = sanitize(right);
+    if (!r) {
+      // Nothing on the right: no trailing padding, but keep the left side's indent.
+      const indent = l.length - l.trimStart().length;
+      return this.wrapped(l.trimStart(), indent);
+    }
     if (l.length + r.length + 1 <= w) return this.line(l + ' '.repeat(w - l.length - r.length) + r);
     if (l) this.wrapped(l);
     for (const part of wrapText(r, w)) this.line(' '.repeat(w - part.length) + part);

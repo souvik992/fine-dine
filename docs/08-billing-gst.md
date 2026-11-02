@@ -17,6 +17,9 @@
 | Alcohol | outside GST (state VAT) | separate tax profile per item category |
 | Inter-state | IGST | rare for dine-in; supported in tax profile |
 
+Decided 2026-11-02 (**CA to confirm**): dine-in is always CGST + SGST, because the place of supply is the
+restaurant. A guest GSTIN (checksum-validated) is stored and printed but never switches a bill to IGST.
+
 ## Bill calculation (exclusive pricing)
 1. Line amount = unit price × qty + Σ(addon price × addon qty).
 2. Subtotal = Σ line amounts (cancelled items excluded).
@@ -49,6 +52,18 @@ Inclusive pricing: tax = round(line × rate / (10000 + rate)); taxable = line �
 
 ## Numbering
 - Bill numbers: per financial year (1 Apr–31 Mar), gap-free, prefix configurable (`T1/26-27/000123`).
+  Decided 2026-11-02: prefix setting `bill.prefix`, 1–3 capital letters/digits, default `B` (`B/26-27/000001`,
+  ≤ 16 characters). The **invoice date and FY are the calendar date of printing** in the outlet time zone (a bill
+  printed at 00:30 on 1 April is in the new FY even if the business date is still 31 March); reports and the
+  Z-report use the business date. The number comes from `counter` row `bill_no:<fy>` inside the PrintBill
+  transaction, so a refused or rolled-back PrintBill never uses one up.
+- PrintBill is refused while items are held (not yet sent to the kitchen) or nothing is fired, and on an order
+  that is already billed (reprint: P2-04). Each print stores the exact document in `bill_document` (append-only,
+  one revision per print) so reprints match. A re-issue after a supersede keeps the bill row, number and printed
+  number text, and adds revision 2, 3 …
+- Settle: tenders must cover the total exactly; only cash may exceed it (the excess is change, and the cash
+  payment row records what was kept). `due` needs a guest name or phone on the bill; `complimentary` needs a
+  reason (in `ref`) and is a leakage flag. Settled bills and all payment rows are immutable (triggers, 0003).
 - Assigned at first `PrintBill`; reprints keep the number; adding items after print supersedes the
   unpaid bill (same number reused for the new print; superseded version kept in audit).
 - Voided bills keep their number and print as VOID in reports.
@@ -64,3 +79,9 @@ Inclusive pricing: tax = round(line × rate / (10000 + rate)); taxable = line �
   `business_day/day.open`. A running day never changes at midnight.
 - Business date closes only via `DayEnd`. Open orders block day-end unless moved to next day (manager).
 - Z-report printed and stored; counters for KOT no. reset next date.
+- Built in P1-10: DayEnd lists the open tables when refused. The Z-report covers bills, covers, KOTs, gross,
+  discounts, service charge, CGST/SGST/IGST, round-off, net; payments by mode; sales by area; sales by category
+  (before discount); items cancelled after a KOT; cash expected (cash payments + opening/pay-ins − pay-outs) vs
+  counted (a difference is a leakage flag). Stored in `business_day.z_report_json`, printed on the bill printer.
+  The next business date opens in the same transaction; `processed_command` older than 7 days and all but the
+  last 10,000 `event_log` rows are pruned.

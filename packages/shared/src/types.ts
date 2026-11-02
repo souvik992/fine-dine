@@ -57,6 +57,8 @@ export interface KotSnapshot {
 export interface BillSnapshot {
   id: string;
   billNo?: number;
+  /** As printed, e.g. "B/26-27/000123". */
+  billNoText?: string;
   fy: string;
   splitNo: number;
   totalPaise: number;

@@ -91,6 +91,16 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
   stationId, orderItemIds }] }`, KOTs ordered by station name.
 - `AddItems`/`FireKOT` on a `billed` order return it to `open` and mark its printed bill `superseded`.
 
+### Billing command notes (P1-10; schemas in `packages/shared/src/schemas/commands/billing.ts`)
+- `PrintBill` discount `{ kind: pct|amount, value, reason }`: pct in basis points, amount in paise, reason
+  required when value > 0. `serviceCharge.rateBp` defaults to setting `bill.serviceChargeBp`. Result
+  `{ billId, billNo, revision, totalPaise, printerId, warning? }` (warning when no bill printer exists).
+- `Settle` result `{ billId, paidPaise, changePaise }`. `DayEnd` result `{ closedDate, nextDate, zReport }`.
+- `SetConfig` `{ values: { "<key>": value } }`, keys: `outlet.name`, `outlet.addressLines`, `outlet.gstin`,
+  `outlet.fssai`, `outlet.phone`, `bill.prefix`, `bill.footerLines`, `bill.roundOffStep`, `bill.roundOffTie`,
+  `bill.serviceChargeBp`, `bill.upiVpa`, `bill.upiPayeeName`, `bill.printerId`, `kot.default_station_id`. Only
+  changed keys are written and audited; result `{ changed }`; emits `config.changed` on `system`.
+
 ### SplitBill payloads
 ```json
 { "mode": "equal", "parts": 3 }
@@ -109,6 +119,7 @@ Rules in `docs/08-billing-gst.md`.
 | `/v1/menu?areaId=&since=<version>` | `MenuSnapshot` (active items; the area's price list overrides base/variant prices) or `{ menuVersion, unchanged: true }` when `since` is current |
 | `/v1/reports/:name?from=&to=` | report rows (see `docs/10-roadmap.md` P4 list) |
 | `/v1/audit?from=&to=&leakage=1` | audit events |
+| `/v1/config` | outlet and billing settings with defaults applied (nothing secret) |
 | `/v1/printers` | `{ printers: [{ id, name, transport, role, widthMm, backupPrinterId?, status, queued, failedToday, lastError? }] }` |
 
 ## Admin endpoints (also commands, admin right)

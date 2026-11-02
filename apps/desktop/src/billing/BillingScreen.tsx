@@ -1,4 +1,4 @@
-import { formatINR, newId, type MenuItem, type MenuSnapshot, type OrderItemSnapshot } from '@dinepos/shared';
+import { formatINR, newId, type MenuItem, type MenuSnapshot, type OrderItemSnapshot, type OutletConfig } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Flame, Printer, Search, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -10,6 +10,9 @@ import { elapsedMinutes, formatElapsed } from '../floor/floor-model.js';
 import { Cart } from './Cart.js';
 import { hasChoices, needsChoices, resolveQuickEntry, visibleItems } from './menu-model.js';
 import { ModifierSheet, type SheetResult } from './ModifierSheet.js';
+import { Modal } from '../components/Modal.js';
+import { PrintBillDialog } from './PrintBillDialog.js';
+import { SettleDialog } from './SettleDialog.js';
 import { useOrderSession } from './useOrderSession.js';
 
 interface Toast {
@@ -32,6 +35,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
     staleTime: 60_000,
   });
   const menu = menuQuery.data && 'items' in menuQuery.data ? menuQuery.data : null;
+  const configQuery = useQuery({ queryKey: ['config'], queryFn: () => api.get<OutletConfig>('/v1/config'), staleTime: 60_000 });
 
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -39,12 +43,28 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
   const [toast, setToast] = useState<Toast | null>(null);
+  const [dialog, setDialog] = useState<'bill' | 'settle' | null>(null);
+  const [settledChange, setSettledChange] = useState<number | null>(null);
   const searchBox = useRef<HTMLInputElement>(null);
 
   const activeCategory = categoryId ?? menu?.categories[0]?.id ?? null;
   const items = useMemo(() => (menu ? visibleItems(menu, activeCategory, query) : []), [menu, activeCategory, query]);
   const held = useMemo(() => order?.items.filter((i) => i.status === 'held') ?? [], [order]);
   const selected = held.find((i) => i.id === selectedId) ?? held.at(-1);
+  const firedCount = order?.items.filter((i) => i.status === 'fired').length ?? 0;
+  const printedBill = order?.state === 'billed' ? order.bills.find((b) => b.state === 'printed') : undefined;
+  const canPrint = order?.state === 'open' && held.length === 0 && firedCount > 0 && configQuery.data !== undefined;
+
+  const openBill = () => {
+    if (canPrint) setDialog('bill');
+    else if (order?.state === 'billed') setToast({ kind: 'error', text: 'The bill is already printed. Press F10 to settle.' });
+    else if (held.length) setToast({ kind: 'error', text: 'Send the new items to the kitchen (F8) before printing the bill.' });
+    else setToast({ kind: 'error', text: 'Nothing to bill yet.' });
+  };
+  const openSettle = () => {
+    if (printedBill) setDialog('settle');
+    else setToast({ kind: 'error', text: 'Print the bill first (F9).' });
+  };
 
   useEffect(() => {
     if (!toast) return;
@@ -115,14 +135,17 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (sheet) return; // the sheet owns the keyboard
+      if (sheet || dialog || settledChange !== null) return; // an open dialog owns the keyboard
       const inSearch = document.activeElement === searchBox.current;
       if (e.key === 'F8') {
         e.preventDefault();
         fire();
-      } else if (e.key === 'F9' || e.key === 'F10') {
+      } else if (e.key === 'F9') {
         e.preventDefault();
-        setToast({ kind: 'error', text: 'Print bill and Settle arrive with the next update (roadmap P1-10).' });
+        openBill();
+      } else if (e.key === 'F10') {
+        e.preventDefault();
+        openSettle();
       } else if (e.key === 'Escape') {
         if (query) setQuery('');
         else onBack();
@@ -260,10 +283,10 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
             <button className="btn btn-primary h-12" onClick={fire} disabled={held.length === 0}>
               <Flame className="h-4 w-4" /> Fire <kbd className="text-xs opacity-80">F8</kbd>
             </button>
-            <button className="btn h-12" disabled title="Arrives in P1-10">
+            <button className="btn h-12" onClick={openBill} disabled={!canPrint}>
               <Printer className="h-4 w-4" /> Bill <kbd className="text-xs">F9</kbd>
             </button>
-            <button className="btn h-12" disabled title="Arrives in P1-10">
+            <button className="btn h-12" onClick={openSettle} disabled={!printedBill}>
               <Wallet className="h-4 w-4" /> Settle <kbd className="text-xs">F10</kbd>
             </button>
           </div>
@@ -276,6 +299,48 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
         </div>
       ) : null}
 
+      {dialog === 'bill' && configQuery.data ? (
+        <PrintBillDialog
+          order={order}
+          config={configQuery.data}
+          session={session}
+          onClose={() => setDialog(null)}
+          onDone={(billNo, warning) => {
+            setDialog(null);
+            setToast(warning ? { kind: 'error', text: `${billNo} saved. ${warning}` } : { kind: 'ok', text: `Bill ${billNo} printed. F10 to settle.` });
+          }}
+        />
+      ) : null}
+      {dialog === 'settle' && printedBill ? (
+        <SettleDialog
+          billId={printedBill.id}
+          billNo={printedBill.billNoText ?? 'bill'}
+          totalPaise={printedBill.totalPaise}
+          session={session}
+          onClose={() => setDialog(null)}
+          onDone={(change) => {
+            setDialog(null);
+            setSettledChange(change);
+          }}
+        />
+      ) : null}
+      {settledChange !== null ? (
+        <Modal title="Bill settled" onClose={onBack}>
+          <div className="text-center">
+            {settledChange > 0 ? (
+              <>
+                <p className="text-sm text-muted-foreground">Change to return</p>
+                <p className="my-2 text-4xl font-bold tabular-nums" data-testid="change-due">{formatINR(settledChange)}</p>
+              </>
+            ) : (
+              <p className="my-2 text-lg font-semibold">Paid in full. The table is free.</p>
+            )}
+            <button data-autofocus className="btn btn-primary mt-4 w-full" onClick={onBack}>
+              Back to floor <kbd className="text-xs opacity-80">Enter</kbd>
+            </button>
+          </div>
+        </Modal>
+      ) : null}
       {sheet ? (
         <ModifierSheet
           menu={menu}

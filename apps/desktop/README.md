@@ -39,6 +39,12 @@ src/
 detection; pure + tested), `BillingScreen.tsx`, `ModifierSheet.tsx`, `Cart.tsx`. Line amounts in the cart use
 the shared `lineAmount`; totals always come from the server snapshot.
 
+## Bill, settle, day end (P1-10)
+F9 Print bill (discount % or ₹ with reason, service charge only if the guest agrees, guest details/GSTIN;
+preview from the shared calculator, printed figures from the server). F10 Settle (type the amount received;
+c/k/u/d/m/o switch cash/card/UPI/due/complimentary/other; + splits; change shown). Day end is on the floor
+header: refuses while tables are open, then asks for counted cash and shows the Z-report summary.
+
 ## Conflict handling
 `VERSION_CONFLICT` → if command is "safe" (see `docs/05-sync-offline.md`) resend with the returned
 version; otherwise show `ConflictBanner` with what changed and who did it.

@@ -133,6 +133,19 @@ const items: SeedItem[] = [
 /** The seed as an ordered list of admin commands (referenced records first). */
 export function devSeedCommands(): SeedCommand[] {
   const cmds: SeedCommand[] = [];
+  cmds.push({
+    type: 'SetConfig',
+    payload: {
+      values: {
+        'outlet.name': 'Spice Garden (DEMO)',
+        'outlet.addressLines': ['12 Park Street', 'Kolkata 700016'],
+        'outlet.phone': '033 4000 1234',
+        'bill.prefix': 'B',
+        'bill.serviceChargeBp': 1000,
+        'bill.upiVpa': 'spicegarden.demo@okbank',
+      },
+    },
+  });
   for (const p of printers) {
     cmds.push({ type: 'UpsertPrinter', payload: { id: seedId(`printer:${p.key}`), name: p.name, transport: 'fake', role: p.role, widthMm: 80 } });
   }

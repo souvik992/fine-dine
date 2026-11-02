@@ -59,7 +59,7 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
   - Accept: punch 5 items with modifiers and fire in under 20 s using keyboard only (manual check).
     Also automated in `apps/desktop/e2e` (seat + 5 items + fire â‰ˆ 33 keystrokes).
 
-- [ ] **P1-10 PrintBill + Settle + DayEnd**
+- [x] **P1-10 PrintBill + Settle + DayEnd**
   - Read first: `08-billing-gst.md`
   - Build: `PrintBill` (discount, optional service charge, bill numbering per FY), `Settle` (multi-tender),
     `DayEnd` + Z-report, desktop Settle screen.

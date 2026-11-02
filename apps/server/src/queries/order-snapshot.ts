@@ -46,6 +46,7 @@ interface KotRow {
 interface BillRow {
   id: string;
   bill_no: number | null;
+  bill_no_text: string | null;
   fy: string;
   split_no: number;
   total_paise: number;
@@ -136,13 +137,15 @@ export function getOrderSnapshot(db: Db, orderId: string): OrderSnapshot | undef
     db
       .prepare(
         `SELECT b.id, b.bill_no, b.fy, b.split_no, b.total_paise, b.state,
-                COALESCE((SELECT sum(p.amount_paise) FROM payment p WHERE p.bill_id = b.id), 0) AS paid_paise
+                COALESCE((SELECT sum(p.amount_paise) FROM payment p WHERE p.bill_id = b.id), 0) AS paid_paise,
+                (SELECT d.bill_no_text FROM bill_document d WHERE d.bill_id = b.id ORDER BY d.revision DESC LIMIT 1) AS bill_no_text
          FROM bill b WHERE b.order_id = ? ORDER BY b.split_no, b.id`,
       )
       .all(orderId) as BillRow[]
   ).map((b) => ({
     id: b.id,
     billNo: opt(b.bill_no),
+    billNoText: opt(b.bill_no_text),
     fy: b.fy,
     splitNo: b.split_no,
     totalPaise: b.total_paise,

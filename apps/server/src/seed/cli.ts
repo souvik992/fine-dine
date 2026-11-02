@@ -15,10 +15,10 @@ async function main(): Promise<void> {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ commandId: newId(), type: cmd.type, payload: cmd.payload, createdAt: new Date().toISOString() }),
     });
-    const body = (await res.json()) as CommandResponse<{ created: boolean }>;
+    const body = (await res.json()) as CommandResponse<{ created?: boolean }>;
     if (!body.ok) throw new Error(`${cmd.type} failed: ${body.error.code} ${body.error.message} ${JSON.stringify(body.error.details ?? '')}`);
-    if (body.result.created) created++;
-    else updated++;
+    if (body.result.created === true) created++;
+    else if (body.result.created === false) updated++;
   }
   console.warn(`Seed done against ${server}: ${created} created, ${updated} already present (updated in place).`);
 }

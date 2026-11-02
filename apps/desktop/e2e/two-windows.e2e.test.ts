@@ -209,4 +209,45 @@ describe('desktop app', () => {
     expect(order.kots).toHaveLength(3); // Tandoor, Kitchen, Bar
     await other!.waitForSelector('[data-table="T3"][data-state="KOT_RUNNING"]', { timeout: 2_000 });
   });
+
+  // P1-10: print the bill with a discount and settle in cash, keyboard only; the table frees up everywhere.
+  it('keyboard only: F9 bill with 10% discount, F10 settle cash with change, table FREE', async () => {
+    const [page, other] = app.windows();
+    const k = page!.keyboard;
+    await k.press('F9');
+    await page!.getByRole('dialog', { name: 'Print bill' }).waitFor();
+    await k.type('10'); // discount % field is focused
+    await k.press('Tab');
+    await k.type('Regular guest');
+    await k.press('Enter');
+    await page!.getByRole('dialog', { name: 'Print bill' }).waitFor({ state: 'detached' });
+    await other!.waitForSelector('[data-table="T3"][data-state="BILL_PRINTED"]', { timeout: 2_000 });
+
+    await k.press('F10');
+    const settle = page!.getByRole('dialog', { name: /^Settle B\/\d{2}-\d{2}\/\d{6}$/ });
+    await settle.waitFor();
+    const due = await page!.getByTestId('settle-total').innerText();
+    await k.type('2000');
+    await k.press('Enter');
+    await page!.getByRole('dialog', { name: 'Bill settled' }).waitFor();
+    const change = await page!.getByTestId('change-due').innerText();
+    await k.press('Enter'); // back to floor
+    await page!.waitForSelector('[data-table="T3"][data-state="FREE"]', { timeout: 2_000 });
+    await other!.waitForSelector('[data-table="T3"][data-state="FREE"]', { timeout: 2_000 });
+
+    // Server agrees: one settled bill, numbered, discounted, paid in cash, change = 2000 − total.
+    const rupees = (s: string) => Number(s.replace(/[^\d]/g, '')); // "₹1,234.50" → 123450 paise
+    const floor = (await (await fetch(`${SERVER}/v1/floor`)).json()) as { tables: Array<{ label: string; orderId?: string }> };
+    expect(floor.tables.find((t) => t.label === 'T3')!.orderId).toBeUndefined();
+    expect(rupees(change)).toBe(200_000 - rupees(due));
+  });
+
+  it('day end is refused while tables are still open, naming them', async () => {
+    const [page] = app.windows();
+    await page!.getByRole('button', { name: 'Day end' }).click();
+    const dlg = page!.getByRole('dialog', { name: 'Day end' });
+    await dlg.waitFor();
+    await expect.poll(() => dlg.getByRole('alert').innerText()).toMatch(/Settle every table before closing the day: T1, T2/);
+    await page!.keyboard.press('Escape');
+  });
 });

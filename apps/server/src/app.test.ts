@@ -5,6 +5,7 @@ import { ensureBusinessDay } from './core/business-day.js';
 import { PosError } from './core/errors.js';
 import type { Db } from './db/connection.js';
 import { createTestDb } from './testing/test-db.js';
+import { loadMigrations } from './db/migrate.js';
 import { SERVER_VERSION } from './version.js';
 
 const now = () => new Date('2026-11-02T06:30:00Z');
@@ -30,7 +31,7 @@ describe('GET /v1/health', () => {
       ok: true,
       service: 'dinepos-server',
       version: SERVER_VERSION,
-      schemaVersion: 2,
+      schemaVersion: loadMigrations().length,
       businessDate: '2026-11-02',
       timeZone: 'Asia/Kolkata',
       serverTime: '2026-11-02T12:00:00.000+05:30',

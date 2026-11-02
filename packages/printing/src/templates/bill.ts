@@ -83,13 +83,15 @@ export function renderBill(doc: BillDocument, opts: { paper: PaperWidth; feed?: 
       const parts = wrapText(l.name, 22);
       p.line(`${parts[0]!.padEnd(22)} ${padLeft(String(l.qty), 4)} ${padLeft(money(l.unitPricePaise), 9)} ${padLeft(money(l.amountPaise), 10)}`);
       for (const rest of parts.slice(1)) p.line(rest);
-      for (const a of l.addons ?? []) p.twoCol(`  + ${a.qty > 1 ? `${a.qty} x ` : ''}${a.name}`, money(a.amountPaise));
+      // Free choices (spice level, no onion) print without an amount.
+      for (const a of l.addons ?? []) p.twoCol(`  + ${a.qty > 1 ? `${a.qty} x ` : ''}${a.name}`, a.amountPaise ? money(a.amountPaise) : '');
     }
   } else {
     for (const l of doc.lines) {
       p.wrapped(l.name);
       p.twoCol(`  ${l.qty} x ${money(l.unitPricePaise)}`, money(l.amountPaise));
-      for (const a of l.addons ?? []) p.twoCol(`  + ${a.qty > 1 ? `${a.qty} x ` : ''}${a.name}`, money(a.amountPaise));
+      // Free choices (spice level, no onion) print without an amount.
+      for (const a of l.addons ?? []) p.twoCol(`  + ${a.qty > 1 ? `${a.qty} x ` : ''}${a.name}`, a.amountPaise ? money(a.amountPaise) : '');
     }
   }
   p.rule();

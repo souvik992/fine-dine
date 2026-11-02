@@ -161,3 +161,10 @@ describe('layout helpers', () => {
     expect(upiUri('a@b', 'Spice Garden', 5, 'Bill T1/1')).toBe('upi://pay?pa=a%40b&pn=Spice%20Garden&am=0.05&cu=INR&tn=Bill%20T1%2F1');
   });
 });
+
+describe('free addons', () => {
+  it('print without an amount', () => {
+    const preview = renderBill({ ...doc, lines: [{ name: 'Paneer Tikka', qty: 1, unitPricePaise: 32_000, amountPaise: 32_000, addons: [{ name: 'Mild', qty: 1, amountPaise: 0 }] }] }, { paper: 80 }).preview;
+    expect(preview.split('\n')).toContain('  + Mild'); // indented, no amount, no trailing spaces
+  });
+});

@@ -5,6 +5,7 @@ import type { CommandContext } from '../core/context.js';
 import { PosError } from '../core/errors.js';
 import type { Db } from '../db/connection.js';
 import { getOrderSnapshot } from '../queries/order-snapshot.js';
+import { getConfig } from '../core/outlet-config.js';
 
 /** States in which items may be added, edited or fired. */
 export function requireEditable(order: OrderRow): void {
@@ -165,7 +166,7 @@ export function resolveStation(db: Db, areaId: string | null, itemId: string): s
     if (row?.station_id) return row.station_id;
     c = row?.parent_id ?? null;
   }
-  return (db.prepare("SELECT value FROM config WHERE key = 'kot.default_station_id'").pluck().get() as string | undefined) ?? null;
+  return getConfig(db)['kot.default_station_id'];
 }
 
 /** Next value of a gap-free counter (inside the command transaction). */

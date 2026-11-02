@@ -28,7 +28,9 @@ describe('dev seed', () => {
     seed();
     const first = counts();
     const second = seed();
-    expect(second.every((r) => (r.result as { created: boolean }).created === false)).toBe(true);
+    const results = second.map((r) => r.result as { created?: boolean; changed?: string[] });
+    expect(results.some((r) => r.created === true)).toBe(false);
+    expect(results.flatMap((r) => r.changed ?? [])).toEqual([]); // SetConfig: no setting changed
     expect(counts()).toEqual(first);
   });
 

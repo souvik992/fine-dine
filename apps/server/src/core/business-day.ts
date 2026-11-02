@@ -17,28 +17,26 @@ export function currentBusinessDate(db: Db): string | null {
 }
 
 /**
- * Makes sure exactly one business date is open; returns it. Runs at startup, before any client can connect.
- * When none is open the server opens today's local date, or the day after the last closed one if that is
- * later (a DayEnd run early for today must not reopen today). Audited as a system action.
+ * Opens the next business date and audits it as a system action. Call inside a transaction, only when no
+ * date is open. The date is today's local date, or the day after the last closed one if that is later
+ * (a DayEnd run before midnight must not reopen the same date).
  */
+export function openNextBusinessDay(db: Db, timeZone: string, at: Date, reason: string): string {
+  const lastClosed = db.prepare('SELECT max(date) FROM business_day').pluck().get() as string | null;
+  const today = localDate(at, timeZone);
+  const date = lastClosed && lastClosed >= today ? addDays(lastClosed, 1) : today;
+  const ts = at.toISOString();
+  db.prepare('INSERT INTO business_day (date, opened_at) VALUES (?, ?)').run(date, ts);
+  db.prepare(
+    `INSERT INTO audit_event (ts, entity, entity_id, action, after_json, reason)
+     VALUES (?, 'business_day', ?, 'day.open', ?, ?)`,
+  ).run(ts, date, JSON.stringify({ date, openedAt: ts, timeZone }), reason);
+  return date;
+}
+
+/** Makes sure exactly one business date is open; returns it. Runs at startup, before any client can connect. */
 export function ensureBusinessDay(db: Db, timeZone: string, now: () => Date = () => new Date()): string {
   return db
-    .transaction(() => {
-      const open = currentBusinessDate(db);
-      if (open) return open;
-
-      const at = now();
-      const lastClosed = db.prepare('SELECT max(date) FROM business_day').pluck().get() as string | null;
-      const today = localDate(at, timeZone);
-      const date = lastClosed && lastClosed >= today ? addDays(lastClosed, 1) : today;
-      const ts = at.toISOString();
-
-      db.prepare('INSERT INTO business_day (date, opened_at) VALUES (?, ?)').run(date, ts);
-      db.prepare(
-        `INSERT INTO audit_event (ts, entity, entity_id, action, after_json, reason)
-         VALUES (?, 'business_day', ?, 'day.open', ?, 'server start: no open business date')`,
-      ).run(ts, date, JSON.stringify({ date, openedAt: ts, timeZone }));
-      return date;
-    })
+    .transaction(() => currentBusinessDate(db) ?? openNextBusinessDay(db, timeZone, now(), 'server start: no open business date'))
     .immediate();
 }

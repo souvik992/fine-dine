@@ -85,6 +85,9 @@ Startup: data dir → `dinepos.lock` (refuses a second server; a lock from a cra
 from another host means the DB is on a shared folder and is refused) → open DB (pragmas read back) → migrate →
 open business date → listen. SIGINT/SIGTERM close HTTP, checkpoint the WAL and release the lock (10 s limit).
 
+Migration 0003 adds `bill_document` (printed bill revisions) and triggers: bills never deleted, settled bills
+frozen (except → void), bill numbers never change, payments append-only.
+
 Migrations: `src/db/migrations/NNNN_name.sql`, numbered without gaps, each in its own IMMEDIATE transaction.
 SHA-256 checksums (LF-normalised) go in `schema_migration_checksum`; an edited applied migration or a database
 newer than the build stops startup. `npm run build` copies the SQL into `dist/`.

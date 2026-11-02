@@ -14,7 +14,7 @@ interface AppContextValue {
 const Ctx = createContext<AppContextValue | null>(null);
 
 /** Which cached GET each stream topic refreshes. Events are triggers; data always comes from GETs (docs/04). */
-const TOPIC_QUERIES: Record<string, string[]> = { floor: ['floor'], printers: ['printers'], menu: ['menu'], system: ['health', 'floor'] };
+const TOPIC_QUERIES: Record<string, string[]> = { floor: ['floor'], printers: ['printers'], menu: ['menu'], system: ['health', 'floor', 'config'] };
 const TOPICS = [...Object.keys(TOPIC_QUERIES), 'order:*'];
 
 /** Query keys a stream event should refresh. */
