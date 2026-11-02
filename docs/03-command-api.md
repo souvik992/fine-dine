@@ -161,6 +161,21 @@ marked `*** SAMPLE - NOT A BILL ***` at the top and bottom; it takes no bill num
 - PIN rules come from the role (`kot.modify`, `kot.cancel`, `reprint` with needs-PIN): by default Cashier needs a
   manager PIN for all three, Captain for modify and cancel; the approver is recorded on the audit rows.
 
+### Tables (P2-03)
+- `MoveTable` `{ toTableId }` (on the order being moved): the table must be free (not blocked; occupied →
+  `INVALID_STATE`, use Merge). Prices and KOTs are unchanged (snapshots). Stations with sent items get a
+  `move_notice` slip "MOVED T4 -> T9". Leakage flag once a KOT exists.
+- `MergeTables` `{ sourceOrderId }` (on the order that stays): the source's lines move here
+  (`original_order_id` = source; `kot_id` unchanged; the KOT rows stay with the source order), covers add up, the
+  source becomes `merged` (`merged_into`, version + 1) and its table is freed; printed bills of both are superseded.
+  Notice "MERGED T4 -> T9"; leakage flag if sent items moved.
+- `TransferItems` `{ itemIds, toOrderId }` (on the order the lines leave): whole held or sent lines (cancelled →
+  `INVALID_STATE`) go to another open order (version + 1, printed bill superseded). Sent lines keep their KOT link;
+  their stations get "ITEMS T4 -> T9" listing them. Leakage flag when sent lines moved (held lines are not flagged,
+  as docs/02 lists "transfer after a KOT exists").
+- A superseded bill clears the order's `bill_printed_at` (the table no longer shows "bill printed"); table state
+  counts sent items even when their KOT belongs to a merged order.
+
 ## Stock commands (P2-10/P2-11; schemas in `packages/shared/src/schemas/commands/stock.ts` and `menu-csv.ts`)
 Quantities are integer thousandths of the material's unit (`qtyMilli`), costs integer paise per whole unit.
 | Type | Payload | Right | Effect |

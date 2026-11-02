@@ -75,6 +75,18 @@ export const cancelFiredItemSchema = z.object({ orderItemId: ulidSchema, reason,
 export const reprintKotSchema = z.object({ kotId: ulidSchema }).strict();
 export const reprintBillSchema = z.object({ billId: ulidSchema }).strict();
 
+// ---- tables (P2-03): the order moves, never its KOT history ----
+
+/** On the order being moved: to a free table. */
+export const moveTableSchema = z.object({ toTableId: ulidSchema }).strict();
+/** On the order that stays: the other table's order joins it and that table is freed. */
+export const mergeTablesSchema = z.object({ sourceOrderId: ulidSchema }).strict();
+/** On the order the lines leave: whole lines (held or sent) go to another open order. */
+export const transferItemsSchema = z
+  .object({ itemIds: z.array(ulidSchema).min(1).max(200), toOrderId: ulidSchema })
+  .strict()
+  .refine((p) => new Set(p.itemIds).size === p.itemIds.length, { message: 'an item appears twice', path: ['itemIds'] });
+
 export type OpenTablePayload = z.infer<typeof openTableSchema>;
 export type AddItemsPayload = z.infer<typeof addItemsSchema>;
 export type UpdateHeldItemPayload = z.infer<typeof updateHeldItemSchema>;

@@ -43,6 +43,8 @@ quantity instead of adding a second line (lines already sent to the kitchen are 
 - Footer buttons: Fire (F8), Fire course… , Print bill (F9), Settle (F10), More (discount, covers, captain,
   customer, transfer items).
 - Conflict banner when the order changed elsewhere.
+- Table actions (P2-03) in the order header, by right: **Move** (pick a free table), **Merge** (pick an occupied
+  table: its order joins this one), **Move items** (tick lines, pick an occupied table). Whole lines only.
 - After the KOT (P2-04): each sent line has a pencil button: "Keep" stepper (0 = cancel the line), reason chips or
   typed reason, "Not prepared yet" (ingredients back to stock); a manager PIN is asked when the role needs it.
   Cancelled lines stay in their KOT, struck through. Each KOT group has "Reprint". When the bill is printed the

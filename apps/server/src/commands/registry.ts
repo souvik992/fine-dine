@@ -6,7 +6,9 @@ import { cancelFiredItem } from './cancel-fired-item.js';
 import { dayEnd } from './day-end.js';
 import { fireKot } from './fire-kot.js';
 import { importMenu } from './import-menu.js';
+import { mergeTables } from './merge-tables.js';
 import { modifyFiredItem } from './modify-fired-item.js';
+import { moveTable } from './move-table.js';
 import { openTable } from './open-table.js';
 import { printBill } from './print-bill.js';
 import { printSampleBill } from './print-sample-bill.js';
@@ -19,6 +21,7 @@ import { setConfig } from './set-config.js';
 import { setItemAvailability } from './set-item-availability.js';
 import { setRecipe } from './set-recipe.js';
 import { setupOutlet } from './setup-outlet.js';
+import { transferItems } from './transfer-items.js';
 import { settle } from './settle.js';
 import { updateHeldItem } from './update-held-item.js';
 import { upsertAddonGroup } from './upsert-addon-group.js';
@@ -68,6 +71,10 @@ const handlers = [
   cancelFiredItem,
   reprintKot,
   reprintBill,
+  // tables (P2-03)
+  moveTable,
+  mergeTables,
+  transferItems,
   // billing + day
   printBill,
   settle,

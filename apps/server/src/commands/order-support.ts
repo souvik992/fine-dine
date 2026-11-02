@@ -20,7 +20,8 @@ export function requireEditable(order: OrderRow): void {
  */
 export function reopenIfBilled(ctx: CommandContext, order: OrderRow): void {
   if (order.state !== 'billed') return;
-  ctx.db.prepare(`UPDATE "order" SET state = 'open' WHERE id = ?`).run(order.id);
+  // The printed bill no longer applies: the table shows its orders again, not "bill printed" (bill rows keep printed_at).
+  ctx.db.prepare(`UPDATE "order" SET state = 'open', bill_printed_at = NULL WHERE id = ?`).run(order.id);
   const bills = ctx.db.prepare(`SELECT id FROM bill WHERE order_id = ? AND state = 'printed'`).pluck().all(order.id) as string[];
   ctx.db.prepare(`UPDATE bill SET state = 'superseded' WHERE order_id = ? AND state = 'printed'`).run(order.id);
   ctx.audit({ entity: 'order', entityId: order.id, action: 'order.reopen', before: { state: 'billed' }, after: { state: 'open', supersededBills: bills } });
@@ -183,7 +184,10 @@ export function emitTableState(ctx: CommandContext, tableId: string | null): voi
     | undefined;
   if (!t) return;
   const order = t.open_order_id ? ctx.db.prepare('SELECT * FROM "order" WHERE id = ?').get(t.open_order_id) as OrderRow | undefined : undefined;
-  const hasKot = order ? ctx.db.prepare('SELECT 1 FROM kot WHERE order_id = ? LIMIT 1').get(order.id) !== undefined : false;
+  // Sent items count even when their KOT belongs to a merged order (P2-03).
+  const hasKot = order
+    ? ctx.db.prepare('SELECT 1 FROM kot WHERE order_id = @id UNION ALL SELECT 1 FROM order_item WHERE order_id = @id AND kot_id IS NOT NULL LIMIT 1').get({ id: order.id }) !== undefined
+    : false;
   const state = deriveTableState(
     { status: t.status },
     order ? { hasFiredKot: hasKot, lastKotAt: order.last_kot_at, billPrintedAt: order.bill_printed_at } : null,

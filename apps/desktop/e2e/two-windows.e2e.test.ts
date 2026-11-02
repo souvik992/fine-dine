@@ -499,6 +499,34 @@ describe('desktop app', () => {
     await page!.keyboard.press('Escape');
   });
 
+  it('Tables: move T6 to T7, merge T9 into it, then move an item to T2 (both windows follow)', async () => {
+    const [page, other] = app.windows();
+    await page!.locator('[data-table="T6"]').click();
+    await page!.getByLabel('Add item').waitFor();
+
+    await page!.getByRole('button', { name: 'Move', exact: true }).click();
+    await page!.getByRole('dialog', { name: 'Move to another table' }).getByRole('listitem', { name: 'Table T7' }).click();
+    await page!.getByTestId('order-title').getByText('Table T7').waitFor();
+    await other!.waitForSelector('[data-table="T6"][data-state="FREE"]', { timeout: 2_000 });
+
+    await page!.getByRole('button', { name: 'Merge', exact: true }).click();
+    await page!.getByRole('dialog', { name: 'Merge another table here' }).getByRole('listitem', { name: 'Table T9' }).click();
+    await page!.getByTestId('held-items').getByText('Masala Papad').waitFor();
+    await other!.waitForSelector('[data-table="T9"][data-state="FREE"]', { timeout: 2_000 });
+
+    await page!.getByRole('button', { name: 'Move items' }).click();
+    const dlg = page!.getByRole('dialog', { name: 'Move items to another table' });
+    await dlg.getByRole('list', { name: 'Items to move' }).getByText('Masala Papad').click();
+    await dlg.getByRole('listitem', { name: 'Table T2' }).click();
+    await dlg.waitFor({ state: 'detached' });
+    expect(await page!.getByTestId('held-items').getByText('Masala Papad').count()).toBe(0);
+
+    const floor = await get<{ tables: Array<{ label: string; orderId?: string }> }>('/v1/floor');
+    const t2 = await get<{ items: Array<{ name: string; status: string }> }>(`/v1/orders/${floor.tables.find((t) => t.label === 'T2')!.orderId!}`);
+    expect(t2.items.some((i) => i.name === 'Masala Papad' && i.status === 'held')).toBe(true);
+    await page!.keyboard.press('Escape');
+  });
+
   it('Menu › Bulk upload: a CSV is checked, then imported all at once', async () => {
     const page = await openSettings('Menu');
     await page.getByRole('tab', { name: 'Bulk upload' }).click();

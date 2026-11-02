@@ -109,3 +109,14 @@ describe('change slips (P2-04)', () => {
     expect(p).not.toContain('now');
   });
 });
+
+describe('move notices (P2-03)', () => {
+  it('print what moved where, with the moved items when there are any', () => {
+    const base = { kotNo: 50, kind: 'move_notice' as const, orderType: 'dine_in' as const, stationName: 'Kitchen', tableLabel: 'T9', time: '21:30', date: '02-11-26' };
+    const p = renderKot({ ...base, notice: 'MOVED T4 -> T9', lines: [] }, { paper: 80 }).preview;
+    expect(p).toContain('MOVED KOT 0050');
+    expect(p).toContain('MOVED T4 -> T9');
+    const t = renderKot({ ...base, notice: 'ITEMS T4 -> T9', lines: [{ qty: 2, name: 'Butter Naan', course: 1, addons: [] }] }, { paper: 58 }).preview;
+    expect(t).toMatch(/2\s+Butter Naan/);
+  });
+});

@@ -1,6 +1,6 @@
 import { formatINR, newId, type MenuItem, type MenuSnapshot, type OrderItemSnapshot, type OrderSnapshot, type OutletConfig } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Flame, Printer, Search, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, Flame, Merge, MoveRight, Printer, Search, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
@@ -16,6 +16,7 @@ import { addOrMerge, changeBy, type LineCommand } from './order-lines.js';
 import { Modal } from '../components/Modal.js';
 import { PrintBillDialog } from './PrintBillDialog.js';
 import { SettleDialog } from './SettleDialog.js';
+import { TableActionsDialog, type TableAction } from './TableActionsDialog.js';
 import { useOrderSession } from './useOrderSession.js';
 
 interface Toast {
@@ -49,6 +50,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
   const [toast, setToast] = useState<Toast | null>(null);
   const [dialog, setDialog] = useState<'bill' | 'settle' | null>(null);
   const [changing, setChanging] = useState<OrderItemSnapshot | null>(null);
+  const [tableAction, setTableAction] = useState<TableAction | null>(null);
   const [settledChange, setSettledChange] = useState<number | null>(null);
   const searchBox = useRef<HTMLInputElement>(null);
 
@@ -175,7 +177,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (sheet || dialog || changing || settledChange !== null || pinRequest) return; // an open dialog owns the keyboard
+      if (sheet || dialog || changing || tableAction || settledChange !== null || pinRequest) return; // an open dialog owns the keyboard
       const inSearch = document.activeElement === searchBox.current;
       if (e.key === 'F8') {
         e.preventDefault();
@@ -249,6 +251,25 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
           <button role="status" onClick={dismissChange} className="rounded-full bg-[var(--kot)] px-3 py-1 text-xs font-bold text-[var(--kot-ink)]">
             Updated on another terminal
           </button>
+        ) : null}
+        {order.state === 'open' || order.state === 'billed' ? (
+          <div className="ml-4 flex gap-1" aria-label="Table actions">
+            {can('table.move', true) ? (
+              <button className="btn h-9" onClick={() => setTableAction('move')}>
+                <MoveRight className="h-4 w-4" /> Move
+              </button>
+            ) : null}
+            {can('table.merge', true) ? (
+              <button className="btn h-9" onClick={() => setTableAction('merge')}>
+                <Merge className="h-4 w-4" /> Merge
+              </button>
+            ) : null}
+            {can('item.transfer', true) ? (
+              <button className="btn h-9" onClick={() => setTableAction('items')} disabled={order.items.every((i) => i.status === 'cancelled')}>
+                <ArrowRightLeft className="h-4 w-4" /> Move items
+              </button>
+            ) : null}
+          </div>
         ) : null}
         <div className="ml-auto flex items-center gap-4">
           <HealthDots />
@@ -364,6 +385,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
           }}
         />
       ) : null}
+      {tableAction ? <TableActionsDialog action={tableAction} order={order} onClose={() => setTableAction(null)} run={run} /> : null}
       {changing ? <FiredItemDialog item={changing} onClose={() => setChanging(null)} run={run} /> : null}
       {dialog === 'settle' && printedBill ? (
         <SettleDialog

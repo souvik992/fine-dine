@@ -31,6 +31,8 @@ export interface KotTicket {
   /** Change slips: the KOT being changed, and why. */
   forKotNo?: number | null;
   reason?: string | null;
+  /** Move notices: what moved where, e.g. "MOVED T4 -> T9" (P2-03). */
+  notice?: string | null;
 }
 
 export interface RenderOptions {
@@ -61,6 +63,7 @@ export function renderKot(t: KotTicket, opts: RenderOptions): { bytes: Uint8Arra
   }
   p.twoCol(t.captainName ? `Captain: ${t.captainName}` : '', `${t.time}  ${t.date}`);
   if (t.forKotNo) p.bold(true).line(`Changes KOT ${String(t.forKotNo).padStart(4, '0')}`).bold(false);
+  if (t.notice) p.bold(true).size(1, 2).wrapped(t.notice).size(1, 1).bold(false);
   p.rule();
 
   const courses = [...new Set(t.lines.map((l) => l.course))].sort((a, b) => a - b);

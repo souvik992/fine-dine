@@ -33,7 +33,7 @@ export function getFloor(db: Db, now: Date, timeZone: string): FloorSnapshot {
       `SELECT t.id, t.area_id, t.label, t.seats, t.layout_x, t.layout_y, t.status,
               o.id AS order_id, o.version AS order_version, o.covers, o.captain_id, o.opened_at,
               o.last_kot_at, o.bill_printed_at,
-              EXISTS (SELECT 1 FROM kot k WHERE k.order_id = o.id) AS has_kot
+              (EXISTS (SELECT 1 FROM kot k WHERE k.order_id = o.id) OR EXISTS (SELECT 1 FROM order_item i WHERE i.order_id = o.id AND i.kot_id IS NOT NULL)) AS has_kot
        FROM dining_table t
        LEFT JOIN "order" o ON o.id = t.open_order_id AND o.state IN ('open', 'billed')`,
     )
