@@ -178,3 +178,50 @@ describe('StreamClient', () => {
     expect(FakeSocket.all).toHaveLength(1);
   });
 });
+
+describe('ApiClient: sessions and manager approval', () => {
+  type Call = { headers: Record<string, string>; body: { commandId: string } };
+  const reply = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
+  const pinRequired = (reason: string) => reply({ ok: false, error: { code: 'PIN_REQUIRED', message: 'Manager PIN', details: { reason } } }, 401);
+
+  it('sends the session token, and on PIN_REQUIRED resends the same command with the manager PIN', async () => {
+    const calls: Call[] = [];
+    const fetch: Fetch = (_u, init) => {
+      calls.push({ headers: init?.headers as Record<string, string>, body: JSON.parse(init?.body as string) as Call['body'] });
+      return calls.length === 1 ? pinRequired('pin_missing') : reply({ ok: true, commandId: 'x', result: null });
+    };
+    const asked: string[] = [];
+    const api = new ApiClient({
+      baseUrl: 'http://s',
+      fetch,
+      getToken: () => 'tok',
+      requestManagerPin: (e) => {
+        asked.push(e.message);
+        return Promise.resolve('2345');
+      },
+    });
+    await api.command('PrintBill', {}, { orderId: 'o', expectedVersion: 3 });
+    expect(asked).toEqual(['Manager PIN']);
+    expect(calls.map((c) => c.headers['x-user-session'])).toEqual(['tok', 'tok']);
+    expect(calls.map((c) => c.headers['x-manager-pin'])).toEqual([undefined, '2345']);
+    expect(calls[0]!.body.commandId).toBe(calls[1]!.body.commandId);
+  });
+
+  it('cancelling the PIN prompt throws the PIN_REQUIRED error; too many tries does not ask again', async () => {
+    const cancel = new ApiClient({ baseUrl: 'http://s', fetch: () => pinRequired('pin_missing'), requestManagerPin: () => Promise.resolve(null) });
+    await expect(cancel.command('PrintBill', {})).rejects.toMatchObject({ code: 'PIN_REQUIRED' });
+    let asked = 0;
+    const blocked = new ApiClient({ baseUrl: 'http://s', fetch: () => pinRequired('too_many_tries'), requestManagerPin: () => (asked++, Promise.resolve('1')) });
+    await expect(blocked.command('PrintBill', {})).rejects.toMatchObject({ code: 'PIN_REQUIRED' });
+    expect(asked).toBe(0);
+  });
+
+  it('tells the app when the session is over, but not for a wrong PIN at sign-in', async () => {
+    let signedOut = 0;
+    const fetch: Fetch = () => reply({ ok: false, error: { code: 'UNAUTHENTICATED', message: 'Please sign in.' } }, 401);
+    const api = new ApiClient({ baseUrl: 'http://s', fetch, onUnauthenticated: () => signedOut++ });
+    await expect(api.get('/v1/session')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    await expect(api.send('POST', '/v1/sessions', { userId: 'u', pin: '0000' })).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    expect(signedOut).toBe(1);
+  });
+});

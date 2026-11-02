@@ -1,21 +1,43 @@
+import type { LoginResult, Right, SessionInfo } from '@dinepos/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ApiClient } from './api/client.js';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ApiClient, type ApiError } from './api/client.js';
 import { loadServerUrl, saveServerUrl } from './api/settings.js';
 import { StreamClient, streamUrl, type StreamStatus } from './api/stream.js';
+
+/** The signed-in person on this terminal. */
+export interface Session extends SessionInfo {
+  token: string;
+}
+
+/** A pending "manager PIN please" prompt (shown by ManagerPinDialog). */
+export interface PinRequest {
+  message: string;
+  resolve: (pin: string | null) => void;
+}
 
 interface AppContextValue {
   api: ApiClient;
   serverUrl: string;
   setServerUrl: (url: string) => void;
   streamStatus: StreamStatus;
+  session: Session | null;
+  signIn: (result: LoginResult) => void;
+  /** Ends the session on the server and shows the sign-in screen. */
+  signOut: () => void;
+  /** Whether the signed-in role has a right; `withPin` also accepts rights that need a manager PIN. */
+  can: (right: Right, withPin?: boolean) => boolean;
+  pinRequest: PinRequest | null;
 }
 
 const Ctx = createContext<AppContextValue | null>(null);
 
 /** Which cached GET each stream topic refreshes. Events are triggers; data always comes from GETs (docs/04). */
-const TOPIC_QUERIES: Record<string, string[]> = { floor: ['floor'], printers: ['printers'], menu: ['menu'], system: ['health', 'floor', 'config'] };
+const TOPIC_QUERIES: Record<string, string[]> = { floor: ['floor'], printers: ['printers'], menu: ['menu', 'catalog'], system: ['health', 'floor', 'config', 'staff', 'roles'] };
 const TOPICS = [...Object.keys(TOPIC_QUERIES), 'order:*'];
+const SESSION_KEY = 'dinepos.session';
+/** docs/07: terminals sign out after 10 idle minutes. */
+export const IDLE_LOCK_MS = 10 * 60_000;
 
 /** Query keys a stream event should refresh. */
 export function queriesFor(topic: string): unknown[][] {
@@ -31,11 +53,80 @@ function storage(): Storage | undefined {
   }
 }
 
+function loadSession(): Session | null {
+  try {
+    const raw = storage()?.getItem(SESSION_KEY);
+    return raw ? (JSON.parse(raw) as Session) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [serverUrl, setUrl] = useState(() => loadServerUrl(storage(), window.location.search));
   const [streamStatus, setStreamStatus] = useState<StreamStatus>('connecting');
-  const api = useMemo(() => new ApiClient({ baseUrl: serverUrl }), [serverUrl]);
+  const [session, setSession] = useState<Session | null>(loadSession);
+  const [pinRequest, setPinRequest] = useState<PinRequest | null>(null);
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+
+  const dropSession = useCallback(() => {
+    storage()?.removeItem(SESSION_KEY);
+    setSession(null);
+    setPinRequest((p) => {
+      p?.resolve(null);
+      return null;
+    });
+    queryClient.clear();
+  }, [queryClient]);
+
+  const api = useMemo(
+    () =>
+      new ApiClient({
+        baseUrl: serverUrl,
+        getToken: () => sessionRef.current?.token ?? null,
+        onUnauthenticated: dropSession,
+        requestManagerPin: (err: ApiError) => new Promise((resolve) => setPinRequest({ message: err.message, resolve })),
+      }),
+    [serverUrl, dropSession],
+  );
+
+  const signIn = useCallback((r: LoginResult) => {
+    const s: Session = { ...r };
+    storage()?.setItem(SESSION_KEY, JSON.stringify(s));
+    setSession(s);
+  }, []);
+
+  const signOut = useCallback(() => {
+    void api.send('DELETE', '/v1/session').catch(() => undefined);
+    dropSession();
+  }, [api, dropSession]);
+
+  // Idle lock: any key or pointer activity keeps the terminal signed in.
+  useEffect(() => {
+    if (!session) return;
+    let timer = setTimeout(signOut, IDLE_LOCK_MS);
+    const bump = () => {
+      clearTimeout(timer);
+      timer = setTimeout(signOut, IDLE_LOCK_MS);
+    };
+    const events = ['keydown', 'pointerdown', 'wheel'] as const;
+    for (const e of events) window.addEventListener(e, bump, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      for (const e of events) window.removeEventListener(e, bump);
+    };
+  }, [session, signOut]);
+
+  // Another window of this terminal signed in or out.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === SESSION_KEY) setSession(loadSession());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   useEffect(() => {
     const stream = new StreamClient({
@@ -60,6 +151,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       api,
       serverUrl,
       streamStatus,
+      session,
+      signIn,
+      signOut,
+      pinRequest: pinRequest && {
+        message: pinRequest.message,
+        resolve: (pin) => {
+          pinRequest.resolve(pin);
+          setPinRequest(null);
+        },
+      },
+      can: (right, withPin = false) => session?.rights.some((r) => r.right === right && (withPin || !r.needsPin)) ?? false,
       setServerUrl: (url) => {
         const store = storage();
         const clean = store ? saveServerUrl(store, url) : url;
@@ -67,7 +169,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setUrl(clean);
       },
     }),
-    [api, serverUrl, streamStatus, queryClient],
+    [api, serverUrl, streamStatus, session, signIn, signOut, pinRequest, queryClient],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

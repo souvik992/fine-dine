@@ -75,7 +75,7 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria �
 
 ## Phase 2 — Bill operations + multi-terminal + rights
 
-- [ ] **P2-01 Users, roles, rights, PIN sessions** (`07-security-licensing.md`) — Accept: FORBIDDEN and PIN_REQUIRED paths tested.
+- [x] **P2-01 Users, roles, rights, PIN sessions** (`07-security-licensing.md`) — Accept: FORBIDDEN and PIN_REQUIRED paths tested.
 - [ ] **P2-02 Device pairing + device tokens** — Accept: unpaired device gets 401; revoke works instantly.
 - [ ] **P2-03 MoveTable, MergeTables, TransferItems** — Accept: KOT history preserved; move_notice KOT printed; leakage flags set.
 - [ ] **P2-04 ModifyFiredItem, CancelFiredItem, Reprint*** — Accept: delta slips render; leakage flags; PIN rules.

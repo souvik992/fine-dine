@@ -2,19 +2,20 @@ import fastifyCors from '@fastify/cors';
 import fastifyWebsocket from '@fastify/websocket';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import { ulid } from 'ulid';
-import { singleTerminalAuth, type Authenticator } from './auth/authenticate.js';
+import { sessionAuth, type Authenticator } from './auth/authenticate.js';
 import { commandRegistry } from './commands/registry.js';
 import { DEFAULT_ALLOWED_ORIGINS } from './config.js';
 import type { CommandRegistry } from './core/command-handler.js';
 import { PosError } from './core/errors.js';
 import { EventBus, noopPrintWaker, type PrintWaker } from './core/events.js';
-import { allowAllRights, type RightsPolicy } from './core/rights.js';
+import { roleRights, type RightsPolicy } from './core/rights.js';
 import type { Db } from './db/connection.js';
 import type { PrinterStatus } from './print/print-queue.js';
 import { RealtimeHub, type HubOptions } from './realtime/hub.js';
 import { commandRoutes } from './routes/commands.js';
 import { healthRoutes } from './routes/health.js';
 import { queryRoutes } from './routes/queries.js';
+import { sessionRoutes } from './routes/sessions.js';
 import { isAllowedOrigin, streamRoutes } from './routes/stream.js';
 
 export interface AppDeps {
@@ -108,13 +109,14 @@ export function buildApp(deps: AppDeps): DinePosApp {
       timeZone,
       now,
       registry: deps.registry ?? commandRegistry,
-      rights: deps.rights ?? allowAllRights,
+      rights: deps.rights ?? roleRights,
       bus,
       printWaker: deps.printWaker ?? noopPrintWaker,
       onPostCommitError: (err, stage) => app.log.error({ err, stage }, 'post-commit step failed'),
     },
-    deps.auth ?? singleTerminalAuth,
+    deps.auth ?? sessionAuth(db, now),
   );
+  sessionRoutes(app, { db, now });
   streamRoutes(app, hub, allowedOrigins);
   return Object.assign(app, { realtime: hub });
 }

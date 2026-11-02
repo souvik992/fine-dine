@@ -1,6 +1,6 @@
 import { newId, type CommandSuccess, type OrderSnapshot } from '@dinepos/shared';
 import { getFloor } from '../queries/floor.js';
-import { devSeedCommands, seedId } from '../seed/dev-seed.js';
+import { devSeedCommands, devSetupCommand, seedId } from '../seed/dev-seed.js';
 import { TEST_NOW, type Harness } from './command-harness.js';
 
 /** Seed ids used by the order tests (see src/seed/dev-seed.ts). */
@@ -28,6 +28,8 @@ export const S = {
 };
 
 export function seedOutlet(h: Harness): void {
+  const setup = devSetupCommand();
+  h.run(setup.type, setup.payload);
   for (const c of devSeedCommands()) h.run(c.type, c.payload);
 }
 

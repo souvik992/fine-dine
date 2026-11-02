@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { commandEnvelopeSchema, isoInZone, localDate, newId, type CommandEnvelope, type CommandSuccess } from '@dinepos/shared';
 import type { z } from 'zod';
+import { approveWithPin } from '../auth/approval.js';
 import type { Db } from '../db/connection.js';
 import { getOrderSnapshot, loadOrderRow } from '../queries/order-snapshot.js';
 import { currentBusinessDate } from './business-day.js';
@@ -140,6 +141,10 @@ function runInTransaction(
     },
     outbox: (kind, p) => outbox.push({ kind, payload: p }),
     touchOrder: (id) => touched.add(id),
+    approve: (need, message) => {
+      approvedBy = approveWithPin(db, actor.managerPin, need, actor.sessionKey ?? 'no-session', now.getTime(), message);
+      return approvedBy;
+    },
   };
   const out = handler.apply(ctx, payload, order) ?? {};
 

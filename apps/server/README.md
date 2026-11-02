@@ -61,9 +61,9 @@ and `processed_command`, then commits. Events and printer wake-ups go out after 
 records no audit entry, a generic `command.<Type>` row is written. Handlers never call `BEGIN`/`COMMIT`,
 never do network or file I/O, and never `await`.
 
-Auth (Phase 1): `auth/authenticate.ts` `singleTerminalAuth` treats every request as the local terminal and
-`core/rights.ts` `allowAllRights` grants every right; the server logs a warning at start. P2-01/P2-02
-replace both through the same interfaces.
+Auth (P2-01): `auth/authenticate.ts` `sessionAuth` turns `X-User-Session` into the actor (and `X-Manager-Pin` for
+approvals); `core/rights.ts` `roleRights` checks the role. `singleTerminalAuth` + `allowAllRights` remain for tests
+and tools only. Device tokens (P2-02) will add to the same interface.
 
 ## Testing
 `createTestDb()` (`src/testing/test-db.ts`) → `:memory:` DB with all migrations. Call `executeCommand`

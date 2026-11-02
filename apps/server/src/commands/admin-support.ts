@@ -17,7 +17,8 @@ export type AdminTable =
   | 'menu_item'
   | 'variant'
   | 'price_list'
-  | 'tax_profile';
+  | 'tax_profile'
+  | 'role';
 
 export const bool = (b: boolean): number => (b ? 1 : 0);
 

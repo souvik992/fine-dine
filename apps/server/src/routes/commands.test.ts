@@ -2,6 +2,8 @@ import { newId } from '@dinepos/shared';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
+import { singleTerminalAuth } from '../auth/authenticate.js';
+import { allowAllRights } from '../core/rights.js';
 import { ensureBusinessDay } from '../core/business-day.js';
 import type { Db } from '../db/connection.js';
 import { createTestDb } from '../testing/test-db.js';
@@ -14,7 +16,8 @@ let app: FastifyInstance;
 beforeEach(() => {
   db = createTestDb();
   ensureBusinessDay(db, 'Asia/Kolkata', now);
-  app = buildApp({ db, timeZone: 'Asia/Kolkata', now, registry: testRegistry });
+  // These tests cover the route and pipeline; sign-in and rights have their own tests (auth/*.test.ts).
+  app = buildApp({ db, timeZone: 'Asia/Kolkata', now, registry: testRegistry, auth: singleTerminalAuth, rights: allowAllRights });
 });
 afterEach(async () => {
   await app.close();

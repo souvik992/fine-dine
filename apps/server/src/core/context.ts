@@ -1,3 +1,4 @@
+import type { Right } from '@dinepos/shared';
 import type { Db } from '../db/connection.js';
 
 /** Who sent the command. Device and user come from auth (P2-01/P2-02); `approvedBy` from a manager PIN. */
@@ -5,6 +6,16 @@ export interface Actor {
   deviceId: string | null;
   userId: string | null;
   approvedBy?: string | null;
+  /** X-Manager-Pin of this request. Checked by approval only; never logged or stored. */
+  managerPin?: string | null;
+  /** Identifies the session for the wrong-manager-PIN limiter (a hash, not the token). */
+  sessionKey?: string | null;
+}
+
+/** What a manager's PIN must cover (see auth/approval.ts). */
+export interface ApprovalRequest {
+  right?: Right;
+  discountBp?: number;
 }
 
 export interface AuditEntry {
@@ -60,4 +71,9 @@ export interface CommandContext {
   outbox(kind: string, payload: unknown): void;
   /** Bumps the version of another order this command changed (e.g. the target of a merge). */
   touchOrder(orderId: string): void;
+  /**
+   * Requires a manager's PIN (X-Manager-Pin) covering `need`; throws PIN_REQUIRED otherwise. The approver is
+   * recorded on every audit row of this command. Returns the approver's user id.
+   */
+  approve(need: ApprovalRequest, message: string): string;
 }

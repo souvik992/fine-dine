@@ -1,4 +1,5 @@
 // Wire types shared by the server and every client (docs/03-command-api.md).
+import type { Right } from './rights.js';
 import type { TableState } from './table-state.js';
 
 export const ERROR_CODES = [
@@ -204,4 +205,54 @@ export interface MenuSnapshot {
 export interface MenuUnchanged {
   menuVersion: number;
   unchanged: true;
+}
+
+// ---------- staff and sessions (docs/07) ----------
+
+/** One person on the sign-in screen (no PINs, no hashes). */
+export interface LoginUser {
+  id: string;
+  name: string;
+  roleName: string;
+}
+
+/** `GET /v1/setup-state`: what the terminal shows before anyone signs in. */
+export interface SetupState {
+  setupNeeded: boolean;
+  outletName: string;
+  users: LoginUser[];
+}
+
+export interface RoleRight {
+  right: Right;
+  needsPin: boolean;
+}
+
+/** `GET /v1/session` and the answer to a sign-in. */
+export interface SessionInfo {
+  user: { id: string; name: string; roleId: string; roleName: string };
+  rights: RoleRight[];
+  discountLimitBp: number;
+  expiresAt: string;
+}
+
+export interface LoginResult extends SessionInfo {
+  token: string;
+}
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  roleId: string;
+  roleName: string;
+  active: boolean;
+  locked: boolean;
+}
+
+export interface RoleInfo {
+  id: string;
+  name: string;
+  discountLimitBp: number;
+  rights: RoleRight[];
+  members: number;
 }

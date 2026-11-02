@@ -2,6 +2,8 @@ import { newId } from '@dinepos/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import { buildApp, type DinePosApp } from '../app.js';
+import { singleTerminalAuth } from '../auth/authenticate.js';
+import { allowAllRights } from '../core/rights.js';
 import { EventBus } from '../core/events.js';
 import { TEST_NOW, useHarness } from '../testing/command-harness.js';
 import { S, seedOutlet } from '../testing/order-fixture.js';
@@ -62,7 +64,8 @@ describe('realtime hub (/v1/stream)', () => {
 
   beforeEach(async () => {
     seedOutlet(h);
-    app = buildApp({ db: h.db, timeZone: 'Asia/Kolkata', now: TEST_NOW, bus: new EventBus(), hub: { heartbeatMs: 100, helloTimeoutMs: 200 } });
+    // Stream tests: commands sent without sign-in (auth has its own tests).
+    app = buildApp({ db: h.db, timeZone: 'Asia/Kolkata', now: TEST_NOW, bus: new EventBus(), hub: { heartbeatMs: 100, helloTimeoutMs: 200 }, auth: singleTerminalAuth, rights: allowAllRights });
     const url = await app.listen({ host: '127.0.0.1', port: 0 });
     base = url.replace('http', 'ws');
   });

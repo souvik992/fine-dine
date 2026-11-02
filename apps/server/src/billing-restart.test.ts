@@ -4,7 +4,7 @@ import path from 'node:path';
 import { newId } from '@dinepos/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ServerConfig } from './config.js';
-import { devSeedCommands, seedId } from './seed/dev-seed.js';
+import { DEV_OWNER, devSeedCommands, devSetupCommand, seedId } from './seed/dev-seed.js';
 import { startServer, type RunningServer } from './server.js';
 
 // P1-10 acceptance: bill numbers are gap-free across a server restart (real file database).
@@ -30,10 +30,17 @@ describe('bill numbering across restart', () => {
   });
   const now = () => new Date('2026-11-02T08:00:00Z');
 
+  let token = '';
+  async function signIn(): Promise<void> {
+    const res = await srv!.app.inject({ method: 'POST', url: '/v1/sessions', payload: { userId: DEV_OWNER.id, pin: DEV_OWNER.pin } });
+    token = res.json<{ token: string }>().token;
+  }
+
   async function cmd(type: string, payload: unknown, order?: { orderId: string; expectedVersion: number }) {
     const res = await srv!.app.inject({
       method: 'POST',
       url: '/v1/commands',
+      headers: token ? { 'x-user-session': token } : {},
       payload: { commandId: newId(), type, payload, createdAt: '2026-11-02T13:30:00+05:30', ...order },
     });
     const body = res.json<{ ok: boolean; version?: number; order?: { id: string }; result: Record<string, unknown> }>();
@@ -53,12 +60,15 @@ describe('bill numbering across restart', () => {
   it('continues 000001, 000002 → restart → 000003', async () => {
     dir = mkdtempSync(path.join(tmpdir(), 'dinepos-billno-'));
     srv = await startServer(config(), { now, logger: false });
+    await cmd(devSetupCommand().type, devSetupCommand().payload); // first run, no session yet
+    await signIn();
     for (const c of devSeedCommands()) await cmd(c.type, c.payload);
     expect(await billTable(1)).toBe('B/26-27/000001');
     expect(await billTable(2)).toBe('B/26-27/000002');
     await srv.close();
 
     srv = await startServer(config(), { now, logger: false });
+    await signIn(); // sessions survive a restart, but a fresh sign-in is the normal path
     expect(await billTable(3)).toBe('B/26-27/000003');
     const numbers = srv.db.prepare('SELECT bill_no FROM bill ORDER BY bill_no').pluck().all();
     expect(numbers).toEqual([1, 2, 3]);

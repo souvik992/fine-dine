@@ -60,6 +60,18 @@ export const printBill = defineCommand({
       throw e;
     }
 
+    // Discount above the role's limit needs a manager PIN (docs/07) and is a leakage flag (docs/02).
+    let overLimit = false;
+    if (breakup.discount > 0 && ctx.actor.userId) {
+      const limitBp = (db.prepare('SELECT r.discount_limit_bp FROM app_user u JOIN role r ON r.id = u.role_id WHERE u.id = ?').pluck().get(ctx.actor.userId) as number | undefined) ?? 0;
+      // Effective discount as a share of the subtotal, rounded up so 10.001% counts as above a 10% limit.
+      const requestedBp = Math.ceil((breakup.discount * 10_000) / breakup.subtotal);
+      if (requestedBp > limitBp) {
+        ctx.approve({ discountBp: requestedBp }, `Discounts above ${limitBp / 100}% need a manager PIN.`);
+        overLimit = true;
+      }
+    }
+
     // Number: reuse a superseded bill's number, else the next one of this financial year.
     const existing = db.prepare(`SELECT id, fy, bill_no, state FROM bill WHERE order_id = ? AND split_no = 0`).get(o.id) as ExistingBill | undefined;
     let billId: string;
@@ -150,6 +162,8 @@ export const printBill = defineCommand({
       entityId: billId,
       action: revision === 1 ? 'bill.print' : 'bill.reissue',
       after: { billNo: billNoText, revision, total: breakup.total, discount: breakup.discount, discountReason: p.discount?.reason ?? null, serviceCharge: breakup.serviceCharge },
+      reason: overLimit ? 'discount above role limit (manager PIN)' : null,
+      leakage: overLimit,
     });
     ctx.outbox('bill.printed', { billId, orderId: o.id, billNo: billNoText, totalPaise: breakup.total });
     emitTableState(ctx, o.table_id);

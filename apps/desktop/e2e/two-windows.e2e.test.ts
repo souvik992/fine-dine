@@ -51,10 +51,19 @@ async function run(cmd: string, args: string[], env: Record<string, string>): Pr
   });
 }
 
+/** A separate sign-in (the demo manager) for commands the test sends from outside the app. */
+let testToken = '';
+async function signInForTest(): Promise<void> {
+  const state = (await (await fetch(`${SERVER}/v1/setup-state`)).json()) as { users: Array<{ id: string; name: string }> };
+  const manager = state.users.find((u) => u.name.startsWith('Vikram'))!;
+  const res = await fetch(`${SERVER}/v1/sessions`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ userId: manager.id, pin: '2345' }) });
+  testToken = ((await res.json()) as { token: string }).token;
+}
+
 async function command(type: string, payload: unknown): Promise<void> {
   const res = await fetch(`${SERVER}/v1/commands`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'x-user-session': testToken },
     body: JSON.stringify({ commandId: ulid(), type, payload, createdAt: new Date().toISOString() }),
   });
   if (!res.ok) throw new Error(`${type}: ${await res.text()}`);
@@ -82,6 +91,7 @@ describe('desktop app', () => {
       : spawn(process.execPath, ['--import', 'tsx', 'apps/server/src/index.ts'], { cwd: repo, env: serverEnv, stdio: 'ignore' });
     await waitForHealth();
     await run(process.execPath, ['--import', 'tsx', 'apps/server/src/seed/cli.ts'], { DINEPOS_URL: SERVER });
+    await signInForTest();
 
     const electron = createRequire(import.meta.url)('electron') as unknown as string;
     app = PACKAGED
@@ -94,6 +104,19 @@ describe('desktop app', () => {
     server?.kill();
     await new Promise((r) => setTimeout(r, 500));
     rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  // P2-01: nothing works before a staff member signs in with their PIN.
+  it('asks who is signing in; a wrong PIN is refused, the right one opens the floor', async () => {
+    const page = await app.firstWindow();
+    await page.getByRole('button', { name: /Asha \(Owner\)/ }).click({ timeout: 20_000 });
+    await page.keyboard.type('9999');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => page.getByRole('alert').innerText()).toMatch(/Wrong name or PIN/);
+    await page.keyboard.type('1234');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('[data-table="T1"]', { timeout: 10_000 });
+    expect(await page.getByTestId('signed-in-user').innerText()).toContain('Asha (Owner)');
   });
 
   it('loads on app://dinepos, locked down, showing the seeded floor', async () => {
@@ -260,5 +283,12 @@ describe('desktop app', () => {
     await dlg.waitFor();
     await expect.poll(() => dlg.getByRole('alert').innerText()).toMatch(/Settle every table before closing the day: T1, T2/);
     await page!.keyboard.press('Escape');
+  });
+
+  it('Lock returns every window of the terminal to the sign-in screen', async () => {
+    const [page, other] = app.windows();
+    await page!.getByRole('button', { name: 'Lock' }).click();
+    await page!.getByText('Who is signing in?').waitFor();
+    await other!.getByText('Who is signing in?').waitFor({ timeout: 5_000 });
   });
 });

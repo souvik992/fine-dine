@@ -87,9 +87,6 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
       allowedOrigins: config.allowedOrigins,
     });
     logSink.log = (level, msg, data) => app.log[level](data ?? {}, msg);
-    app.log.warn(
-      'Auth mode "single-terminal": every request acts as the local terminal. Use only on a trusted LAN until device pairing (P2-02).',
-    );
     const url = await app.listen({ host: config.host, port: config.port });
     printQueue.start();
     if (opts.banner) {

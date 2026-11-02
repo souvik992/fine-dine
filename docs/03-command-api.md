@@ -122,6 +122,16 @@ Rules in `docs/08-billing-gst.md`.
 | `/v1/config` | outlet and billing settings with defaults applied (nothing secret) |
 | `/v1/printers` | `{ printers: [{ id, name, transport, role, widthMm, backupPrinterId?, status, queued, failedToday, lastError? }] }` |
 
+## Staff commands (P2-01; schemas in `packages/shared/src/schemas/commands/users.ts`)
+| Type | Payload | Right |
+| --- | --- | --- |
+| `SetupOutlet` | outletName, ownerId, ownerName, pin | none: only while no staff exist |
+| `UpsertUser` | id, name, roleId, pin? (required when new), active | users.manage |
+| `UpsertRole` | id, name, discountLimitBp, rights[{right, needsPin}] | users.manage |
+
+Sessions: `POST /v1/sessions`, `GET /v1/session`, `DELETE /v1/session`, `GET /v1/setup-state` (public),
+`GET /v1/staff`, `GET /v1/roles` (users.manage). Commands without a valid `X-User-Session` answer `UNAUTHENTICATED`.
+
 ## Admin endpoints (also commands, admin right)
 `UpsertArea`, `UpsertTable`, `UpsertCategory`, `UpsertMenuItem`, `UpsertAddonGroup`, `UpsertStation`,
 `UpsertPrinter`, `UpsertUser`, `UpsertRole`, `PairDevice`, `RevokeDevice`, `SetConfig`.

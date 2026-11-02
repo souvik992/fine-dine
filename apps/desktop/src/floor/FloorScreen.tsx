@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { HealthDots } from '../components/HealthDots.js';
+import { UserBadge } from '../components/UserBadge.js';
 import { findTable, moveFocus, STATE_META, stateCounts, tablesInArea, type Arrow } from './floor-model.js';
 import { DayEndDialog } from './DayEndDialog.js';
 import { SeatDialog } from './SeatDialog.js';
@@ -27,7 +28,7 @@ function columnsOf(grid: HTMLElement | null): number {
 }
 
 export function FloorScreen({ onSettings, onOpenOrder }: { onSettings: () => void; onOpenOrder: (orderId: string) => void }) {
-  const { api } = useApp();
+  const { api, pinRequest, can } = useApp();
   const now = useClock();
   const floor = useQuery({
     queryKey: ['floor'],
@@ -69,7 +70,7 @@ export function FloorScreen({ onSettings, onOpenOrder }: { onSettings: () => voi
   // Typing a letter or digit anywhere on the floor jumps to the table search (docs/09: type "T7" + Enter).
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (seating || closingDay || e.ctrlKey || e.altKey || e.metaKey) return;
+      if (seating || closingDay || pinRequest || e.ctrlKey || e.altKey || e.metaKey) return;
       if (document.activeElement === searchBox.current) return;
       if (/^[a-z0-9]$/i.test(e.key)) {
         searchBox.current?.focus();
@@ -77,7 +78,7 @@ export function FloorScreen({ onSettings, onOpenOrder }: { onSettings: () => voi
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [seating, closingDay]);
+  }, [seating, closingDay, pinRequest]);
 
   const submitSearch = () => {
     if (!data) return;
@@ -151,9 +152,12 @@ export function FloorScreen({ onSettings, onOpenOrder }: { onSettings: () => voi
         <time className="w-14 text-right text-sm font-semibold tabular-nums" dateTime={now.toISOString()}>
           {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })}
         </time>
-        <button className="btn h-10" onClick={() => setClosingDay(true)} disabled={!data} title="Close the business day and print the Z-report">
-          <MoonStar className="h-4 w-4" /> Day end
-        </button>
+        {can('dayend', true) ? (
+          <button className="btn h-10" onClick={() => setClosingDay(true)} disabled={!data} title="Close the business day and print the Z-report">
+            <MoonStar className="h-4 w-4" /> Day end
+          </button>
+        ) : null}
+        <UserBadge />
         <button className="btn h-10 w-10 px-0" onClick={onSettings} aria-label="Settings" title="Settings">
           <Settings className="h-5 w-5" />
         </button>

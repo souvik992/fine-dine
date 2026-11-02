@@ -2,6 +2,7 @@
 // variants and addons. DEVELOPMENT ONLY. Ids are derived from stable keys, so re-running upserts the same
 // rows instead of adding new ones.
 import { createHash } from 'node:crypto';
+import { CAPTAIN_ROLE_ID, CASHIER_ROLE_ID, MANAGER_ROLE_ID } from '@dinepos/shared';
 
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
@@ -130,9 +131,26 @@ const items: SeedItem[] = [
   { code: 'FLS', name: 'Fresh Lime Soda', category: 'mocktails', price: 120, veg: true, variants: [['Sweet', 120], ['Salted', 120]] },
 ];
 
+/** Demo owner created by first-run setup (DEVELOPMENT ONLY PINs). */
+export const DEV_OWNER = { id: seedId('user:owner'), name: 'Asha (Owner)', pin: '1234' };
+export const DEV_STAFF = [
+  { key: 'manager', name: 'Vikram (Manager)', roleId: MANAGER_ROLE_ID, pin: '2345' },
+  { key: 'cashier', name: 'Meena (Cashier)', roleId: CASHIER_ROLE_ID, pin: '1111' },
+  { key: 'captain', name: 'Ravi (Captain)', roleId: CAPTAIN_ROLE_ID, pin: '3333' },
+] as const;
+
+/** First-run setup for the demo outlet (run once, before signing in). */
+export function devSetupCommand(): SeedCommand {
+  return { type: 'SetupOutlet', payload: { outletName: 'Spice Garden (DEMO)', ownerId: DEV_OWNER.id, ownerName: DEV_OWNER.name, pin: DEV_OWNER.pin } };
+}
+
 /** The seed as an ordered list of admin commands (referenced records first). */
 export function devSeedCommands(): SeedCommand[] {
   const cmds: SeedCommand[] = [];
+  for (const u of DEV_STAFF) {
+    // No PIN on re-runs would be refused for a new person, so the PIN is always sent; it is the same value.
+    cmds.push({ type: 'UpsertUser', payload: { id: seedId(`user:${u.key}`), name: u.name, roleId: u.roleId, pin: u.pin } });
+  }
   cmds.push({
     type: 'SetConfig',
     payload: {

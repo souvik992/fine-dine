@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { getFloor } from '../queries/floor.js';
 import { getMenu } from '../queries/menu.js';
 import { TEST_NOW, useHarness } from '../testing/command-harness.js';
-import { DEV_SEED_COUNTS, devSeedCommands, seedId } from './dev-seed.js';
+import { DEV_SEED_COUNTS, devSeedCommands, devSetupCommand, seedId } from './dev-seed.js';
 
 // P1-05 acceptance: seed runs idempotently; floor returns 12 FREE tables.
 describe('dev seed', () => {
   const h = useHarness();
-  const seed = () => devSeedCommands().map((c) => h.run(c.type, c.payload));
+  const seed = () => {
+    if (h.count('app_user') === 0) h.run(devSetupCommand().type, devSetupCommand().payload);
+    return devSeedCommands().map((c) => h.run(c.type, c.payload));
+  };
   const counts = () =>
     Object.fromEntries(
       ['area', 'dining_table', 'station', 'printer', 'station_printer', 'category', 'menu_item', 'variant', 'addon_group', 'addon', 'item_addon_group'].map((t) => [

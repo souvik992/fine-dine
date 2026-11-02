@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { HealthDots } from '../components/HealthDots.js';
+import { UserBadge } from '../components/UserBadge.js';
 import { VegMark } from '../components/VegMark.js';
 import { elapsedMinutes, formatElapsed } from '../floor/floor-model.js';
 import { Cart } from './Cart.js';
@@ -25,7 +26,7 @@ interface Toast {
  * Alt+↑/↓ pick a held line, + / − its quantity, Delete removes it, Esc clears the search or goes back.
  */
 export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: () => void }) {
-  const { api } = useApp();
+  const { api, pinRequest } = useApp();
   const { session, order, error, changedElsewhere, dismissChange } = useOrderSession(orderId);
   const areaId = order?.table?.areaId;
   const menuQuery = useQuery({
@@ -135,7 +136,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (sheet || dialog || settledChange !== null) return; // an open dialog owns the keyboard
+      if (sheet || dialog || settledChange !== null || pinRequest) return; // an open dialog owns the keyboard
       const inSearch = document.activeElement === searchBox.current;
       if (e.key === 'F8') {
         e.preventDefault();
@@ -210,8 +211,9 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
             Updated on another terminal
           </button>
         ) : null}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-4">
           <HealthDots />
+          <UserBadge />
         </div>
       </header>
 
