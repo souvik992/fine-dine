@@ -5,6 +5,7 @@ import { dayEnd } from './day-end.js';
 import { fireKot } from './fire-kot.js';
 import { openTable } from './open-table.js';
 import { printBill } from './print-bill.js';
+import { printTestPage } from './print-test-page.js';
 import { removeHeldItem } from './remove-held-item.js';
 import { setConfig } from './set-config.js';
 import { setupOutlet } from './setup-outlet.js';
@@ -30,6 +31,7 @@ const handlers = [
   upsertAddonGroup,
   upsertMenuItem,
   setConfig,
+  printTestPage,
   // staff
   setupOutlet,
   upsertUser,

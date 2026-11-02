@@ -33,7 +33,7 @@ interface AppContextValue {
 const Ctx = createContext<AppContextValue | null>(null);
 
 /** Which cached GET each stream topic refreshes. Events are triggers; data always comes from GETs (docs/04). */
-const TOPIC_QUERIES: Record<string, string[]> = { floor: ['floor'], printers: ['printers'], menu: ['menu', 'catalog'], system: ['health', 'floor', 'config', 'staff', 'roles'] };
+const TOPIC_QUERIES: Record<string, string[]> = { floor: ['floor', 'catalog'], printers: ['printers', 'catalog'], menu: ['menu', 'catalog'], system: ['health', 'floor', 'config', 'staff', 'roles'] };
 const TOPICS = [...Object.keys(TOPIC_QUERIES), 'order:*'];
 const SESSION_KEY = 'dinepos.session';
 /** docs/07: terminals sign out after 10 idle minutes. */
@@ -119,6 +119,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [session, signOut]);
 
+  // A stored session is checked with the server at start (and its rights refreshed): a session from an
+  // earlier run, another server or a deactivated person must not look signed in.
+  const sessionToken = session?.token ?? null;
+  useEffect(() => {
+    if (!sessionToken) return;
+    let cancelled = false;
+    api.get<SessionInfo>('/v1/session').then(
+      (info) => {
+        if (cancelled || sessionRef.current?.token !== sessionToken) return;
+        const s: Session = { ...info, token: sessionToken };
+        storage()?.setItem(SESSION_KEY, JSON.stringify(s));
+        setSession(s);
+      },
+      () => undefined, // UNAUTHENTICATED already dropped it; a network error keeps it until the server is back
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [api, sessionToken]);
+
   // Another window of this terminal signed in or out.
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
@@ -165,11 +185,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setServerUrl: (url) => {
         const store = storage();
         const clean = store ? saveServerUrl(store, url) : url;
+        if (clean !== serverUrl) dropSession(); // a session belongs to one server
         queryClient.clear();
         setUrl(clean);
       },
     }),
-    [api, serverUrl, streamStatus, session, signIn, signOut, pinRequest, queryClient],
+    [api, serverUrl, streamStatus, session, signIn, signOut, pinRequest, queryClient, dropSession],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

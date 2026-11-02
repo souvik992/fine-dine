@@ -2,7 +2,7 @@
 // Drives the real Electron app (built renderer on app://dinepos) against a real outlet server process.
 // Run: npm run test:e2e -w @dinepos/desktop (builds first).
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -285,10 +285,127 @@ describe('desktop app', () => {
     await page!.keyboard.press('Escape');
   });
 
+  // ---- Setup screens (owner), each checked against the server ----
+
+  const catalog = async () =>
+    (await (await fetch(`${SERVER}/v1/admin/catalog`, { headers: { 'x-user-session': testToken } })).json()) as {
+      tables: Array<{ label: string; layoutX: number | null; layoutY: number | null }>;
+      items: Array<{ name: string; shortCode: string | null; basePricePaise: number }>;
+    };
+
+  async function openSettings(section: string) {
+    const [page] = app.windows();
+    if (await page!.getByRole('navigation', { name: 'Settings sections' }).isVisible().catch(() => false)) {
+      await page!.getByRole('navigation', { name: 'Settings sections' }).getByRole('button', { name: new RegExp(section) }).click();
+      return page!;
+    }
+    await page!.getByRole('button', { name: 'Settings' }).click();
+    await page!.getByRole('navigation', { name: 'Settings sections' }).getByRole('button', { name: new RegExp(section) }).click();
+    return page!;
+  }
+
+  it('Outlet & bills: renaming the restaurant is saved', async () => {
+    const page = await openSettings('Outlet & bills');
+    const name = page.getByRole('textbox', { name: 'Restaurant name' });
+    await name.fill('Spice Garden Kolkata (DEMO)');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByRole('status').getByText('Saved').waitFor();
+    const state = (await (await fetch(`${SERVER}/v1/setup-state`)).json()) as { outletName: string };
+    expect(state.outletName).toBe('Spice Garden Kolkata (DEMO)');
+  });
+
+  it('Staff & roles: a new person is added and can sign in', async () => {
+    const page = await openSettings('Staff & roles');
+    await page.getByRole('button', { name: 'Add person' }).click();
+    const dlg = page.getByRole('dialog', { name: 'Add a person' });
+    await dlg.getByRole('textbox', { name: /Name/ }).fill('Priya');
+    await dlg.getByLabel(/^PIN/).fill('6060');
+    await dlg.getByLabel('Type it again').fill('6060');
+    await dlg.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('list', { name: 'Staff list' }).getByText('Priya').waitFor();
+    const state = (await (await fetch(`${SERVER}/v1/setup-state`)).json()) as { users: Array<{ id: string; name: string; roleName: string }> };
+    const priya = state.users.find((u) => u.name === 'Priya')!;
+    expect(priya.roleName).toBe('Cashier');
+    const res = await fetch(`${SERVER}/v1/sessions`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ userId: priya.id, pin: '6060' }) });
+    expect(res.status).toBe(200);
+  });
+
+  it('Floor & tables: add a table, drag it on the layout, and save the position', async () => {
+    const page = await openSettings('Floor & tables');
+    await page.getByRole('button', { name: 'Add table' }).click();
+    const dlg = page.getByRole('dialog', { name: 'Add a table' });
+    await dlg.getByRole('textbox', { name: /Table name/ }).fill('T9');
+    await dlg.getByRole('button', { name: 'Save' }).click();
+    const tile = page.locator('[data-layout-table="T9"]');
+    await tile.waitFor();
+    const before = (await catalog()).tables.find((t) => t.label === 'T9')!;
+    expect(before.layoutX).not.toBeNull();
+
+    const box = (await tile.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 160, box.y + box.height / 2 + 60, { steps: 8 });
+    await page.mouse.up();
+    await page.getByRole('button', { name: /Save layout \(1 moved\)/ }).click();
+    await page.getByRole('button', { name: /^Save layout$/ }).waitFor();
+    const after = (await catalog()).tables.find((t) => t.label === 'T9')!;
+    expect(after.layoutX).not.toBe(before.layoutX);
+    expect((after.layoutX ?? 0) % 20).toBe(0); // snapped to the grid
+  });
+
+  it('Menu: a new item can be sold by its short code at once', async () => {
+    const page = await openSettings('Menu');
+    await page.getByRole('button', { name: 'Add item' }).click();
+    const dlg = page.getByRole('dialog', { name: 'Add an item' });
+    await dlg.getByRole('textbox', { name: /^Name/ }).fill('Masala Papad');
+    await dlg.getByRole('textbox', { name: /Short code/ }).fill('MP');
+    await dlg.getByRole('textbox', { name: /Price/ }).fill('60');
+    await dlg.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('table', { name: 'Items' }).getByText('Masala Papad').waitFor();
+    expect((await catalog()).items.find((i) => i.shortCode === 'MP')).toMatchObject({ name: 'Masala Papad', basePricePaise: 6_000 });
+
+    // Back on the floor: T9 (just added) → seat → MP sells.
+    await page.getByRole('button', { name: 'Floor', exact: true }).click();
+    await page.locator('[data-table="T9"]').click();
+    await page.getByRole('dialog', { name: 'Seat table T9' }).waitFor();
+    await page.keyboard.press('Enter');
+    await page.getByLabel('Add item').waitFor();
+    await page.keyboard.type('mp');
+    await page.keyboard.press('Enter');
+    await page.getByTestId('held-items').getByText('Masala Papad').waitFor();
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+  });
+
+  it('Kitchen & printers: a test print reaches the printer', async () => {
+    const page = await openSettings('Kitchen & printers');
+    const row = page.getByRole('list', { name: 'Printers' }).getByRole('listitem').filter({ hasText: 'Bill printer' });
+    await row.getByRole('button', { name: 'Test print' }).click();
+    await row.getByText('Test page sent').waitFor();
+    await expect
+      .poll(() => {
+        const dir = path.join(dataDir, 'prints');
+        const files = readdirSync(dir, { recursive: true }).map(String).filter((f) => f.endsWith('.txt'));
+        return files.some((f) => readFileSync(path.join(dir, f), 'utf8').includes('DinePOS test page'));
+      }, { timeout: 5_000 })
+      .toBe(true);
+    await page.getByRole('button', { name: 'Floor', exact: true }).click();
+  });
+
   it('Lock returns every window of the terminal to the sign-in screen', async () => {
     const [page, other] = app.windows();
     await page!.getByRole('button', { name: 'Lock' }).click();
     await page!.getByText('Who is signing in?').waitFor();
     await other!.getByText('Who is signing in?').waitFor({ timeout: 5_000 });
+  });
+
+  it('a stored session the server does not know (old run, other server) shows the sign-in screen', async () => {
+    const [page] = app.windows();
+    await page!.evaluate(() => {
+      const fake = { token: 'not-a-real-token', user: { id: 'x', name: 'Ghost', roleId: 'x', roleName: 'Owner' }, rights: [], discountLimitBp: 0, expiresAt: '2099-01-01T00:00:00Z' };
+      localStorage.setItem('dinepos.session', JSON.stringify(fake));
+    });
+    await page!.reload();
+    await page!.getByText('Who is signing in?').waitFor({ timeout: 10_000 });
   });
 });

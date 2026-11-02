@@ -181,8 +181,9 @@ export function devSeedCommands(): SeedCommand[] {
           areaId,
           label: `${a.prefix}${n}`,
           seats: a.seats,
-          layoutX: ((n - 1) % 4) * 120,
-          layoutY: Math.floor((n - 1) / 4) * 120,
+          // Same spacing as the layout editor's free slots (tile 140×100 + 20 gap).
+          layoutX: 20 + ((n - 1) % 4) * 160,
+          layoutY: 20 + Math.floor((n - 1) / 4) * 120,
         },
       });
     }

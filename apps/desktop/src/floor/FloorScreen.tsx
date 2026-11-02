@@ -6,6 +6,7 @@ import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { HealthDots } from '../components/HealthDots.js';
 import { UserBadge } from '../components/UserBadge.js';
+import { canvasSize, hasLayout, TILE_H, TILE_W } from '../settings/layout-model.js';
 import { findTable, moveFocus, STATE_META, stateCounts, tablesInArea, type Arrow } from './floor-model.js';
 import { DayEndDialog } from './DayEndDialog.js';
 import { SeatDialog } from './SeatDialog.js';
@@ -49,6 +50,29 @@ export function FloorScreen({ onSettings, onOpenOrder }: { onSettings: () => voi
   const activeArea = areaId ?? data?.areas[0]?.id ?? null;
   const tables = useMemo(() => (data ? tablesInArea(data, activeArea) : []), [data, activeArea]);
   const counts = stateCounts(tables);
+  const [view, setView] = useState<'layout' | 'grid'>(() => (localStorage.getItem('dinepos.floorView') === 'grid' ? 'grid' : 'layout'));
+  const layout = hasLayout(tables.map((t) => ({ id: t.id, layoutX: t.layoutX ?? null, layoutY: t.layoutY ?? null })));
+  const showLayout = layout && view === 'layout';
+  const room = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const size = canvasSize(tables.map((t) => ({ id: t.id, layoutX: t.layoutX ?? null, layoutY: t.layoutY ?? null })));
+  useEffect(() => {
+    const el = room.current;
+    if (!el) return;
+    const fit = () => setScale(Math.min(1.2, el.clientWidth / size.w));
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [size.w, showLayout]);
+  const switchView = (v: 'layout' | 'grid') => {
+    setView(v);
+    try {
+      localStorage.setItem('dinepos.floorView', v);
+    } catch {
+      // per-terminal convenience only
+    }
+  };
 
   const open = (t: FloorTable) => {
     if (t.state === 'FREE' || t.state === 'RESERVED') setSeating(t);
@@ -182,28 +206,53 @@ export function FloorScreen({ onSettings, onOpenOrder }: { onSettings: () => voi
           <p className="mt-16 text-center text-muted-foreground">No tables in this area yet. Add them in Settings.</p>
         ) : (
           <>
-            <div className="mb-3 flex flex-wrap gap-2 text-xs font-semibold text-muted-foreground" aria-label="Table summary">
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-muted-foreground" aria-label="Table summary">
               {Object.entries(counts).map(([state, n]) => (
                 <span key={state} className="rounded-full border border-border bg-card px-3 py-1">
                   {STATE_META[state as keyof typeof STATE_META].label}: {n}
                 </span>
               ))}
+              {layout ? (
+                <span className="ml-auto flex gap-1" role="radiogroup" aria-label="Floor view">
+                  {(['layout', 'grid'] as const).map((v) => (
+                    <button key={v} role="radio" aria-checked={view === v} className="tab h-7" aria-selected={view === v} onClick={() => switchView(v)}>
+                      {v === 'layout' ? 'Layout' : 'Grid'}
+                    </button>
+                  ))}
+                </span>
+              ) : null}
             </div>
-            <div ref={grid} role="grid" aria-label="Tables" className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]" onKeyDown={onGridKey}>
-              {tables.map((t, i) => (
-                <TableTile
-                  key={t.id}
-                  ref={(el) => {
-                    tileRefs.current[i] = el;
-                  }}
-                  table={t}
-                  now={now}
-                  focused={i === Math.min(focus, tables.length - 1)}
-                  onFocus={() => setFocus(i)}
-                  onOpen={open}
-                />
-              ))}
-            </div>
+            {showLayout ? (
+              <div ref={room} className="relative w-full" style={{ height: size.h * scale }} aria-label="Tables (floor layout)">
+                {tables.map((t, i) => (
+                  <TableTile
+                    key={t.id}
+                    table={t}
+                    now={now}
+                    focused={i === Math.min(focus, tables.length - 1)}
+                    onFocus={() => setFocus(i)}
+                    onOpen={open}
+                    style={{ position: 'absolute', left: (t.layoutX ?? 0) * scale, top: (t.layoutY ?? 0) * scale, width: TILE_W * scale, height: TILE_H * scale, minHeight: 0 }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div ref={grid} role="grid" aria-label="Tables" className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]" onKeyDown={onGridKey}>
+                {tables.map((t, i) => (
+                  <TableTile
+                    key={t.id}
+                    ref={(el) => {
+                      tileRefs.current[i] = el;
+                    }}
+                    table={t}
+                    now={now}
+                    focused={i === Math.min(focus, tables.length - 1)}
+                    onFocus={() => setFocus(i)}
+                    onOpen={open}
+                  />
+                ))}
+              </div>
+            )}
           </>
         )}
       </main>

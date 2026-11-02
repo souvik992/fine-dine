@@ -1,88 +1,70 @@
-import { ArrowLeft, CheckCircle2, PlugZap } from 'lucide-react';
-import { useState } from 'react';
-import { ApiClient, ApiError } from '../api/client.js';
-import { normaliseServerUrl } from '../api/settings.js';
+import type { Right } from '@dinepos/shared';
+import { ArrowLeft, ChefHat, LayoutGrid, MonitorSmartphone, Store, Users, UtensilsCrossed } from 'lucide-react';
+import { useState, type ComponentType } from 'react';
 import { useApp } from '../app-context.js';
+import { UserBadge } from '../components/UserBadge.js';
+import { FloorSettings } from './FloorSettings.js';
+import { KitchenSettings } from './KitchenSettings.js';
+import { MenuSettings } from './MenuSettings.js';
+import { OutletSettings } from './OutletSettings.js';
+import { StaffSettings } from './StaffSettings.js';
+import { TerminalSettings } from './TerminalSettings.js';
 
-interface Health {
-  ok: boolean;
-  version: string;
-  businessDate: string | null;
-}
+type SectionKey = 'outlet' | 'floor' | 'menu' | 'kitchen' | 'staff' | 'terminal';
 
-/** Terminal settings: which outlet server this terminal talks to (docs/01: static IP recommended). */
+const SECTIONS: Array<{ key: SectionKey; label: string; hint: string; icon: ComponentType<{ className?: string }>; right: Right | null }> = [
+  { key: 'outlet', label: 'Outlet & bills', hint: 'Name, GSTIN, bill number, round-off, UPI', icon: Store, right: 'admin' },
+  { key: 'floor', label: 'Floor & tables', hint: 'Areas, tables and the floor layout', icon: LayoutGrid, right: 'admin' },
+  { key: 'menu', label: 'Menu', hint: 'Categories, items, options and add-ons', icon: UtensilsCrossed, right: 'admin' },
+  { key: 'kitchen', label: 'Kitchen & printers', hint: 'Stations, printers, test print', icon: ChefHat, right: 'admin' },
+  { key: 'staff', label: 'Staff & roles', hint: 'People, PINs, rights and discount limits', icon: Users, right: 'users.manage' },
+  { key: 'terminal', label: 'This terminal', hint: 'Outlet server address', icon: MonitorSmartphone, right: null },
+];
+
+/** Settings (like Tiffin POS): one section at a time, each shown only to roles that may change it. */
 export function SettingsScreen({ onBack }: { onBack: () => void }) {
-  const { serverUrl, setServerUrl } = useApp();
-  const [value, setValue] = useState(serverUrl);
-  const [state, setState] = useState<{ kind: 'idle' | 'testing' } | { kind: 'ok'; health: Health; url: string } | { kind: 'error'; message: string }>({ kind: 'idle' });
-
-  const test = async (): Promise<string | null> => {
-    let url: string;
-    try {
-      url = normaliseServerUrl(value);
-    } catch (e) {
-      setState({ kind: 'error', message: (e as Error).message });
-      return null;
-    }
-    setState({ kind: 'testing' });
-    try {
-      const health = await new ApiClient({ baseUrl: url, timeoutMs: 4_000 }).get<Health>('/v1/health');
-      setState({ kind: 'ok', health, url });
-      return url;
-    } catch (e) {
-      setState({ kind: 'error', message: e instanceof ApiError ? e.message : 'The server did not answer.' });
-      return null;
-    }
-  };
+  const { session, can } = useApp();
+  const visible = SECTIONS.filter((s) => s.right === null || (session && can(s.right)));
+  const [active, setActive] = useState<SectionKey>(visible[0]!.key);
+  const current = visible.find((s) => s.key === active) ?? visible[0]!;
 
   return (
-    <div className="mx-auto max-w-xl px-6 py-8">
-      <button className="btn mb-6" onClick={onBack}>
-        <ArrowLeft className="h-4 w-4" /> Back to floor
-      </button>
-      <h1 className="font-display text-3xl font-semibold">Terminal settings</h1>
-      <p className="mb-6 mt-1 text-sm text-muted-foreground">This terminal is a client of the outlet server on the master PC.</p>
-
-      <form
-        className="rounded-xl border border-border bg-card p-5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void test().then((url) => {
-            if (url) {
-              setServerUrl(url);
-              onBack();
-            }
-          });
-        }}
-      >
-        <label htmlFor="server" className="block text-sm font-semibold">
-          Outlet server address
-        </label>
-        <p className="mb-2 text-xs text-muted-foreground">The master PC&apos;s IP address, e.g. 192.168.1.10. Port 7420 is added if you leave it out.</p>
-        <input id="server" className="input" value={value} onChange={(e) => setValue(e.target.value)} spellCheck={false} autoComplete="off" />
-        <div aria-live="polite" className="mt-3 min-h-6 text-sm">
-          {state.kind === 'testing' ? <span className="text-muted-foreground">Checking…</span> : null}
-          {state.kind === 'ok' ? (
-            <span className="flex items-center gap-1.5 font-semibold text-ok">
-              <CheckCircle2 className="h-4 w-4" /> Connected to DinePOS {state.health.version}
-              {state.health.businessDate ? `, business date ${state.health.businessDate}` : ''}
-            </span>
-          ) : null}
-          {state.kind === 'error' ? (
-            <span role="alert" className="font-semibold text-danger">
-              {state.message}
-            </span>
-          ) : null}
+    <div className="flex h-full flex-col">
+      <header className="flex items-center gap-3 border-b border-border bg-card px-4 py-2.5">
+        <button className="btn" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" /> {session ? 'Floor' : 'Back'}
+        </button>
+        <h1 className="font-display text-xl font-semibold">Settings</h1>
+        <div className="ml-auto">
+          <UserBadge />
         </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className="btn" onClick={() => void test()} disabled={state.kind === 'testing'}>
-            <PlugZap className="h-4 w-4" /> Test connection
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={state.kind === 'testing'}>
-            Save and connect
-          </button>
-        </div>
-      </form>
+      </header>
+      <div className="flex min-h-0 flex-1">
+        <nav className="w-64 shrink-0 overflow-y-auto border-r border-border bg-card p-2" aria-label="Settings sections">
+          {visible.map(({ key, label, hint, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActive(key)}
+              aria-current={key === current.key ? 'page' : undefined}
+              className={`mb-1 flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left ${key === current.key ? 'bg-foreground text-background' : 'hover:bg-secondary'}`}
+            >
+              <Icon className="mt-0.5 h-5 w-5 shrink-0" />
+              <span>
+                <span className="block text-sm font-semibold">{label}</span>
+                <span className={`block text-xs ${key === current.key ? 'opacity-80' : 'text-muted-foreground'}`}>{hint}</span>
+              </span>
+            </button>
+          ))}
+        </nav>
+        <main className="min-w-0 flex-1 overflow-y-auto px-8 py-6">
+          {current.key === 'outlet' ? <OutletSettings /> : null}
+          {current.key === 'floor' ? <FloorSettings /> : null}
+          {current.key === 'menu' ? <MenuSettings /> : null}
+          {current.key === 'kitchen' ? <KitchenSettings /> : null}
+          {current.key === 'staff' ? <StaffSettings /> : null}
+          {current.key === 'terminal' ? <TerminalSettings onSaved={onBack} /> : null}
+        </main>
+      </div>
     </div>
   );
 }

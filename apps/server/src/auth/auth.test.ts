@@ -248,3 +248,33 @@ describe('PIN hashing', () => {
     expect(verifyPin('12', a)).toBe(false);
   });
 });
+
+describe('settings reads and test print', () => {
+  it('GET /v1/admin/catalog needs admin and includes inactive items and station printers', async () => {
+    const owner = await seeded();
+    const cashier = (await login(ids.cashier, '1111')).body.token;
+    expect((await app.inject({ method: 'GET', url: '/v1/admin/catalog', headers: { 'x-user-session': cashier } })).statusCode).toBe(403);
+    await send('UpsertMenuItem', { id: ids.dal, categoryId: seedId('category:mains'), name: 'Dal Makhani', veg: true, basePricePaise: 28_000, taxRateBp: 500, active: false }, { token: owner });
+    const cat = (await app.inject({ method: 'GET', url: '/v1/admin/catalog', headers: { 'x-user-session': owner } })).json<{
+      items: Array<{ id: string; active: boolean }>;
+      stations: Array<{ name: string; printerIds: string[] }>;
+      tables: unknown[];
+      printers: unknown[];
+    }>();
+    expect(cat.items).toHaveLength(30);
+    expect(cat.items.find((i) => i.id === ids.dal)?.active).toBe(false);
+    expect(cat.stations.find((s) => s.name === 'Kitchen')?.printerIds).toEqual([seedId('printer:kitchen')]);
+    expect(cat.tables).toHaveLength(12);
+    expect(cat.printers).toHaveLength(4);
+  });
+
+  it('PrintTestPage queues a test page on that printer', async () => {
+    const owner = await seeded();
+    const r = await send('PrintTestPage', { printerId: seedId('printer:bill') }, { token: owner });
+    expect(r.body.ok).toBe(true);
+    const job = db.prepare("SELECT printer_id, preview_text FROM print_job WHERE doc_kind = 'test'").get() as { printer_id: string; preview_text: string };
+    expect(job.printer_id).toBe(seedId('printer:bill'));
+    expect(job.preview_text).toContain('DinePOS test page');
+    expect(job.preview_text).toContain('If you can read this, the printer works.');
+  });
+});

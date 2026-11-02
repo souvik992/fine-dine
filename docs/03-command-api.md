@@ -132,6 +132,12 @@ Rules in `docs/08-billing-gst.md`.
 Sessions: `POST /v1/sessions`, `GET /v1/session`, `DELETE /v1/session`, `GET /v1/setup-state` (public),
 `GET /v1/staff`, `GET /v1/roles` (users.manage). Commands without a valid `X-User-Session` answer `UNAUTHENTICATED`.
 
+`GET /v1/admin/catalog` (admin) returns everything the settings screens edit, inactive records included:
+`{ areas, tables (with occupied), printers (all fields), stations (with printerIds), categories, addonGroups, items }`.
+
+`PrintTestPage` { printerId } (right admin): queues a short test page (outlet name, printer name, width, time)
+on that printer through the normal print queue; result `{ printerId }`.
+
 ## Admin endpoints (also commands, admin right)
 `UpsertArea`, `UpsertTable`, `UpsertCategory`, `UpsertMenuItem`, `UpsertAddonGroup`, `UpsertStation`,
 `UpsertPrinter`, `UpsertUser`, `UpsertRole`, `PairDevice`, `RevokeDevice`, `SetConfig`.

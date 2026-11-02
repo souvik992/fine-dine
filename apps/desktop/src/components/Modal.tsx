@@ -5,7 +5,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
  * Dialog with focus handling: focuses the `data-autofocus` control (else the first control) once when it opens, returns focus when it closes,
  * Esc closes. `onClose` may change identity on every parent render without moving focus.
  */
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Modal({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const panel = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -29,7 +29,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label={title}>
-      <div ref={panel} className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-card shadow-xl">
+      <div ref={panel} className={`max-h-[calc(100dvh-2rem)] w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} overflow-y-auto rounded-xl border border-border bg-card shadow-xl`}>
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <h2 className="font-display text-xl font-semibold">{title}</h2>
           <button className="btn h-9 w-9 px-0" onClick={() => closeRef.current()} aria-label="Close">

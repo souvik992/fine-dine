@@ -2,6 +2,7 @@ import { loginSchema, type RoleInfo, type StaffMember } from '@dinepos/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { login, logout, resolveSession, roleRights, setupState } from '../auth/sessions.js';
 import { PosError } from '../core/errors.js';
+import { getAdminCatalog } from '../queries/admin-catalog.js';
 import type { Db } from '../db/connection.js';
 
 const token = (req: FastifyRequest) => {
@@ -29,13 +30,20 @@ export function sessionRoutes(app: FastifyInstance, deps: { db: Db; now: () => D
     return reply.status(204).send();
   });
 
-  /** Staff and roles for Settings. Needs "manage staff". */
-  const requireManageStaff = (req: FastifyRequest) => {
+  /** Settings reads need a session whose role has the right without a PIN. */
+  const requireRight = (req: FastifyRequest, right: 'users.manage' | 'admin') => {
     const s = resolveSession(db, token(req), now());
-    if (!s.rights.some((r) => r.right === 'users.manage' && !r.needsPin)) {
-      throw new PosError('FORBIDDEN', 'You do not have the "users.manage" right.', { right: 'users.manage' });
+    if (!s.rights.some((r) => r.right === right && !r.needsPin)) {
+      throw new PosError('FORBIDDEN', `You do not have the "${right}" right.`, { right });
     }
   };
+  const requireManageStaff = (req: FastifyRequest) => requireRight(req, 'users.manage');
+
+  /** Everything the menu, floor and printer settings edit (inactive items included). */
+  app.get('/v1/admin/catalog', (req, reply) => {
+    requireRight(req, 'admin');
+    return reply.headers(noStore).send(getAdminCatalog(db));
+  });
 
   app.get('/v1/staff', (req, reply) => {
     requireManageStaff(req);

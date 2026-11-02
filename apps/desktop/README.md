@@ -45,6 +45,13 @@ preview from the shared calculator, printed figures from the server). F10 Settle
 c/k/u/d/m/o switch cash/card/UPI/due/complimentary/other; + splits; change shown). Day end is on the floor
 header: refuses while tables are open, then asks for counted cash and shows the Z-report summary.
 
+## Sign-in and settings (P2-01)
+`src/auth/`: first-run setup, name tiles + PIN pad, manager PIN dialog (the command is resent with the same
+`commandId` and `X-Manager-Pin`). The session lives in localStorage `dinepos.session`, is checked against the
+server at start, shared by all windows, and locks after 10 idle minutes (or Lock / Ctrl+L).
+`src/settings/`: one file per section (Outlet, Floor, Menu, Kitchen, Staff, Terminal) plus `common.tsx`;
+`layout-model.ts` holds the layout editor geometry (pure + tested). Sections follow `docs/09-ui-screens.md` §7.
+
 ## Installer (P1-11)
 `npm run dist -w @dinepos/desktop` → `release/DinePOS-Setup-<version>.exe` (+ `release/win-unpacked/`). Steps:
 server bundle (`apps/server/scripts/bundle.mjs`: one `server.mjs` + migrations + better-sqlite3 Node-API

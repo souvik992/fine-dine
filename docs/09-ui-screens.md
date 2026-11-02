@@ -20,7 +20,8 @@ Every state also has a text label and icon — colour is never the only signal.
 ## Desktop app (Electron)
 ### 1. Floor (built in P1-08: area tabs, table search, health dots, clock, tiles, seat dialog, arrow keys)
 - Top bar: area tabs, search table (type `T7` + Enter), order-type buttons (Takeaway), clock, sync/print health dots.
-- Grid or saved floor layout (drag tables in Edit layout mode).
+- Layout / Grid switch (remembered per terminal): Layout shows tables where they were placed in Settings ›
+  Floor & tables; areas without a saved layout fall back to the grid.
 - Tile: label, covers, elapsed min, amount, captain initials, state label.
 - Click: open order (or seat dialog if free). Right-click / long-press: Move, Merge, Split, Print bill, Reprint, Block.
 - Keyboard: arrows move focus, Enter opens, `M` move, `G` merge, `P` print bill.
@@ -52,7 +53,27 @@ Addon options follow the order they were entered in (menu admin), so hotkeys sta
 - Cards: cancelled after fire, modified after fire, reprints, moves/transfers, voids, unbilled KOTs — counts
   for today, click to list with who/when/why.
 
-### 6. Reports, 7. Settings (outlet, areas/tables, menu, stations/printers, users/roles, devices, tax, licence, backup)
+### 6. Reports
+
+### 7. Settings (built with P2-01: `apps/desktop/src/settings/`)
+Sections are shown by right; every save is a command, so it is audited and other terminals update live.
+- **Outlet & bills** (admin): outlet name, phone, address, GSTIN, FSSAI, bill prefix, service charge, round-off and tie rule,
+  UPI id/payee for the QR, footer, bill printer, default kitchen station.
+  Only changed keys are sent in one `SetConfig`.
+- **Floor & tables** (admin): areas (name, price list), tables (label, seats, active), "Add several" (prefix +
+  range, skips labels that exist, at most 100). Layout editor: drag tiles on a 20-unit grid, unplaced tables wait
+  in a tray, "Save layout (n moved)" sends one `UpsertTable` per moved table. A table with an open order cannot
+  be deactivated.
+- **Menu** (admin): items (code, name, category, price, GST rate, veg, station override, variants, add-on
+  groups, active), categories (station, sort), add-on groups (min/max, options). Saved variants and options can
+  be deactivated but not removed, so old orders keep their meaning.
+- **Kitchen & printers** (admin): printers (network IP/port, Windows USB name, or preview-only; paper width;
+  KOT/bill role; copies; cutter; backup printer) with live status and **Test print** (`PrintTestPage`);
+  stations with their printers.
+- **Staff & roles** (users.manage): people (name, role, new PIN, active) and roles (discount limit, each right
+  allowed / allowed with manager PIN / not allowed).
+- **This terminal** (everyone): server address and connection test.
+- Later: devices (P2-02), tax, licence, backup.
 
 ## Captain PWA (phone/tablet)
 - Login with PIN → My tables (assigned areas first) → table → order screen.

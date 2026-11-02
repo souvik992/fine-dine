@@ -1,6 +1,6 @@
 import { formatINR, type FloorTable } from '@dinepos/shared';
 import { Ban, CalendarClock, Circle, Flame, ReceiptText, Users } from 'lucide-react';
-import { forwardRef, type ComponentType } from 'react';
+import { forwardRef, type ComponentType, type CSSProperties } from 'react';
 import { formatElapsed, elapsedMinutes, STATE_META, type StateMeta } from './floor-model.js';
 
 const ICONS: Record<StateMeta['icon'], ComponentType<{ className?: string }>> = {
@@ -18,9 +18,11 @@ interface Props {
   focused: boolean;
   onOpen: (t: FloorTable) => void;
   onFocus: () => void;
+  /** Position and size in the saved floor layout (layout view). */
+  style?: CSSProperties;
 }
 
-export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile({ table, now, focused, onOpen, onFocus }, ref) {
+export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile({ table, now, focused, onOpen, onFocus, style }, ref) {
   const meta = STATE_META[table.state];
   const Icon = ICONS[meta.icon];
   const elapsed = formatElapsed(elapsedMinutes(table.since, now));
@@ -38,6 +40,7 @@ export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile
       tabIndex={focused ? 0 : -1}
       onFocus={onFocus}
       onClick={() => onOpen(table)}
+      style={style}
     >
       <div className="flex items-start justify-between gap-2">
         <span className="font-display text-2xl font-semibold leading-none">{table.label}</span>

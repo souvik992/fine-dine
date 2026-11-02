@@ -69,3 +69,18 @@ describe('dev seed', () => {
     expect(seedId('x')).toMatch(/^01[0-9A-HJKMNP-TV-Z]{24}$/);
   });
 });
+
+describe('dev seed layout', () => {
+  it('places tables without overlapping (tile 140×100)', () => {
+    const tables = devSeedCommands()
+      .filter((c) => c.type === 'UpsertTable')
+      .map((c) => c.payload as { areaId: string; layoutX: number; layoutY: number });
+    for (const a of tables) {
+      for (const b of tables) {
+        if (a === b || a.areaId !== b.areaId) continue;
+        const overlap = Math.abs(a.layoutX - b.layoutX) < 140 && Math.abs(a.layoutY - b.layoutY) < 100;
+        expect(overlap).toBe(false);
+      }
+    }
+  });
+});
