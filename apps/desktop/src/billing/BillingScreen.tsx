@@ -1,4 +1,4 @@
-import { formatINR, newId, type MenuItem, type MenuSnapshot, type OrderItemSnapshot, type OutletConfig } from '@dinepos/shared';
+import { formatINR, newId, type MenuItem, type MenuSnapshot, type OrderItemSnapshot, type OrderSnapshot, type OutletConfig } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Flame, Printer, Search, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -11,6 +11,7 @@ import { elapsedMinutes, formatElapsed } from '../floor/floor-model.js';
 import { Cart } from './Cart.js';
 import { hasChoices, needsChoices, resolveQuickEntry, visibleItems } from './menu-model.js';
 import { ModifierSheet, type SheetResult } from './ModifierSheet.js';
+import { addOrMerge, changeBy, type LineCommand } from './order-lines.js';
 import { Modal } from '../components/Modal.js';
 import { PrintBillDialog } from './PrintBillDialog.js';
 import { SettleDialog } from './SettleDialog.js';
@@ -74,10 +75,13 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
     return () => clearTimeout(t);
   }, [toast]);
 
-  const run = async (type: string, payload: unknown, done?: string): Promise<boolean> => {
+  const run = (type: string, payload: unknown, done?: string): Promise<boolean> => track(() => session.run(type, payload), done);
+  /** Cart changes decided on the latest order when their turn comes (quick taps build on each other). */
+  const runLatest = (build: (o: OrderSnapshot) => LineCommand | null): Promise<boolean> => track(() => session.runLatest(build));
+  const track = async (send: () => Promise<unknown>, done?: string): Promise<boolean> => {
     setPending((n) => n + 1);
     try {
-      await session.run(type, payload);
+      await send();
       if (done) setToast({ kind: 'ok', text: done });
       return true;
     } catch (e) {
@@ -88,11 +92,14 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
     }
   };
 
+  /** The same item again (same size, add-ons, note, course) raises its held line instead of adding a new one. */
   const addLine = (item: MenuItem, r: Omit<SheetResult, 'addonIds'> & { addonIds?: string[] }) => {
-    const id = newId();
-    setSelectedId(id);
-    void run('AddItems', {
-      items: [{ id, itemId: item.id, variantId: r.variantId, qty: r.qty, addons: (r.addonIds ?? []).map((addonId) => ({ addonId, qty: 1 })), note: r.note, course: r.course }],
+    const line = { id: newId(), itemId: item.id, variantId: r.variantId, qty: r.qty, addons: (r.addonIds ?? []).map((addonId) => ({ addonId, qty: 1 })), note: r.note, course: r.course };
+    setSelectedId(line.id);
+    void runLatest((o) => {
+      const cmd = addOrMerge(o, line);
+      if (cmd.type === 'UpdateHeldItem') setSelectedId(cmd.payload.orderItemId);
+      return cmd;
     });
   };
 
@@ -141,9 +148,11 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
     );
   };
 
+  /** + / − apply to the line's quantity when sent, so quick presses add up. */
   const changeQty = (i: OrderItemSnapshot, qty: number) => {
     if (qty < 1) return;
-    void run('UpdateHeldItem', { orderItemId: i.id, qty });
+    const delta = qty - i.qty;
+    void runLatest((o) => changeBy(o, i.id, delta));
   };
   const remove = (i: OrderItemSnapshot) => void run('RemoveHeldItem', { orderItemId: i.id });
 

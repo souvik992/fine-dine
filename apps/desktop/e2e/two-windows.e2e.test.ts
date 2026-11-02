@@ -216,9 +216,14 @@ describe('desktop app', () => {
 
     await k.type('dm');
     await k.press('Enter'); // no choices → added directly
+    await k.type('dm');
+    await k.press('Enter'); // the same item again, quickly: raises the line instead of adding another
+    await k.type('dm');
+    await k.press('Enter');
 
     const held = page!.getByTestId('held-items').locator('li');
     await expect.poll(() => held.count(), { timeout: 5_000 }).toBe(5);
+    await held.filter({ hasText: 'Dal Makhani' }).getByText('3', { exact: true }).waitFor({ timeout: 5_000 });
     await k.press('F8');
     await expect.poll(() => page!.getByTestId('kot-group').count(), { timeout: 5_000 }).toBeGreaterThan(0);
     await expect.poll(() => held.count(), { timeout: 5_000 }).toBe(0);
@@ -238,7 +243,7 @@ describe('desktop app', () => {
       ['Tandoori Chicken (Half)', 1, '', 'fired'],
       ['Butter Naan', 4, 'Extra cheese', 'fired'],
       ['Virgin Mojito', 2, 'Soda', 'fired'],
-      ['Dal Makhani', 1, '', 'fired'],
+      ['Dal Makhani', 3, '', 'fired'],
     ]);
     expect(order.kots).toHaveLength(3); // Tandoor, Kitchen, Bar
     await other!.waitForSelector('[data-table="T3"][data-state="KOT_RUNNING"]', { timeout: 2_000 });
@@ -261,7 +266,7 @@ describe('desktop app', () => {
     const settle = page!.getByRole('dialog', { name: /^Settle B\/\d{2}-\d{2}\/\d{6}$/ });
     await settle.waitFor();
     const due = await page!.getByTestId('settle-total').innerText();
-    await k.type('2000');
+    await k.type('3000');
     await k.press('Enter');
     await page!.getByRole('dialog', { name: 'Bill settled' }).waitFor();
     const change = await page!.getByTestId('change-due').innerText();
@@ -269,11 +274,11 @@ describe('desktop app', () => {
     await page!.waitForSelector('[data-table="T3"][data-state="FREE"]', { timeout: 2_000 });
     await other!.waitForSelector('[data-table="T3"][data-state="FREE"]', { timeout: 2_000 });
 
-    // Server agrees: one settled bill, numbered, discounted, paid in cash, change = 2000 − total.
+    // Server agrees: one settled bill, numbered, discounted, paid in cash, change = 3000 − total.
     const rupees = (s: string) => Number(s.replace(/[^\d]/g, '')); // "₹1,234.50" → 123450 paise
     const floor = (await (await fetch(`${SERVER}/v1/floor`)).json()) as { tables: Array<{ label: string; orderId?: string }> };
     expect(floor.tables.find((t) => t.label === 'T3')!.orderId).toBeUndefined();
-    expect(rupees(change)).toBe(200_000 - rupees(due));
+    expect(rupees(change)).toBe(300_000 - rupees(due));
   });
 
   it('day end is refused while tables are still open, naming them', async () => {

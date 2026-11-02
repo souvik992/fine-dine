@@ -20,3 +20,4 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-02 P2-10 Stock (from Tiffin): materials, purchases (immutable, void), wastage/count/correction, recipes per item/variant/add-on used at KOT fire (ADR-0003), usage report + CSV, stock.manage right (migration 0005), Stock screen with low-stock badge
 - 2026-11-02 P2-11 Menu bulk upload (CSV template, row checks, ImportMenu all-or-nothing) and SetItemAvailability: right-click a billing tile to mark it sold out
 - 2026-11-02 P2-12 Bill design (from Tiffin): logo (1-bit raster), name size, header lines, show/hide switches for phone, table, covers, captain, cashier, guest, rate, free add-ons, taxable amounts, item count; live 58/80 mm preview of unsaved changes; PrintSampleBill; e2e uses its own Electron profile
+- 2026-11-02 Fix: adding the same item again raises its held cart line instead of adding a duplicate line; quick repeated taps and +/− add up (decided on the latest order)

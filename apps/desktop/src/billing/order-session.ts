@@ -75,6 +75,40 @@ export class OrderSession {
     return job;
   }
 
+  /**
+   * Queues a command decided when it is its turn, from the latest snapshot (e.g. "raise the held line" vs "add a
+   * line"), so quick repeated taps build on each other. On a version conflict the command is decided again on the
+   * newer snapshot and sent with a new commandId (the first was refused, so nothing can apply twice). Only for
+   * cart commands that are safe to decide again (REBASE_SAFE). Resolves to null when there is nothing to do.
+   */
+  runLatest<R = unknown>(build: (s: OrderSnapshot) => { type: string; payload: unknown } | null): Promise<CommandSuccess<R> | null> {
+    const job = this.chain.then(async () => {
+      if (!this.snapshot) await this.refresh();
+      const attempt = async (s: OrderSnapshot) => {
+        const cmd = build(s);
+        return cmd ? { cmd, res: await this.api.command<R>(cmd.type, cmd.payload, { orderId: this.orderId, expectedVersion: s.version, commandId: newId() }) } : null;
+      };
+      let done: Awaited<ReturnType<typeof attempt>>;
+      try {
+        done = await attempt(this.snapshot!);
+      } catch (err) {
+        if (!(err instanceof ApiError) || err.code !== 'VERSION_CONFLICT' || !err.order) throw this.absorb(err);
+        this.receive(err.order); // someone else changed it: show that, then decide again once
+        done = await attempt(err.order).catch((e: unknown) => {
+          throw this.absorb(e);
+        });
+      }
+      if (!done) return null;
+      if (done.res.order) {
+        this.ownVersions.add(done.res.order.version);
+        this.receive(done.res.order);
+      }
+      return done.res;
+    });
+    this.chain = job.catch(() => undefined);
+    return job;
+  }
+
   /** Keeps the newer snapshot that comes with a conflict, so the screen shows what changed. */
   private absorb(err: unknown): unknown {
     if (err instanceof ApiError && err.order) this.receive(err.order);

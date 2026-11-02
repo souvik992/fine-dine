@@ -32,6 +32,9 @@ opens options for an item that has optional ones; in the sheet 1–9/0 toggle op
 [ / ] course, Enter adds, Esc cancels; Alt+↑/↓ pick a held line, + / − its quantity, Delete removes it;
 F8 fires all held items; Esc clears the search, then returns to the floor. Seating a table opens its order.
 Addon options follow the order they were entered in (menu admin), so hotkeys stay stable.
+Adding an item already waiting in the cart with the same size, add-ons, note and course raises that line's
+quantity instead of adding a second line (lines already sent to the kitchen are never changed). Cart changes and
++ / − are decided on the latest order when their turn in the queue comes, so quick repeated taps add up.
 - Left rail: categories. Middle: item grid (name, price, veg/non-veg dot, out-of-stock greyed) + search box
   with short codes (`pt2` = Paneer Tikka ×2). Right: cart.
 - Cart sections: Held (editable) and Fired (grouped by KOT, read-only; actions via context menu).
