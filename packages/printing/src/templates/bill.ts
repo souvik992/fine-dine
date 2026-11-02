@@ -19,6 +19,11 @@ export interface BillDocLine {
   unitPricePaise: number;
   /** unit price × qty (addons are listed under the line with their own amounts). */
   amountPaise: number;
+  /**
+   * Split bills (P2-05): a share of a line, e.g. "1/3" or "2/3". Then `unitPricePaise` is the whole line's
+   * amount and `amountPaise` this part's share; add-ons are inside the amount.
+   */
+  qtyText?: string | null;
   addons?: Array<{ name: string; qty: number; amountPaise: number }>;
 }
 
@@ -107,6 +112,12 @@ export function renderBill(doc: BillDocument, opts: { paper: PaperWidth; feed?: 
     p.bold(true).line(`${'Item'.padEnd(nameW)} ${padLeft('Qty', 4)}${d.showRate ? ` ${padLeft('Rate', 9)}` : ''} ${padLeft('Amount', 10)}`).bold(false);
     for (const l of doc.lines) {
       const parts = wrapText(l.name, nameW);
+      if (l.qtyText) {
+        // A share of a line: "1/3 of 640.00" under the name, the share on the right.
+        for (const part of parts) p.line(part);
+        p.twoCol(`  ${l.qtyText} of ${money(l.unitPricePaise)}`, money(l.amountPaise));
+        continue;
+      }
       p.line(`${parts[0]!.padEnd(nameW)} ${padLeft(String(l.qty), 4)}${d.showRate ? ` ${padLeft(money(l.unitPricePaise), 9)}` : ''} ${padLeft(money(l.amountPaise), 10)}`);
       for (const rest of parts.slice(1)) p.line(rest);
       addons(l);
@@ -114,7 +125,8 @@ export function renderBill(doc: BillDocument, opts: { paper: PaperWidth; feed?: 
   } else {
     for (const l of doc.lines) {
       p.wrapped(l.name);
-      p.twoCol(d.showRate ? `  ${l.qty} x ${money(l.unitPricePaise)}` : `  Qty ${l.qty}`, money(l.amountPaise));
+      if (l.qtyText) p.twoCol(`  ${l.qtyText} of ${money(l.unitPricePaise)}`, money(l.amountPaise));
+      else p.twoCol(d.showRate ? `  ${l.qty} x ${money(l.unitPricePaise)}` : `  Qty ${l.qty}`, money(l.amountPaise));
       addons(l);
     }
   }

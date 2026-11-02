@@ -70,6 +70,22 @@ export const settleSchema = z
     path: ['tenders'],
   });
 
+/** SplitBill (docs/03, docs/08 "Split bills"): on a printed bill; each part becomes its own numbered bill. */
+export const splitBillSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('equal'), parts: z.number().int().min(2).max(20) }).strict(),
+  z.object({ mode: z.literal('proportion'), parts: z.array(z.object({ weight: z.number().int().min(1).max(100) }).strict()).min(2).max(20) }).strict(),
+  z
+    .object({
+      mode: z.literal('items'),
+      /** Every billed line's whole quantity must be assigned; a line may be shared (2 naan here, 1 there). */
+      parts: z
+        .array(z.object({ items: z.array(z.object({ orderItemId: ulidSchema, qty: z.number().int().min(1).max(999) }).strict()).min(1).max(200) }).strict())
+        .min(2)
+        .max(20),
+    })
+    .strict(),
+]);
+
 export const dayEndSchema = z.object({ cashCountedPaise: paise }).strict();
 
 /** Outlet settings stored in the `config` table (one JSON value per key). */
@@ -103,4 +119,5 @@ export const setConfigSchema = z
 export type PrintBillPayload = z.infer<typeof printBillSchema>;
 export type SettlePayload = z.infer<typeof settleSchema>;
 export type DayEndPayload = z.infer<typeof dayEndSchema>;
+export type SplitBillPayload = z.infer<typeof splitBillSchema>;
 export type SetConfigPayload = z.infer<typeof setConfigSchema>;

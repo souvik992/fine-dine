@@ -139,7 +139,7 @@ export function getOrderSnapshot(db: Db, orderId: string): OrderSnapshot | undef
         `SELECT b.id, b.bill_no, b.fy, b.split_no, b.total_paise, b.state,
                 COALESCE((SELECT sum(p.amount_paise) FROM payment p WHERE p.bill_id = b.id), 0) AS paid_paise,
                 (SELECT d.bill_no_text FROM bill_document d WHERE d.bill_id = b.id ORDER BY d.revision DESC LIMIT 1) AS bill_no_text
-         FROM bill b WHERE b.order_id = ? ORDER BY b.split_no, b.id`,
+         FROM bill b WHERE b.order_id = ? ORDER BY b.fy, b.bill_no, b.split_no, b.id`,
       )
       .all(orderId) as BillRow[]
   ).map((b) => ({

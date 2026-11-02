@@ -13,6 +13,7 @@ export * from './schemas/commands/orders.js';
 export * from './schemas/commands/stock.js';
 export * from './schemas/commands/users.js';
 export * from './schemas/envelope.js';
+export * from './split-bill.js';
 export * from './stock.js';
 export * from './table-state.js';
 export * from './tax.js';

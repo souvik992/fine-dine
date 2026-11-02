@@ -107,6 +107,13 @@ export const printBill = defineCommand({
       ).run(billId, o.id, fy, seq, ...amounts, ctx.nowIso);
     }
 
+    // Parts of an earlier split that are no longer needed: void, keeping their numbers (decided 2026-11-02).
+    for (const id of db.prepare(`SELECT id FROM bill WHERE order_id = ? AND state = 'superseded' AND id <> ?`).pluck().all(o.id, billId) as string[]) {
+      db.prepare(`UPDATE bill SET state = 'void' WHERE id = ?`).run(id);
+      ctx.audit({ entity: 'bill', entityId: id, action: 'bill.void', before: { state: 'superseded' }, after: { state: 'void' }, reason: 'Split part not needed after the bill was printed again' });
+    }
+    db.prepare('UPDATE bill SET split_of = 1 WHERE id = ?').run(billId);
+
     if (p.customer) db.prepare('UPDATE "order" SET customer_name = ?, customer_phone = ? WHERE id = ?').run(p.customer.name, p.customer.phone, o.id);
     db.prepare(`UPDATE "order" SET state = 'billed', bill_printed_at = ? WHERE id = ?`).run(ctx.nowIso, o.id);
 

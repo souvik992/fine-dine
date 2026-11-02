@@ -48,8 +48,12 @@ export const settle = defineCommand({
     if (cash - change > 0) insert.run(newId(), bill.id, 'cash', cash - change, null, ctx.actor.userId, ctx.nowIso);
 
     db.prepare(`UPDATE bill SET state = 'settled' WHERE id = ?`).run(bill.id);
-    db.prepare(`UPDATE "order" SET state = 'settled', closed_at = ? WHERE id = ?`).run(ctx.nowIso, o.id);
-    db.prepare('UPDATE dining_table SET open_order_id = NULL WHERE open_order_id = ?').run(o.id);
+    // A split bill (P2-05): the order closes and the table frees when the last part is paid.
+    const unpaidParts = db.prepare(`SELECT count(*) FROM bill WHERE order_id = ? AND state = 'printed'`).pluck().get(o.id) as number;
+    if (unpaidParts === 0) {
+      db.prepare(`UPDATE "order" SET state = 'settled', closed_at = ? WHERE id = ?`).run(ctx.nowIso, o.id);
+      db.prepare('UPDATE dining_table SET open_order_id = NULL WHERE open_order_id = ?').run(o.id);
+    }
 
     const complimentary = p.tenders.some((t) => t.mode === 'complimentary');
     ctx.audit({
@@ -62,6 +66,6 @@ export const settle = defineCommand({
     });
     ctx.outbox('bill.settled', { billId: bill.id, orderId: o.id, totalPaise: total, tenders: p.tenders.map((t) => ({ mode: t.mode, amountPaise: t.amountPaise })), changePaise: change });
     emitTableState(ctx, o.table_id);
-    return { result: { billId: bill.id, paidPaise: paid, changePaise: change } };
+    return { result: { billId: bill.id, paidPaise: paid, changePaise: change, unpaidParts } };
   },
 });

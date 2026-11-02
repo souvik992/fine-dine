@@ -220,3 +220,14 @@ describe('bill display options (Settings › Bill design)', () => {
     expect(() => renderBill(doc, { paper: 58, logo: { width: 392, height: 1, data: new Uint8Array(49) } })).toThrow(/wider than the paper/);
   });
 });
+
+describe('split parts (P2-05)', () => {
+  it('a shared line prints its fraction of the whole line; parts print "Part 2 of 3"', () => {
+    const share = { ...doc, part: { no: 2, of: 3 }, lines: [{ name: 'Paneer Tikka', qty: 2, qtyText: '1/3', unitPricePaise: 64_000, amountPaise: 21_333 }] };
+    for (const paper of [80, 58] as const) {
+      const p = renderBill(share, { paper }).preview;
+      expect(p).toContain('Part 2 of 3');
+      expect(p).toMatch(/1\/3 of 640\.00\s+213\.33/);
+    }
+  });
+});

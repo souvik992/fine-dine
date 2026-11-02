@@ -527,6 +527,43 @@ describe('desktop app', () => {
     await page!.keyboard.press('Escape');
   });
 
+  it('Split bill: T2 split equally in two, each part paid on its own, then the table is free', async () => {
+    const [page, other] = app.windows();
+    const k = page!.keyboard;
+    await page!.locator('[data-table="T2"]').click();
+    await page!.getByLabel('Add item').waitFor();
+    await k.press('F8'); // send the Masala Papad moved here earlier
+    await expect.poll(() => page!.getByTestId('held-items').locator('li').count(), { timeout: 5_000 }).toBe(0);
+    await k.press('F9');
+    await page!.getByRole('dialog', { name: 'Print bill' }).waitFor();
+    await k.press('Enter');
+    await page!.getByRole('dialog', { name: 'Print bill' }).waitFor({ state: 'detached' });
+
+    await page!.getByRole('button', { name: 'Split bill' }).click();
+    const split = page!.getByRole('dialog', { name: 'Split bill' });
+    expect(await split.getByTestId('split-parts').innerText()).toBe('2');
+    await split.getByRole('button', { name: 'Split into 2 bills' }).click();
+    await split.waitFor({ state: 'detached' });
+
+    const floor = await get<{ tables: Array<{ label: string; orderId?: string }> }>('/v1/floor');
+    const order = await get<{ bills: Array<{ state: string; totalPaise: number; billNoText: string }> }>(`/v1/orders/${floor.tables.find((t) => t.label === 'T2')!.orderId!}`);
+    const parts = order.bills.filter((b) => b.state === 'printed');
+    expect(parts).toHaveLength(2);
+    for (const b of parts) expect(b.totalPaise % 100).toBe(0); // rounded to whole rupees
+
+    for (const [i, part] of parts.entries()) {
+      if (i === 0) await k.press('F10');
+      else await page!.getByRole('button', { name: /Settle next part/ }).click();
+      const settle = page!.getByRole('dialog', { name: new RegExp(`part ${i + 1} of 2`) });
+      await settle.waitFor();
+      await k.type(String(part.totalPaise / 100));
+      await k.press('Enter');
+      await page!.getByRole('dialog', { name: i === 0 ? 'Part settled' : 'Bill settled' }).waitFor();
+    }
+    await k.press('Enter'); // back to floor
+    await other!.waitForSelector('[data-table="T2"][data-state="FREE"]', { timeout: 2_000 });
+  });
+
   it('Menu › Bulk upload: a CSV is checked, then imported all at once', async () => {
     const page = await openSettings('Menu');
     await page.getByRole('tab', { name: 'Bulk upload' }).click();

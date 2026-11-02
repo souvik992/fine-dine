@@ -27,7 +27,7 @@ describe('Settle', () => {
   it('settles bill and order, frees the table', () => {
     expect(total).toBe(88_200);
     const res = settle([{ mode: 'upi', amountPaise: total, ref: 'UPI123' }]);
-    expect(res.result).toEqual({ billId, paidPaise: total, changePaise: 0 });
+    expect(res.result).toEqual({ billId, paidPaise: total, changePaise: 0, unpaidParts: 0 });
     expect(res.order).toMatchObject({ state: 'settled', bills: [{ state: 'settled', paidPaise: total }] });
     expect(o.tableState(S.t1)).toBe('FREE');
     expect(h.db.prepare('SELECT open_order_id FROM dining_table WHERE id = ?').pluck().get(S.t1)).toBeNull();

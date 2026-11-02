@@ -57,6 +57,9 @@ quantity instead of adding a second line (lines already sent to the kitchen are 
   required), Complimentary (reason + PIN). Keypad. Settle disabled until paid = total.
 
 ### 4. Split bill dialog
+- Built in P2-05 (`SplitDialog.tsx`, "Split bill" in the order header once the bill is printed): tabs Equally (parts
+  stepper), By item (a part column per part; + / − move one portion between parts), By share (a weight per part).
+  F10 then settles part by part ("Settle B/26-27/000002 (part 2 of 3)", "Settle next part").
 - Mode tabs: Equal (n stepper), By item (drag items into part columns, qty splitting), By proportion (weights).
 - Live totals per part; "Unassigned" column must be empty to confirm.
 

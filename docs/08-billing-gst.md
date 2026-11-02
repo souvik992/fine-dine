@@ -50,6 +50,19 @@ Inclusive pricing: tax = round(line × rate / (10000 + rate)); taxable = line �
 - Each part is a full bill row with its own bill number, tax breakup and tenders.
 - Σ parts = unsplit total exactly (test this with random orders: property test).
 
+Built in P2-05 (`packages/shared/src/split-bill.ts`, `SplitBill`): the whole bill is calculated once with the
+discount and service charge it was printed with; each line's net, discount, tax, service charge and its tax are
+shared out to the parts by weights (largest remainder, ties to the later part), so nothing is taxed twice and every
+part is a valid bill (`checkBillInvariants`). A line can be shared by quantity ("2/3 of 640.00" on the part).
+Decided 2026-11-02 with the product owner:
+- **Rounding:** every part is rounded to the round-off step; the round-off is spread in whole steps so the parts
+  still add up to the unsplit total (₹1,213 in 3 → 404 + 404 + 405).
+- **Numbers:** split after printing. The printed bill keeps its number as Part 1; Parts 2..n take the next numbers.
+  A re-split reuses the numbers in order; a part no longer needed is voided (keeps its number, VOID in reports).
+  Printing the bill again after items were added reuses Part 1's number and voids the other parts.
+- Paying a part leaves the table occupied until the last part is paid. Once a part is paid the order cannot change
+  (adding, cancelling, moving items or re-splitting is refused): changes go on a new order.
+
 ## Numbering
 - Bill numbers: per financial year (1 Apr–31 Mar), gap-free, prefix configurable (`T1/26-27/000123`).
   Decided 2026-11-02: prefix setting `bill.prefix`, 1–3 capital letters/digits, default `B` (`B/26-27/000001`,

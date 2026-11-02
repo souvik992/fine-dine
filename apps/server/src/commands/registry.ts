@@ -23,6 +23,7 @@ import { setRecipe } from './set-recipe.js';
 import { setupOutlet } from './setup-outlet.js';
 import { transferItems } from './transfer-items.js';
 import { settle } from './settle.js';
+import { splitBill } from './split-bill.js';
 import { updateHeldItem } from './update-held-item.js';
 import { upsertAddonGroup } from './upsert-addon-group.js';
 import { upsertArea } from './upsert-area.js';
@@ -77,6 +78,7 @@ const handlers = [
   transferItems,
   // billing + day
   printBill,
+  splitBill,
   settle,
   dayEnd,
 ];

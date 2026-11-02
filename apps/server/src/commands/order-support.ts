@@ -20,6 +20,10 @@ export function requireEditable(order: OrderRow): void {
  */
 export function reopenIfBilled(ctx: CommandContext, order: OrderRow): void {
   if (order.state !== 'billed') return;
+  // A split bill with a paid part cannot change: billing it again would charge the paid items twice (P2-05).
+  if (ctx.db.prepare(`SELECT 1 FROM bill WHERE order_id = ? AND state = 'settled'`).get(order.id)) {
+    throw new PosError('INVALID_STATE', 'Part of this bill is already paid. Settle the other parts first; changes go on a new order.', { orderId: order.id });
+  }
   // The printed bill no longer applies: the table shows its orders again, not "bill printed" (bill rows keep printed_at).
   ctx.db.prepare(`UPDATE "order" SET state = 'open', bill_printed_at = NULL WHERE id = ?`).run(order.id);
   const bills = ctx.db.prepare(`SELECT id FROM bill WHERE order_id = ? AND state = 'printed'`).pluck().all(order.id) as string[];

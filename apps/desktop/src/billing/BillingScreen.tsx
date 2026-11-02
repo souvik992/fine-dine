@@ -1,6 +1,6 @@
 import { formatINR, newId, type MenuItem, type MenuSnapshot, type OrderItemSnapshot, type OrderSnapshot, type OutletConfig } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRightLeft, Flame, Merge, MoveRight, Printer, Search, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, Flame, Merge, MoveRight, Printer, Search, Split, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
@@ -16,6 +16,7 @@ import { addOrMerge, changeBy, type LineCommand } from './order-lines.js';
 import { Modal } from '../components/Modal.js';
 import { PrintBillDialog } from './PrintBillDialog.js';
 import { SettleDialog } from './SettleDialog.js';
+import { SplitDialog } from './SplitDialog.js';
 import { TableActionsDialog, type TableAction } from './TableActionsDialog.js';
 import { useOrderSession } from './useOrderSession.js';
 
@@ -51,6 +52,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
   const [dialog, setDialog] = useState<'bill' | 'settle' | null>(null);
   const [changing, setChanging] = useState<OrderItemSnapshot | null>(null);
   const [tableAction, setTableAction] = useState<TableAction | null>(null);
+  const [splitting, setSplitting] = useState(false);
   const [settledChange, setSettledChange] = useState<number | null>(null);
   const searchBox = useRef<HTMLInputElement>(null);
 
@@ -60,6 +62,9 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
   const selected = held.find((i) => i.id === selectedId) ?? held.at(-1);
   const firedCount = order?.items.filter((i) => i.status === 'fired').length ?? 0;
   const printedBill = order?.state === 'billed' ? order.bills.find((b) => b.state === 'printed') : undefined;
+  /** Parts of a split bill (printed or paid), in bill-number order; one part when not split. */
+  const parts = order?.bills.filter((b) => b.state === 'printed' || b.state === 'settled') ?? [];
+  const unpaidParts = order?.state === 'billed' ? parts.filter((b) => b.state === 'printed').length : 0;
   const canPrint = order?.state === 'open' && held.length === 0 && firedCount > 0 && configQuery.data !== undefined;
 
   /** F9 on a printed bill reprints it (DUPLICATE, same number; a manager PIN when the role needs one). */
@@ -177,7 +182,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (sheet || dialog || changing || tableAction || settledChange !== null || pinRequest) return; // an open dialog owns the keyboard
+      if (sheet || dialog || changing || tableAction || splitting || settledChange !== null || pinRequest) return; // an open dialog owns the keyboard
       const inSearch = document.activeElement === searchBox.current;
       if (e.key === 'F8') {
         e.preventDefault();
@@ -262,6 +267,11 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
             {can('table.merge', true) ? (
               <button className="btn h-9" onClick={() => setTableAction('merge')}>
                 <Merge className="h-4 w-4" /> Merge
+              </button>
+            ) : null}
+            {order.state === 'billed' && can('bill.split', true) && order.bills.every((b) => b.state !== 'settled' && b.paidPaise === 0) ? (
+              <button className="btn h-9" onClick={() => setSplitting(true)}>
+                <Split className="h-4 w-4" /> Split bill
               </button>
             ) : null}
             {can('item.transfer', true) ? (
@@ -385,12 +395,13 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
           }}
         />
       ) : null}
+      {splitting ? <SplitDialog order={order} onClose={() => setSplitting(false)} run={run} /> : null}
       {tableAction ? <TableActionsDialog action={tableAction} order={order} onClose={() => setTableAction(null)} run={run} /> : null}
       {changing ? <FiredItemDialog item={changing} onClose={() => setChanging(null)} run={run} /> : null}
       {dialog === 'settle' && printedBill ? (
         <SettleDialog
           billId={printedBill.id}
-          billNo={printedBill.billNoText ?? 'bill'}
+          billNo={`${printedBill.billNoText ?? 'bill'}${parts.length > 1 ? ` (part ${parts.indexOf(printedBill) + 1} of ${parts.length})` : ''}`}
           totalPaise={printedBill.totalPaise}
           session={session}
           onClose={() => setDialog(null)}
@@ -401,7 +412,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
         />
       ) : null}
       {settledChange !== null ? (
-        <Modal title="Bill settled" onClose={onBack}>
+        <Modal title={unpaidParts > 0 ? 'Part settled' : 'Bill settled'} onClose={unpaidParts > 0 ? () => setSettledChange(null) : onBack}>
           <div className="text-center">
             {settledChange > 0 ? (
               <>
@@ -409,11 +420,29 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
                 <p className="my-2 text-4xl font-bold tabular-nums" data-testid="change-due">{formatINR(settledChange)}</p>
               </>
             ) : (
-              <p className="my-2 text-lg font-semibold">Paid in full. The table is free.</p>
+              <p className="my-2 text-lg font-semibold">{unpaidParts > 0 ? 'Paid in full.' : 'Paid in full. The table is free.'}</p>
             )}
-            <button data-autofocus className="btn btn-primary mt-4 w-full" onClick={onBack}>
-              Back to floor <kbd className="text-xs opacity-80">Enter</kbd>
-            </button>
+            {unpaidParts > 0 ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  {unpaidParts} more part{unpaidParts === 1 ? '' : 's'} to pay.
+                </p>
+                <button
+                  data-autofocus
+                  className="btn btn-primary mt-4 w-full"
+                  onClick={() => {
+                    setSettledChange(null);
+                    setDialog('settle');
+                  }}
+                >
+                  Settle next part <kbd className="text-xs opacity-80">Enter</kbd>
+                </button>
+              </>
+            ) : (
+              <button data-autofocus className="btn btn-primary mt-4 w-full" onClick={onBack}>
+                Back to floor <kbd className="text-xs opacity-80">Enter</kbd>
+              </button>
+            )}
           </div>
         </Modal>
       ) : null}

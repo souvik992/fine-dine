@@ -105,10 +105,13 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 ### SplitBill payloads
 ```json
 { "mode": "equal", "parts": 3 }
-{ "mode": "items", "parts": [ { "itemIds": ["a","b"] }, { "itemIds": ["c"] } ] }
+{ "mode": "items", "parts": [ { "items": [{ "orderItemId": "a", "qty": 2 }] }, { "items": [{ "orderItemId": "a", "qty": 1 }, { "orderItemId": "c", "qty": 1 }] } ] }
 { "mode": "proportion", "parts": [ { "weight": 2 }, { "weight": 1 }, { "weight": 1 } ] }
 ```
-Rules in `docs/08-billing-gst.md`.
+Rules in `docs/08-billing-gst.md`. 2 to 20 parts; by item, every billed line's whole quantity must be assigned
+(`VALIDATION`). Only on a printed bill with nothing paid (`INVALID_STATE`). Result `{ bills: [{ billId, billNo,
+totalPaise }] }`; each part is printed ("Part 2 of 3"). `Settle` on a part settles that bill; the order and the
+table close with the last part (result `unpaidParts`).
 
 ## Queries
 | GET | Returns |
