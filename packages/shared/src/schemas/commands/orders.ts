@@ -63,6 +63,18 @@ export const fireKotSchema = z.union([
   z.object({ all: z.literal(true) }).strict(),
 ]);
 
+// ---- after the KOT (P2-04): every change is a slip to the kitchen, audited with a reason, and a leakage flag ----
+
+const reason = z.string().trim().min(1).max(120);
+/** "Not prepared": what the removed portions would have used goes back to stock (ADR-0003). */
+const returnToStock = z.boolean().default(false);
+
+/** Reduce a fired line. To add more, add the item again and fire it. */
+export const modifyFiredItemSchema = z.object({ orderItemId: ulidSchema, newQty: qty, reason, returnToStock }).strict();
+export const cancelFiredItemSchema = z.object({ orderItemId: ulidSchema, reason, returnToStock }).strict();
+export const reprintKotSchema = z.object({ kotId: ulidSchema }).strict();
+export const reprintBillSchema = z.object({ billId: ulidSchema }).strict();
+
 export type OpenTablePayload = z.infer<typeof openTableSchema>;
 export type AddItemsPayload = z.infer<typeof addItemsSchema>;
 export type UpdateHeldItemPayload = z.infer<typeof updateHeldItemSchema>;

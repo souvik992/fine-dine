@@ -473,6 +473,32 @@ describe('desktop app', () => {
     await page!.keyboard.press('Escape');
   });
 
+  it('After the KOT: cancel a sent item with a reason (cancel slip printed), then reprint the KOT', async () => {
+    const [page] = app.windows();
+    const prints = () => {
+      const dir = path.join(dataDir, 'prints');
+      return readdirSync(dir, { recursive: true })
+        .map(String)
+        .filter((f) => f.endsWith('.txt'))
+        .map((f) => readFileSync(path.join(dir, f), 'utf8'));
+    };
+    await page!.locator('[data-table="T6"]').click();
+    await page!.getByLabel('Add item').waitFor();
+    await page!.getByRole('button', { name: 'Change sent Paneer Tikka' }).click();
+    const dlg = page!.getByRole('dialog', { name: 'Change sent item: Paneer Tikka' });
+    expect(await dlg.getByTestId('keep-qty').innerText()).toBe('0'); // one portion: cancel the line
+    await dlg.getByRole('radio', { name: 'Guest changed mind' }).click();
+    await dlg.getByRole('button', { name: 'Cancel item' }).click();
+    await dlg.waitFor({ state: 'detached' });
+    await page!.getByRole('listitem', { name: 'Paneer Tikka cancelled' }).waitFor();
+    await expect.poll(() => prints().some((t) => t.includes('CANCELLED KOT') && t.includes('Reason: Guest changed mind')), { timeout: 5_000 }).toBe(true);
+
+    const before = prints().filter((t) => t.includes('** DUPLICATE **')).length;
+    await page!.getByRole('button', { name: /^Reprint KOT/ }).first().click();
+    await expect.poll(() => prints().filter((t) => t.includes('** DUPLICATE **')).length, { timeout: 5_000 }).toBeGreaterThan(before);
+    await page!.keyboard.press('Escape');
+  });
+
   it('Menu › Bulk upload: a CSV is checked, then imported all at once', async () => {
     const page = await openSettings('Menu');
     await page.getByRole('tab', { name: 'Bulk upload' }).click();

@@ -10,6 +10,7 @@ import { VegMark } from '../components/VegMark.js';
 import { elapsedMinutes, formatElapsed } from '../floor/floor-model.js';
 import { Cart } from './Cart.js';
 import { hasChoices, needsChoices, resolveQuickEntry, visibleItems } from './menu-model.js';
+import { FiredItemDialog } from './FiredItemDialog.js';
 import { ModifierSheet, type SheetResult } from './ModifierSheet.js';
 import { addOrMerge, changeBy, type LineCommand } from './order-lines.js';
 import { Modal } from '../components/Modal.js';
@@ -47,6 +48,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
   const [pending, setPending] = useState(0);
   const [toast, setToast] = useState<Toast | null>(null);
   const [dialog, setDialog] = useState<'bill' | 'settle' | null>(null);
+  const [changing, setChanging] = useState<OrderItemSnapshot | null>(null);
   const [settledChange, setSettledChange] = useState<number | null>(null);
   const searchBox = useRef<HTMLInputElement>(null);
 
@@ -58,9 +60,24 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
   const printedBill = order?.state === 'billed' ? order.bills.find((b) => b.state === 'printed') : undefined;
   const canPrint = order?.state === 'open' && held.length === 0 && firedCount > 0 && configQuery.data !== undefined;
 
+  /** F9 on a printed bill reprints it (DUPLICATE, same number; a manager PIN when the role needs one). */
+  const reprintBill = () => {
+    if (!printedBill) return;
+    void api.command<{ billNo: string }>('ReprintBill', { billId: printedBill.id }).then(
+      (r) => setToast({ kind: 'ok', text: `Bill ${r.result.billNo} printed again (DUPLICATE).` }),
+      (e: unknown) => setToast({ kind: 'error', text: e instanceof ApiError ? e.message : 'Could not reprint. Try again.' }),
+    );
+  };
+  const reprintKot = (kotId: string, kotNo: number) => {
+    void api.command('ReprintKOT', { kotId }).then(
+      () => setToast({ kind: 'ok', text: `KOT ${String(kotNo).padStart(4, '0')} printed again (DUPLICATE).` }),
+      (e: unknown) => setToast({ kind: 'error', text: e instanceof ApiError ? e.message : 'Could not reprint. Try again.' }),
+    );
+  };
+
   const openBill = () => {
     if (canPrint) setDialog('bill');
-    else if (order?.state === 'billed') setToast({ kind: 'error', text: 'The bill is already printed. Press F10 to settle.' });
+    else if (printedBill) reprintBill();
     else if (held.length) setToast({ kind: 'error', text: 'Send the new items to the kitchen (F8) before printing the bill.' });
     else setToast({ kind: 'error', text: 'Nothing to bill yet.' });
   };
@@ -158,7 +175,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (sheet || dialog || settledChange !== null || pinRequest) return; // an open dialog owns the keyboard
+      if (sheet || dialog || changing || settledChange !== null || pinRequest) return; // an open dialog owns the keyboard
       const inSearch = document.activeElement === searchBox.current;
       if (e.key === 'F8') {
         e.preventDefault();
@@ -305,13 +322,22 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
         </main>
 
         <div className="flex min-h-0 flex-col">
-          <Cart order={order} selectedId={selected?.id ?? null} busy={pending > 0} onSelect={setSelectedId} onQty={changeQty} onRemove={remove} />
+          <Cart
+            order={order}
+            selectedId={selected?.id ?? null}
+            busy={pending > 0}
+            onSelect={setSelectedId}
+            onQty={changeQty}
+            onRemove={remove}
+            onChangeSent={order.state === 'open' || order.state === 'billed' ? setChanging : undefined}
+            onReprintKot={reprintKot}
+          />
           <div className="grid w-[380px] grid-cols-3 gap-2 border-l border-t border-border bg-card p-3">
             <button className="btn btn-primary h-12" onClick={fire} disabled={held.length === 0}>
               <Flame className="h-4 w-4" /> Fire <kbd className="text-xs opacity-80">F8</kbd>
             </button>
-            <button className="btn h-12" onClick={openBill} disabled={!canPrint}>
-              <Printer className="h-4 w-4" /> Bill <kbd className="text-xs">F9</kbd>
+            <button className="btn h-12" onClick={openBill} disabled={!canPrint && !printedBill}>
+              <Printer className="h-4 w-4" /> {printedBill ? 'Reprint' : 'Bill'} <kbd className="text-xs">F9</kbd>
             </button>
             <button className="btn h-12" onClick={openSettle} disabled={!printedBill}>
               <Wallet className="h-4 w-4" /> Settle <kbd className="text-xs">F10</kbd>
@@ -338,6 +364,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
           }}
         />
       ) : null}
+      {changing ? <FiredItemDialog item={changing} onClose={() => setChanging(null)} run={run} /> : null}
       {dialog === 'settle' && printedBill ? (
         <SettleDialog
           billId={printedBill.id}

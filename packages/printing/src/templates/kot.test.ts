@@ -88,3 +88,24 @@ describe('text helpers', () => {
     expect(wrapText('', 10)).toEqual(['']);
   });
 });
+
+describe('change slips (P2-04)', () => {
+  const base = { kotNo: 43, orderType: 'dine_in' as const, stationName: 'Tandoor', tableLabel: 'T7', time: '21:10', date: '02-11-26' };
+
+  it('a modify slip shows the KOT it changes, the quantity removed, what is left and the reason', () => {
+    const p = renderKot({ ...base, kind: 'modify', forKotNo: 41, reason: 'Guest changed mind', lines: [{ qty: -1, nowQty: 2, name: 'Butter Naan', course: 1, addons: [] }] }, { paper: 80 }).preview;
+    expect(p).toContain('MODIFIED KOT 0043');
+    expect(p).toContain('Changes KOT 0041');
+    expect(p).toMatch(/-1 Butter Naan/);
+    expect(p).toContain('now 2');
+    expect(p).toContain('Reason: Guest changed mind');
+  });
+
+  it('a cancel slip and a duplicate', () => {
+    const p = renderKot({ ...base, kind: 'cancel', forKotNo: 41, reason: 'Wrong order', duplicate: true, lines: [{ qty: -2, name: 'Dal Makhani', course: 1, addons: [] }] }, { paper: 58 }).preview;
+    expect(p.split('\n')[0]).toContain('** DUPLICATE **');
+    expect(p.split('\n').slice(1, 3)).toEqual(['CANCELLED KOT', '0043']); // wraps on 58 mm, never cut
+    expect(p).toMatch(/-2 Dal Makhani/);
+    expect(p).not.toContain('now');
+  });
+});

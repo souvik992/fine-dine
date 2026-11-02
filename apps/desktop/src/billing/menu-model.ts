@@ -129,12 +129,19 @@ export function cartLineAmount(i: OrderItemSnapshot): number {
 
 export interface KotGroup {
   kotNo: number;
+  /** For "Reprint KOT". */
+  kotId: string | undefined;
   items: OrderItemSnapshot[];
 }
 
-/** Fired items grouped by KOT number (newest first), as the cart shows them. */
+/**
+ * Sent lines grouped by KOT number (newest first), as the cart shows them. Cancelled lines stay in their KOT
+ * (shown struck through) so the table can see what was sent and taken back.
+ */
 export function firedByKot(items: readonly OrderItemSnapshot[]): KotGroup[] {
   const groups = new Map<number, OrderItemSnapshot[]>();
-  for (const i of items) if (i.status === 'fired' && i.kotNo !== undefined) groups.set(i.kotNo, [...(groups.get(i.kotNo) ?? []), i]);
-  return [...groups.entries()].sort(([a], [b]) => b - a).map(([kotNo, list]) => ({ kotNo, items: list }));
+  for (const i of items) {
+    if ((i.status === 'fired' || i.status === 'cancelled') && i.kotNo !== undefined) groups.set(i.kotNo, [...(groups.get(i.kotNo) ?? []), i]);
+  }
+  return [...groups.entries()].sort(([a], [b]) => b - a).map(([kotNo, list]) => ({ kotNo, kotId: list[0]!.kotId, items: list }));
 }

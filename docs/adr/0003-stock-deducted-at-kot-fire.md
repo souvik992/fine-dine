@@ -20,6 +20,6 @@ firing (P2-04) were usually already cooked.
 
 ## Consequences
 - Consumption reports match what the kitchen actually made, including cancelled-after-fire food (a leakage signal).
-- Ordering items that were never cooked needs a manual correction; P2-04 may add a "not prepared" choice to
-  `CancelFiredItem` that reverses the KOT's movements for that line.
+- Items that were never cooked: since P2-04, Modify/CancelFiredItem take `returnToStock` ("Not prepared yet" in the
+  dialog), which posts `adjust` movements for the removed portions' recipe, referenced to the change slip.
 - No change to billing, bill numbering or printed bills.

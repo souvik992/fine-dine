@@ -43,6 +43,10 @@ quantity instead of adding a second line (lines already sent to the kitchen are 
 - Footer buttons: Fire (F8), Fire course… , Print bill (F9), Settle (F10), More (discount, covers, captain,
   customer, transfer items).
 - Conflict banner when the order changed elsewhere.
+- After the KOT (P2-04): each sent line has a pencil button: "Keep" stepper (0 = cancel the line), reason chips or
+  typed reason, "Not prepared yet" (ingredients back to stock); a manager PIN is asked when the role needs it.
+  Cancelled lines stay in their KOT, struck through. Each KOT group has "Reprint". When the bill is printed the
+  Bill button becomes "Reprint" (F9), printing a DUPLICATE with the same number.
 - Sold out (P2-11): right-click an item tile to mark it sold out or back on (`menu.stock`). Sold-out tiles stay
   visible, greyed, with a "Sold out" label; choosing one explains why.
 

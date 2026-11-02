@@ -360,3 +360,39 @@ describe('bill design (Settings › Bill design)', () => {
     expect(stored.display.showCaptain).toBe(false);
   }, 20_000);
 });
+
+describe('after the KOT: PIN rules (P2-04)', () => {
+  it('a Cashier needs a manager PIN to cancel a sent item or reprint; the approver is recorded', async () => {
+    const owner = await seeded();
+    const open = await send('OpenTable', { tableId: ids.t1, covers: 2 }, { token: owner });
+    const orderId = open.body.order!.id;
+    const item = newId();
+    await send('AddItems', { items: [{ id: item, itemId: ids.dal, qty: 2 }] }, { token: owner, orderId, expectedVersion: 1 });
+    const fired = await send('FireKOT', { all: true }, { token: owner, orderId, expectedVersion: 2 });
+    const kotId = (fired.body.result as { kots: Array<{ id: string }> }).kots[0]!.id;
+    const cashier = (await login(ids.cashier, '1111')).body.token;
+
+    const cancel = (pin?: string) => send('CancelFiredItem', { orderItemId: item, reason: 'Guest left' }, { token: cashier, orderId, expectedVersion: 3, ...(pin ? { pin } : {}) });
+    expect((await cancel()).body.error).toMatchObject({ code: 'PIN_REQUIRED', details: { right: 'kot.cancel', reason: 'pin_missing' } });
+    expect((await cancel('2345')).body.ok).toBe(true);
+    const row = db.prepare("SELECT user_id, approved_by, leakage_flag FROM audit_event WHERE action = 'item.cancel_fired'").get();
+    expect(row).toEqual({ user_id: ids.cashier, approved_by: ids.manager, leakage_flag: 1 });
+
+    expect((await send('ReprintKOT', { kotId }, { token: cashier })).body.error?.code).toBe('PIN_REQUIRED');
+    expect((await send('ReprintKOT', { kotId }, { token: cashier, pin: '2345' })).body.ok).toBe(true);
+    expect((await send('ReprintKOT', { kotId }, { token: owner })).body.ok).toBe(true); // the Owner needs no PIN
+  }, 20_000);
+
+  it('a Captain needs a manager PIN to reduce a sent item', async () => {
+    const owner = await seeded();
+    const open = await send('OpenTable', { tableId: ids.t1, covers: 2 }, { token: owner });
+    const orderId = open.body.order!.id;
+    const item = newId();
+    await send('AddItems', { items: [{ id: item, itemId: ids.dal, qty: 3 }] }, { token: owner, orderId, expectedVersion: 1 });
+    await send('FireKOT', { all: true }, { token: owner, orderId, expectedVersion: 2 });
+    const captain = (await login(ids.captain, '3333')).body.token;
+    const modify = (pin?: string) => send('ModifyFiredItem', { orderItemId: item, newQty: 1, reason: 'Too much' }, { token: captain, orderId, expectedVersion: 3, ...(pin ? { pin } : {}) });
+    expect((await modify()).body.error).toMatchObject({ code: 'PIN_REQUIRED', details: { right: 'kot.modify' } });
+    expect((await modify('2345')).body.ok).toBe(true);
+  }, 20_000);
+});

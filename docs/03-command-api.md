@@ -144,6 +144,23 @@ marked `*** SAMPLE - NOT A BILL ***` at the top and bottom; it takes no bill num
 `POST /v1/bill-preview` { widthMm: 58|80, config?: partial config } (admin; a read, nothing is stored) returns
 `{ preview }`: the same sample rendered with the saved settings overlaid by the unsaved ones (the live preview).
 
+### After the KOT (P2-04; schemas in `packages/shared/src/schemas/commands/orders.ts`)
+- `ModifyFiredItem` `{ orderItemId, newQty, reason, returnToStock? }`: only reduces (`newQty` below the current
+  qty, else `INVALID_STATE`: add the item again to add more). The line keeps `newQty`; the removed part becomes a
+  new `cancelled` line on the same KOT. Add-ons are charged per line and stay with the remaining part. Result
+  `{ orderItemId, qty, kotId, kotNo }` (the slip).
+- `CancelFiredItem` `{ orderItemId, reason, returnToStock? }`: the line becomes `cancelled` (kept, off the bill).
+- Both send a change slip (`modify` / `cancel` KOT: `-qty name`, `now n`, "Changes KOT 0042", the reason) to the
+  line's station, supersede a printed bill (like adding items), audit with the reason and set the leakage flag.
+  `returnToStock: true` ("not prepared") posts `adjust` movements for the removed portions' recipe (ADR-0003).
+  A held line → `INVALID_STATE` (change it in the cart); a cancelled line → `INVALID_STATE`.
+- `ReprintKOT` `{ kotId }`: the stored ticket (`kot_document`, migration 0006) marked DUPLICATE on the station's
+  printers; `kot.reprint_count` + 1. `ReprintBill` `{ billId }`: the latest `bill_document` revision marked DUPLICATE,
+  same number; `INVALID_STATE` when superseded (print again with PrintBill) or void; works on settled bills; the
+  count comes from the audit log (settled bill rows are frozen). Both: leakage flag, no order version change.
+- PIN rules come from the role (`kot.modify`, `kot.cancel`, `reprint` with needs-PIN): by default Cashier needs a
+  manager PIN for all three, Captain for modify and cancel; the approver is recorded on the audit rows.
+
 ## Stock commands (P2-10/P2-11; schemas in `packages/shared/src/schemas/commands/stock.ts` and `menu-csv.ts`)
 Quantities are integer thousandths of the material's unit (`qtyMilli`), costs integer paise per whole unit.
 | Type | Payload | Right | Effect |

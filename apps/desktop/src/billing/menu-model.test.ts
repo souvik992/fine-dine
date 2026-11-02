@@ -137,8 +137,8 @@ describe('cart helpers', () => {
     expect(cartLineAmount(line('a', 'held'))).toBe(16_000);
   });
 
-  it('groups fired lines by KOT, newest first', () => {
-    const groups = firedByKot([line('a', 'fired', 1), line('b', 'held'), line('c', 'fired', 2), line('d', 'fired', 1)]);
+  it('groups sent lines by KOT, newest first; cancelled lines stay in their KOT', () => {
+    const groups = firedByKot([line('a', 'fired', 1), line('b', 'held'), line('c', 'fired', 2), line('d', 'cancelled', 1)]);
     expect(groups.map((g) => [g.kotNo, g.items.map((i) => i.id)])).toEqual([
       [2, ['c']],
       [1, ['a', 'd']],

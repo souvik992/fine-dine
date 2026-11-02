@@ -2,14 +2,18 @@
 import { createRegistry, type CommandRegistry } from '../core/command-handler.js';
 import { addItems } from './add-items.js';
 import { adjustStock } from './adjust-stock.js';
+import { cancelFiredItem } from './cancel-fired-item.js';
 import { dayEnd } from './day-end.js';
 import { fireKot } from './fire-kot.js';
 import { importMenu } from './import-menu.js';
+import { modifyFiredItem } from './modify-fired-item.js';
 import { openTable } from './open-table.js';
 import { printBill } from './print-bill.js';
 import { printSampleBill } from './print-sample-bill.js';
 import { printTestPage } from './print-test-page.js';
 import { recordPurchase } from './record-purchase.js';
+import { reprintBill } from './reprint-bill.js';
+import { reprintKot } from './reprint-kot.js';
 import { removeHeldItem } from './remove-held-item.js';
 import { setConfig } from './set-config.js';
 import { setItemAvailability } from './set-item-availability.js';
@@ -59,6 +63,11 @@ const handlers = [
   updateHeldItem,
   removeHeldItem,
   fireKot,
+  // after the KOT (P2-04)
+  modifyFiredItem,
+  cancelFiredItem,
+  reprintKot,
+  reprintBill,
   // billing + day
   printBill,
   settle,

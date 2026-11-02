@@ -58,23 +58,21 @@ export function stockChanged(ctx: CommandContext, stockItemIds: string[]): void 
   ctx.emit('stock', 'stock.changed', { stockItemIds: [...new Set(stockItemIds)] });
 }
 
-interface FiredLine {
-  id: string;
-  item_id: string;
-  variant_id: string | null;
+/** A sold quantity of a menu item: its size, how many, and the add-ons with their qty on the line. */
+export interface UseLine {
+  itemId: string;
+  variantId: string | null;
   qty: number;
+  addons: Array<{ addonId: string; qty: number }>;
 }
 
 /**
- * Material use of the fired lines: the variant's recipe if it has one, else the item's, times the line qty; plus
- * each add-on's recipe times the add-on's qty on the line (already a line total, docs/03 AddItems). Summed per
+ * Material use of the lines: the variant's recipe if it has one, else the item's, times the line qty; plus each
+ * add-on's recipe times the add-on's qty on the line (already a line total, docs/03 AddItems). Summed per
  * material. Lines without a recipe use nothing.
  */
-export function recipeUse(db: Db, orderItemIds: string[]): Map<string, number> {
+export function recipeUseOf(db: Db, lines: UseLine[]): Map<string, number> {
   const need = new Map<string, number>();
-  if (orderItemIds.length === 0) return need;
-  const ids = JSON.stringify(orderItemIds);
-  const lines = db.prepare('SELECT id, item_id, variant_id, qty FROM order_item WHERE id IN (SELECT value FROM json_each(?))').all(ids) as FiredLine[];
   const recipeOf = db.prepare(
     `SELECT r.stock_item_id, r.qty_milli FROM recipe_line r JOIN stock_item s ON s.id = r.stock_item_id AND s.active = 1
      WHERE r.owner_kind = ? AND r.owner_id = ?`,
@@ -92,13 +90,43 @@ export function recipeUse(db: Db, orderItemIds: string[]): Map<string, number> {
   const add = (rows: Array<{ stock_item_id: string; qty_milli: number }>, times: number) => {
     for (const r of rows) need.set(r.stock_item_id, (need.get(r.stock_item_id) ?? 0) + r.qty_milli * times);
   };
-  const addonsOf = db.prepare('SELECT addon_id, qty FROM order_item_addon WHERE order_item_id = ?');
   for (const l of lines) {
-    const own = l.variant_id ? recipe('variant', l.variant_id) : [];
-    add(own.length ? own : recipe('item', l.item_id), l.qty);
-    for (const a of addonsOf.all(l.id) as Array<{ addon_id: string; qty: number }>) add(recipe('addon', a.addon_id), a.qty);
+    const own = l.variantId ? recipe('variant', l.variantId) : [];
+    add(own.length ? own : recipe('item', l.itemId), l.qty);
+    for (const a of l.addons) add(recipe('addon', a.addonId), a.qty);
   }
   return need;
+}
+
+/** The order items as UseLines (current qty and add-ons). */
+export function useLinesOf(db: Db, orderItemIds: string[]): UseLine[] {
+  if (orderItemIds.length === 0) return [];
+  const rows = db.prepare('SELECT id, item_id, variant_id, qty FROM order_item WHERE id IN (SELECT value FROM json_each(?))').all(JSON.stringify(orderItemIds)) as Array<{
+    id: string;
+    item_id: string;
+    variant_id: string | null;
+    qty: number;
+  }>;
+  const addonsOf = db.prepare('SELECT addon_id AS addonId, qty FROM order_item_addon WHERE order_item_id = ?');
+  return rows.map((r) => ({ itemId: r.item_id, variantId: r.variant_id, qty: r.qty, addons: addonsOf.all(r.id) as UseLine['addons'] }));
+}
+
+export function recipeUse(db: Db, orderItemIds: string[]): Map<string, number> {
+  return recipeUseOf(db, useLinesOf(db, orderItemIds));
+}
+
+/**
+ * "Not prepared" on a cancel or reduction (P2-04, ADR-0003): what those portions would have used goes back to
+ * stock as an `adjust` movement referenced to the change slip, with the reason. Returns the materials touched.
+ */
+export function returnToStock(ctx: CommandContext, kotId: string, lines: UseLine[], reason: string): string[] {
+  const touched: string[] = [];
+  for (const [stockItemId, qty] of [...recipeUseOf(ctx.db, lines)].sort(([a], [b]) => a.localeCompare(b))) {
+    if (qty <= 0) continue;
+    postMovement(ctx, { stockItemId, deltaMilli: qty, kind: 'adjust', refType: 'kot', refId: kotId, reason: `Not prepared: ${reason}` });
+    touched.push(stockItemId);
+  }
+  return touched;
 }
 
 /** Called by FireKOT for each KOT: one `sale` movement per material, referenced to the KOT. */
