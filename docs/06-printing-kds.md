@@ -49,19 +49,33 @@ qty × rate = amount; subtotal; discount (with reason code); service charge (onl
 and SGST with rates; round-off; grand total; payment QR (UPI intent `upi://pay?pa=...&am=...&tn=Bill 1234`);
 footer text. Split parts print "Part 2 of 3". Reprints print DUPLICATE.
 
+Built in P1-07 (`packages/printing/src/templates/bill.ts`): the template only lays out figures from
+`calculateBill`. 80 mm uses Item/Qty/Rate/Amount columns; 58 mm puts `qty x rate  amount` under the name. A
+line that does not fit is wrapped, never cut (bill numbers, GSTINs). Text mode has no ₹ glyph, so amounts
+print as `Rs 1,680.00`; Hindi/Bengali bitmap lines are still to do (`bitmap-text.ts`). Not yet verified on a
+physical printer.
+
 ### Z-report (day-end)
 Sales by mode, by area, by category; discounts; voids; cancelled-after-fire count; cash expected vs counted.
 
 ## Worker
-1. One worker per printer; polls `print_job` where `state in ('queued','retry')` ordered by created_at.
-2. Send bytes. TCP: open socket, write, end, await 'close' (timeout 5 s). USB: Windows RAW spool.
-3. Success → `state='done'`. Failure → attempts++, backoff 2 s / 5 s / 15 s, then `state='failed'`, emit
-   `print.status` offline; if `backupPrinterId`, enqueue copy there with header `REROUTED FROM <name>`.
-4. On server start: resume `queued`/`retry` jobs.
+1. One worker per printer (`apps/server/src/print/print-queue.ts`), woken after each command commits; it takes
+   the oldest `queued`/`retry` job. Order is strict: a job waiting out a backoff holds back the next one.
+2. Send bytes (× `copies`). TCP: connect, write, end; the job counts as printed once every byte is flushed and
+   the printer did not reset the connection within 1.5 s (many printers never close their side, so waiting for
+   `close` alone would reprint every ticket). Connect + flush must finish within 5 s. USB: Windows RAW spool via
+   winspool.drv from a constant PowerShell 5.1 script (printer name in an env var, bytes on stdin).
+3. Success → `state='done'`. Failure → attempts++, backoff 2 s / 5 s / 15 s (so 1 try + 3 retries), then
+   `state='failed'`. `print.status` `{ printerId, status: retrying|offline|ok, queued, error }` is emitted on the
+   first failure (`retrying`), on giving up (`offline`) and on the first success after trouble (`ok`). If
+   `backupPrinterId`, a copy is queued there with header `** REROUTED FROM <name> **` (audited as
+   `print.reroute`); a rerouted job is never rerouted again.
+4. On server start: resume `queued`/`retry` jobs. On stop: cancel backoff timers, finish the ticket being sent.
+   `GET /v1/printers` shows each printer's status, queued count and last error.
 5. Optional status poll (DLE EOT 4) for paper-end where supported.
 
 ## Fake printer (dev)
-`transport: fake` writes a rendered text preview to `data/prints/<printer>/<jobId>.txt` and logs it. Tests
+`transport: fake` writes a rendered text preview to `data/prints/<printerId>/<jobId>.txt` and logs it. Tests
 assert on the text preview, not raw bytes.
 
 ## KDS

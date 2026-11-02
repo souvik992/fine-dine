@@ -43,7 +43,7 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria �
   - Accept: firing items for 2 stations creates 2 KOTs with consecutive numbers; table state transitions
     FREE→SEATED→KOT_RUNNING; snapshots copied; cannot fire on settled order (INVALID_STATE).
 
-- [ ] **P1-07 Printing package + worker**
+- [x] **P1-07 Printing package + worker**
   - Read first: `06-printing-kds.md`, `packages/printing/README.md`
   - Build: ESC/POS builder, KOT + bill templates (58/80 mm), transports `tcp`, `usb` (stub on non-Windows), `fake`; server print worker with retry/backoff/reroute.
   - Accept: fake printer writes text previews matching snapshot tests; failed TCP job retries 3 times then

@@ -7,6 +7,7 @@ import { PosError } from './core/errors.js';
 import { EventBus, noopPrintWaker, type PrintWaker } from './core/events.js';
 import { allowAllRights, type RightsPolicy } from './core/rights.js';
 import type { Db } from './db/connection.js';
+import type { PrinterStatus } from './print/print-queue.js';
 import { commandRoutes } from './routes/commands.js';
 import { healthRoutes } from './routes/health.js';
 import { queryRoutes } from './routes/queries.js';
@@ -22,6 +23,8 @@ export interface AppDeps {
   auth?: Authenticator;
   bus?: EventBus;
   printWaker?: PrintWaker;
+  /** Live printer status for GET /v1/printers. */
+  printQueue?: { status(printerId: string): PrinterStatus | undefined };
 }
 
 // Secrets never reach the log (docs/07-security-licensing.md).
@@ -70,7 +73,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   );
 
   healthRoutes(app, { db, timeZone, now, startedAt });
-  queryRoutes(app, { db, timeZone, now });
+  queryRoutes(app, { db, timeZone, now, printerStatus: deps.printQueue ? (id) => deps.printQueue!.status(id) : undefined });
   commandRoutes(
     app,
     {

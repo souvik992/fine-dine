@@ -85,12 +85,18 @@ export class EscPos {
     return this.raw(LF);
   }
 
-  /** Left text and right text on one line; the left side is cut to fit. */
+  /**
+   * Left text and right text on one line. When they do not fit, the left side is wrapped on its own line(s)
+   * and the right side is right-aligned below: nothing is ever cut (bill numbers, GSTINs, amounts).
+   */
   twoCol(left: string, right: string): this {
     const w = this.width();
-    const r = sanitize(right).slice(0, w);
-    const l = sanitize(left).slice(0, Math.max(0, w - r.length - 1));
-    return this.line(l + ' '.repeat(Math.max(1, w - l.length - r.length)) + r);
+    const l = sanitize(left);
+    const r = sanitize(right);
+    if (l.length + r.length + 1 <= w) return this.line(l + ' '.repeat(w - l.length - r.length) + r);
+    if (l) this.wrapped(l);
+    for (const part of wrapText(r, w)) this.line(' '.repeat(w - part.length) + part);
+    return this;
   }
 
   /** Word-wrapped text; continuation lines get the same indent. */
@@ -121,6 +127,38 @@ export class EscPos {
 
   drawerKick(): this {
     return this.raw(ESC, 0x70, 0, 25, 250);
+  }
+
+  /** Centre alignment on (ESC a 1) or back to left (ESC a 0). Only affects bytes, not the preview. */
+  align(center: boolean): this {
+    return this.raw(ESC, 0x61, center ? 1 : 0);
+  }
+
+  /** Native QR code (model 2, GS ( k), centred. The preview shows `[label]`. */
+  qr(data: string, label = 'QR code', size = 6): this {
+    const d = sanitize(data);
+    if (d.length === 0 || d.length > 400) throw new RangeError('QR data must be 1 to 400 characters');
+    this.align(true);
+    this.raw(GS, 0x28, 0x6b, 4, 0, 0x31, 0x41, 0x32, 0); // model 2
+    this.raw(GS, 0x28, 0x6b, 3, 0, 0x31, 0x43, size); // module size
+    this.raw(GS, 0x28, 0x6b, 3, 0, 0x31, 0x45, 49); // error correction M
+    const len = d.length + 3;
+    this.raw(GS, 0x28, 0x6b, len & 0xff, len >> 8, 0x31, 0x50, 0x30);
+    for (const ch of d) this.buf.push(ch.charCodeAt(0));
+    this.raw(GS, 0x28, 0x6b, 3, 0, 0x31, 0x51, 0x30); // print
+    this.raw(LF).align(false);
+    const w = this.width();
+    const tag = `[${label}]`;
+    this.previewLines.push(' '.repeat(Math.max(0, Math.floor((w - tag.length) / 2))) + tag);
+    return this;
+  }
+
+  /** Prepends a ready-made job (used when rerouting to a backup printer). */
+  static prefix(header: Uint8Array, job: Uint8Array): Uint8Array {
+    const out = new Uint8Array(header.length + job.length);
+    out.set(header, 0);
+    out.set(job, header.length);
+    return out;
   }
 
   bytes(): Uint8Array {

@@ -109,7 +109,7 @@ Rules in `docs/08-billing-gst.md`.
 | `/v1/menu?areaId=&since=<version>` | `MenuSnapshot` (active items; the area's price list overrides base/variant prices) or `{ menuVersion, unchanged: true }` when `since` is current |
 | `/v1/reports/:name?from=&to=` | report rows (see `docs/10-roadmap.md` P4 list) |
 | `/v1/audit?from=&to=&leakage=1` | audit events |
-| `/v1/printers` | printer list + status |
+| `/v1/printers` | `{ printers: [{ id, name, transport, role, widthMm, backupPrinterId?, status, queued, failedToday, lastError? }] }` |
 
 ## Admin endpoints (also commands, admin right)
 `UpsertArea`, `UpsertTable`, `UpsertCategory`, `UpsertMenuItem`, `UpsertAddonGroup`, `UpsertStation`,

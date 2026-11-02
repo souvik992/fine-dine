@@ -9,3 +9,4 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-02 P1-04 Command pipeline: shared envelope schema, PosError, executeCommand (IMMEDIATE tx, idempotent replay with request hash, version check, rights hook, audit/event_log/print_job/outbox, post-commit publish), registry, POST /v1/commands, order snapshot query
 - 2026-11-02 P1-05 Admin Upsert* commands (area, table, printer, station, category, addon group, menu item), deriveTableState, GET /v1/floor and /v1/menu (price lists, since), idempotent dev seed over HTTP
 - 2026-11-02 P1-06 OpenTable, AddItems, UpdateHeldItem, RemoveHeldItem, FireKOT: snapshots + area prices, addon min/max, station routing, per-day KOT numbers, KOT template (ESC/POS + preview) and print jobs, table.state events
+- 2026-11-02 P1-07 Bill template (58/80 mm, GST groups, UPI QR), TCP/Windows-spooler/fake transports, durable per-printer print queue with backoff, print.status, backup reroute, GET /v1/printers
