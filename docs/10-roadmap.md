@@ -49,7 +49,7 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
   - Accept: fake printer writes text previews matching snapshot tests; failed TCP job retries 3 times then
     `failed` and emits `print.status`.
 
-- [ ] **P1-08 Desktop app shell**
+- [x] **P1-08 Desktop app shell**
   - Read first: `09-ui-screens.md`, `apps/desktop/README.md`
   - Build: Electron + Vite + React; settings for server URL; Floor screen from `/v1/floor`; WS client with resume.
   - Accept: two desktop windows show the same table state change within 1 s.

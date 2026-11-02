@@ -79,6 +79,7 @@ DUPLICATE replay, INVALID_STATE.
 | `DATA_DIR` | dev `./data`, prod `%ProgramData%\DinePOS` (`/var/lib/dinepos` elsewhere) | holds DB, `backups/`, `logs/`, lock |
 | `DINEPOS_TIMEZONE` | `Asia/Kolkata` | business date and `serverTime` |
 | `LOG_LEVEL` | `info` | JSON logs (pino); auth headers are redacted |
+| `DINEPOS_ALLOWED_ORIGINS` | `app://dinepos,http://localhost:5173,http://127.0.0.1:5173` | browser origins for CORS and `/v1/stream` |
 
 Startup: data dir → `dinepos.lock` (refuses a second server; a lock from a crashed pid is taken over; a lock
 from another host means the DB is on a shared folder and is refused) → open DB (pragmas read back) → migrate →

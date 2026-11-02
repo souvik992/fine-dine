@@ -1,0 +1,32 @@
+{
+  "name": "@dinepos/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DinePOS billing terminal (Electron). A client of the outlet server; never opens the database.",
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "vite build && node scripts/build-electron.mjs",
+    "start": "npm run build && node scripts/run-electron.mjs",
+    "test": "vitest run --root ../.. apps/desktop/",
+    "test:e2e": "npm run build && vitest run --root ../.. --config apps/desktop/vitest.e2e.config.ts"
+  },
+  "dependencies": {
+    "@dinepos/shared": "0.1.0",
+    "@tanstack/react-query": "^5.105.1",
+    "lucide-react": "^1.66.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^45.2.1",
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.64.1",
+    "tailwindcss": "^4.3.3"
+  }
+}

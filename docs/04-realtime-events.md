@@ -24,6 +24,19 @@ Endpoint: `GET /v1/stream` (WebSocket). Auth: first message `{ "type": "hello", 
 | `day.changed` | `system` | businessDate | all |
 | `license.warning` | `system` | daysLeft | desktop |
 
+## Protocol details (built in P1-08, `apps/server/src/realtime/hub.ts`)
+- Topics: exact (`floor`, `station:<id>`) or prefix wildcard (`order:*`). Up to 50 per connection.
+- After `hello` the server answers `{ "type": "ready", "lastSeq", "replayed" }` (after any replay) or
+  `{ "type": "resync", "lastSeq" }`. With `resumeFrom: null` there is no replay; the client starts at `lastSeq`.
+- The hub subscribes to live events before reading `event_log`, buffers them during replay and drops any
+  `seq` already replayed, so a reconnect never loses or repeats an event.
+- Heartbeat: every 15 s a WS ping plus `{ "type": "heartbeat", "lastSeq", "at" }` (browsers cannot see pings).
+  The desktop client goes offline after 35 s without any message and reconnects (0.5/1/2/5/10 s backoff).
+- Close codes: 4400 bad hello, 4408 no hello within 10 s, 4429 client too slow (>1 MB queued; reconnect and
+  resume), 1001 server stopping.
+- Browser `Origin` must be in `DINEPOS_ALLOWED_ORIGINS` (default `app://dinepos` and the Vite dev server) or the
+  server's own host (captain/KDS PWAs); otherwise 403 before the upgrade. The same list drives CORS.
+
 ## Rules
 1. Events are written to `event_log` inside the command transaction and broadcast after commit.
 2. On connect with `resumeFrom`, the server replays events with `seq > resumeFrom` for the requested topics,

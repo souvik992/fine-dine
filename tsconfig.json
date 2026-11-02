@@ -1,8 +1,23 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/shared" },
-    { "path": "packages/printing" },
-    { "path": "apps/server" }
+    {
+      "path": "packages/shared"
+    },
+    {
+      "path": "packages/printing"
+    },
+    {
+      "path": "apps/server"
+    },
+    {
+      "path": "apps/desktop"
+    },
+    {
+      "path": "apps/desktop/electron"
+    },
+    {
+      "path": "apps/desktop/e2e"
+    }
   ]
 }

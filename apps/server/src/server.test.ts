@@ -22,6 +22,7 @@ const config = (): ServerConfig => ({
   dbFile: 'test.db',
   timeZone: 'Asia/Kolkata',
   logLevel: 'silent',
+  allowedOrigins: ['app://dinepos'],
 });
 
 beforeEach(() => {

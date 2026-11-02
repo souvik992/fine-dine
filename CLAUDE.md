@@ -39,7 +39,7 @@ truth. When code and docs disagree, stop and ask, or update the doc in the same 
 
 ## Commands you can run
 - `npm install` · `npm run test` · `npm run typecheck` · `npm run lint` · `npm run check` (all three)
-- `npm run dev:server` (after P1-02) · `npm run dev:desktop` (after P1-08)
+- `npm run dev:server` (after P1-02) · `npm run dev:desktop` (after P1-08) · `npm run test:e2e -w @dinepos/desktop`
 - Single workspace: `npm run test -w @dinepos/server`
 
 ## Definition of done for a task

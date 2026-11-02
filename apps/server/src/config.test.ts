@@ -13,6 +13,7 @@ describe('loadConfig', () => {
       dbFile: 'dev.db',
       timeZone: 'Asia/Kolkata',
       logLevel: 'info',
+      allowedOrigins: ['app://dinepos', 'http://localhost:5173', 'http://127.0.0.1:5173'],
     });
   });
 
@@ -26,6 +27,10 @@ describe('loadConfig', () => {
     const c = loadConfig({ DATA_DIR: './x', DINEPOS_PORT: '8000' }, '/work', 'linux');
     expect(c.dataDir).toBe(path.resolve('/work', 'x'));
     expect(c.port).toBe(8000);
+  });
+
+  it('reads allowed origins as a list', () => {
+    expect(loadConfig({ DINEPOS_ALLOWED_ORIGINS: 'app://dinepos, http://10.0.0.5:5173 ,' }).allowedOrigins).toEqual(['app://dinepos', 'http://10.0.0.5:5173']);
   });
 
   it('rejects invalid values with a readable message', () => {

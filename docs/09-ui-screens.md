@@ -6,7 +6,7 @@ dim dining room. Our own visual identity — do not imitate another vendor's lay
 ## Design tokens (starting point, change freely)
 | Token | Value | Use |
 | --- | --- | --- |
-| Font | Inter / Noto Sans (Devanagari, Bengali fallbacks) | all text |
+| Font | Manrope (UI) + Fraunces (headings, table labels), bundled woff2; Noto Sans for Devanagari/Bengali later | all text |
 | Base size | 15 px desktop, 17 px captain | |
 | Radius | 10 px | cards, tiles |
 | State: Free | neutral outline | table tile |
@@ -18,7 +18,7 @@ dim dining room. Our own visual identity — do not imitate another vendor's lay
 Every state also has a text label and icon — colour is never the only signal.
 
 ## Desktop app (Electron)
-### 1. Floor
+### 1. Floor (built in P1-08: area tabs, table search, health dots, clock, tiles, seat dialog, arrow keys)
 - Top bar: area tabs, search table (type `T7` + Enter), order-type buttons (Takeaway), clock, sync/print health dots.
 - Grid or saved floor layout (drag tables in Edit layout mode).
 - Tile: label, covers, elapsed min, amount, captain initials, state label.

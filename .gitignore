@@ -10,3 +10,6 @@ data/
 backups/
 coverage/
 .DS_Store
+.tsbuild/
+dist-renderer/
+dist-electron/

@@ -5,14 +5,14 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/out/**', '**/coverage/**', '**/node_modules/**', '**/data/**'],
+    ignores: ['**/dist/**', '**/dist-*/**', '**/.tsbuild/**', '**/out/**', '**/coverage/**', '**/node_modules/**', '**/data/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
     languageOptions: {
       parserOptions: {
-        projectService: { allowDefaultProject: ['*.js', '*.ts', 'apps/*/scripts/*.mjs'] },
+        projectService: { allowDefaultProject: ['*.js', '*.ts', 'apps/*/scripts/*.mjs', 'apps/*/*.config.ts'] },
         tsconfigRootDir: import.meta.dirname,
       },
       globals: { ...globals.node },
@@ -49,7 +49,8 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.{js,mjs,cjs}'],
+    // Plain JS and build-tool configs: lint without type information.
+    files: ['**/*.{js,mjs,cjs}', '**/*.config.ts'],
     ...tseslint.configs.disableTypeChecked,
   },
 );

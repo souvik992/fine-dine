@@ -11,7 +11,11 @@ export interface ServerConfig {
   dbFile: string;
   timeZone: string;
   logLevel: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent';
+  /** Browser origins allowed to call the API and open the stream (the desktop app, the dev UI). */
+  allowedOrigins: string[];
 }
+
+export const DEFAULT_ALLOWED_ORIGINS = ['app://dinepos', 'http://localhost:5173', 'http://127.0.0.1:5173'];
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -24,6 +28,11 @@ const EnvSchema = z.object({
     .default('Asia/Kolkata')
     .refine(isValidTimeZone, { message: 'must be an IANA time zone such as Asia/Kolkata' }),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  /** Comma-separated; replaces the defaults. */
+  DINEPOS_ALLOWED_ORIGINS: z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined ? DEFAULT_ALLOWED_ORIGINS : v.split(',').map((o) => o.trim()).filter(Boolean))),
 });
 
 /** Where the master keeps its data when DATA_DIR is not set (docs/01-architecture.md). */
@@ -57,5 +66,6 @@ export function loadConfig(
     dbFile: e.NODE_ENV === 'production' ? 'dinepos.db' : 'dev.db',
     timeZone: e.DINEPOS_TIMEZONE,
     logLevel: e.LOG_LEVEL,
+    allowedOrigins: e.DINEPOS_ALLOWED_ORIGINS,
   };
 }

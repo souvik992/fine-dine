@@ -63,7 +63,17 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
       },
       log: (level, msg, data) => logSink.log?.(level, msg, data),
     });
-    const app = buildApp({ db, timeZone: config.timeZone, now, startedAt: now(), logger, bus, printWaker: printQueue, printQueue });
+    const app = buildApp({
+      db,
+      timeZone: config.timeZone,
+      now,
+      startedAt: now(),
+      logger,
+      bus,
+      printWaker: printQueue,
+      printQueue,
+      allowedOrigins: config.allowedOrigins,
+    });
     logSink.log = (level, msg, data) => app.log[level](data ?? {}, msg);
     app.log.warn(
       'Auth mode "single-terminal": every request acts as the local terminal. Use only on a trusted LAN until device pairing (P2-02).',

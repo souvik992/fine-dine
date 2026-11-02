@@ -1,16 +1,21 @@
+import fastifyCors from '@fastify/cors';
+import fastifyWebsocket from '@fastify/websocket';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import { ulid } from 'ulid';
 import { singleTerminalAuth, type Authenticator } from './auth/authenticate.js';
 import { commandRegistry } from './commands/registry.js';
+import { DEFAULT_ALLOWED_ORIGINS } from './config.js';
 import type { CommandRegistry } from './core/command-handler.js';
 import { PosError } from './core/errors.js';
 import { EventBus, noopPrintWaker, type PrintWaker } from './core/events.js';
 import { allowAllRights, type RightsPolicy } from './core/rights.js';
 import type { Db } from './db/connection.js';
 import type { PrinterStatus } from './print/print-queue.js';
+import { RealtimeHub, type HubOptions } from './realtime/hub.js';
 import { commandRoutes } from './routes/commands.js';
 import { healthRoutes } from './routes/health.js';
 import { queryRoutes } from './routes/queries.js';
+import { isAllowedOrigin, streamRoutes } from './routes/stream.js';
 
 export interface AppDeps {
   db: Db;
@@ -25,6 +30,9 @@ export interface AppDeps {
   printWaker?: PrintWaker;
   /** Live printer status for GET /v1/printers. */
   printQueue?: { status(printerId: string): PrinterStatus | undefined };
+  /** Browser origins allowed for CORS and the stream. */
+  allowedOrigins?: readonly string[];
+  hub?: HubOptions;
 }
 
 // Secrets never reach the log (docs/07-security-licensing.md).
@@ -34,10 +42,14 @@ export const LOG_REDACT = [
   'req.headers["x-manager-pin"]',
 ];
 
+export type DinePosApp = FastifyInstance & { realtime: RealtimeHub };
+
 /** Builds the HTTP app without listening, so tests can use `app.inject()`. */
-export function buildApp(deps: AppDeps): FastifyInstance {
+export function buildApp(deps: AppDeps): DinePosApp {
   const { db, timeZone, now = () => new Date(), logger = false } = deps;
   const startedAt = deps.startedAt ?? now();
+  const allowedOrigins = deps.allowedOrigins ?? DEFAULT_ALLOWED_ORIGINS;
+  const bus = deps.bus ?? new EventBus();
   const app = Fastify({
     logger,
     bodyLimit: 1024 * 1024,
@@ -48,6 +60,15 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.addHook('onSend', async (req, reply) => {
     void reply.header('x-request-id', req.id);
   });
+
+  void app.register(fastifyCors, {
+    origin: (origin, cb) => cb(null, isAllowedOrigin(origin, undefined, allowedOrigins)),
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['content-type', 'authorization', 'x-user-session', 'x-manager-pin'],
+    exposedHeaders: ['x-request-id'],
+    maxAge: 600,
+  });
+  void app.register(fastifyWebsocket, { options: { maxPayload: 64 * 1024 } });
 
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof PosError) {
@@ -72,6 +93,12 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     reply.status(404).send(errorBody('NOT_FOUND', `No route for ${req.method} ${req.url.split('?')[0]}.`)),
   );
 
+  const hub = new RealtimeHub(db, bus, { now, ...deps.hub });
+  app.addHook('preClose', (done) => {
+    hub.closeAll();
+    done();
+  });
+
   healthRoutes(app, { db, timeZone, now, startedAt });
   queryRoutes(app, { db, timeZone, now, printerStatus: deps.printQueue ? (id) => deps.printQueue!.status(id) : undefined });
   commandRoutes(
@@ -82,13 +109,14 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       now,
       registry: deps.registry ?? commandRegistry,
       rights: deps.rights ?? allowAllRights,
-      bus: deps.bus ?? new EventBus(),
+      bus,
       printWaker: deps.printWaker ?? noopPrintWaker,
       onPostCommitError: (err, stage) => app.log.error({ err, stage }, 'post-commit step failed'),
     },
     deps.auth ?? singleTerminalAuth,
   );
-  return app;
+  streamRoutes(app, hub, allowedOrigins);
+  return Object.assign(app, { realtime: hub });
 }
 
 function errorBody(code: string, message: string, details?: unknown) {
