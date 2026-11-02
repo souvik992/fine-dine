@@ -21,3 +21,22 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test
+
+  installer:
+    needs: check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Bundles the server, verifies node.exe + WinSW against pinned SHA-256, builds the NSIS installer and
+      # checks the release contents (scripts/inspect-release.mjs).
+      - run: npm run dist -w @dinepos/desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DinePOS-Setup
+          path: apps/desktop/release/DinePOS-Setup-*.exe
+          if-no-files-found: error

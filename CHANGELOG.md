@@ -13,3 +13,4 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-02 P1-08 WebSocket hub (/v1/stream: hello, replay, resync, heartbeat, origin check) + CORS; Electron desktop shell (locked-down app://, React 19), server settings, live Floor screen with seat dialog; e2e: two windows in sync in ~100 ms
 - 2026-11-02 P1-09 Billing screen: quick-entry short codes, item grid, modifier sheet with hotkeys, held/fired cart, F8 fire, order command queue with silent rebase, GET /v1/orders/:id; keyboard-only e2e
 - 2026-11-02 P1-10 PrintBill (gap-free FY numbers by print date, supersede re-issue, bill_document revisions), Settle (multi-tender, change), DayEnd + Z-report, SetConfig, migration 0003 immutability triggers; desktop F9/F10/Day end
+- 2026-11-02 P1-11 (built, acceptance pending) Server bundle, pinned node.exe + WinSW, Windows service definition, NSIS installer with "Install as master", release inspection, packaged e2e, CI installer artifact

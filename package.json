@@ -34,10 +34,16 @@
     "node": ">=22"
   },
   "overrides": {
-    "minimatch": "^11.0.1"
+    "eslint": {
+      "minimatch": "^11.0.1"
+    },
+    "typescript-eslint": {
+      "minimatch": "^11.0.1"
+    }
   },
   "allowScripts": {
     "esbuild@0.28.2": true,
-    "better-sqlite3": false
+    "better-sqlite3": false,
+    "electron-winstaller": false
   }
 }

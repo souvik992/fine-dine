@@ -13,3 +13,7 @@ coverage/
 .tsbuild/
 dist-renderer/
 dist-electron/
+dist-bundle/
+.stage/
+release/
+build-cache/

@@ -5,7 +5,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/dist-*/**', '**/.tsbuild/**', '**/out/**', '**/coverage/**', '**/node_modules/**', '**/data/**'],
+    ignores: ['**/dist/**', '**/dist-*/**', '**/.tsbuild/**', '**/release/**', '**/.stage/**', '**/build-cache/**', '**/out/**', '**/coverage/**', '**/node_modules/**', '**/data/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -52,5 +52,11 @@ export default tseslint.config(
     // Plain JS and build-tool configs: lint without type information.
     files: ['**/*.{js,mjs,cjs}', '**/*.config.ts'],
     ...tseslint.configs.disableTypeChecked,
+  },
+  {
+    // CommonJS config files (electron-builder) use require by design.
+    files: ['**/*.cjs'],
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+    languageOptions: { sourceType: 'commonjs', globals: { ...globals.node } },
   },
 );

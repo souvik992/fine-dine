@@ -10,7 +10,8 @@
     "clean": "tsc -b --clean",
     "start": "node dist/index.js",
     "seed": "tsx src/seed/cli.ts",
-    "test": "vitest run --root ../.. apps/server/"
+    "test": "vitest run --root ../.. apps/server/",
+    "bundle": "node scripts/bundle.mjs"
   },
   "dependencies": {
     "@dinepos/printing": "0.1.0",
@@ -25,6 +26,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "@types/ws": "^8.18.2",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15"
   },
   "engines": {

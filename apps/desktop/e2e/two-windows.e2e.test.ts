@@ -14,6 +14,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const here = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const repo = path.resolve(here, '..', '..');
 const PORT = 7461;
+/**
+ * DINEPOS_E2E_PACKAGED=1 tests the built release instead of the dev build: release/win-unpacked/DinePOS.exe, and the
+ * server started exactly as the Windows service starts it (resources/server/node.exe server.mjs, production mode).
+ */
+const PACKAGED = process.env.DINEPOS_E2E_PACKAGED === '1';
+const unpacked = path.join(here, 'release', 'win-unpacked');
 const SERVER = `http://127.0.0.1:${PORT}`;
 
 let server: ChildProcess;
@@ -66,16 +72,21 @@ const tileState = (page: Page, label: string) => page.locator(`[data-table="${la
 describe('desktop app', () => {
   beforeAll(async () => {
     dataDir = mkdtempSync(path.join(tmpdir(), 'dinepos-e2e-'));
-    server = spawn(process.execPath, ['--import', 'tsx', 'apps/server/src/index.ts'], {
-      cwd: repo,
-      env: cleanEnv({ DATA_DIR: dataDir, DINEPOS_PORT: String(PORT), DINEPOS_HOST: '127.0.0.1', LOG_LEVEL: 'warn' }),
-      stdio: 'ignore',
-    });
+    const serverEnv = cleanEnv({ DATA_DIR: dataDir, DINEPOS_PORT: String(PORT), DINEPOS_HOST: '127.0.0.1', LOG_LEVEL: 'warn' });
+    server = PACKAGED
+      ? spawn(path.join(unpacked, 'resources', 'server', 'node.exe'), ['server.mjs'], {
+          cwd: path.join(unpacked, 'resources', 'server'),
+          env: { ...serverEnv, NODE_ENV: 'production' },
+          stdio: 'ignore',
+        })
+      : spawn(process.execPath, ['--import', 'tsx', 'apps/server/src/index.ts'], { cwd: repo, env: serverEnv, stdio: 'ignore' });
     await waitForHealth();
     await run(process.execPath, ['--import', 'tsx', 'apps/server/src/seed/cli.ts'], { DINEPOS_URL: SERVER });
 
     const electron = createRequire(import.meta.url)('electron') as unknown as string;
-    app = await _electron.launch({ executablePath: electron, args: [here], cwd: here, env: cleanEnv({ DINEPOS_SERVER_URL: SERVER }) });
+    app = PACKAGED
+      ? await _electron.launch({ executablePath: path.join(unpacked, 'DinePOS.exe'), args: [], cwd: unpacked, env: cleanEnv({ DINEPOS_SERVER_URL: SERVER }) })
+      : await _electron.launch({ executablePath: electron, args: [here], cwd: here, env: cleanEnv({ DINEPOS_SERVER_URL: SERVER }) });
   }, 120_000);
 
   afterAll(async () => {

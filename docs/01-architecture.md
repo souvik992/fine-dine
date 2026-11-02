@@ -74,4 +74,12 @@ POST /v1/commands
 - Captain and KDS PWAs are served at `/captain` and `/kds`.
 
 ## Data directory (master)
-`%ProgramData%\DinePOS\` → `dinepos.db`, `backups\`, `logs\`, `config.json`, `license.key`.
+`%ProgramData%\DinePOS\` → `dinepos.db`, `backups\`, `logs\`, `prints\`, `config.json`, `license.key`.
+
+## Windows service (P1-11)
+The installer's "Install as master" option registers the server as the Windows service `DinePOSServer`
+(WinSW 2.12 wrapper, `resources\server\DinePOS-Server.xml`): automatic start at boot, restart on failure
+(5 s / 10 s / 30 s), stop by Ctrl+C with a 15 s limit (graceful shutdown), rolling logs in
+`%ProgramData%\DinePOS\logs`, runtime = bundled Node 24.21.0 (`resources\server\node.exe`). Firewall: inbound
+TCP 7420 on private/domain profiles only. Uninstall removes the service and rule, never the data folder.
+The service runs as LocalSystem for now; a least-privilege account (LocalService + folder ACL) is a follow-up.

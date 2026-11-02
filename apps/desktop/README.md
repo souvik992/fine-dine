@@ -45,6 +45,35 @@ preview from the shared calculator, printed figures from the server). F10 Settle
 c/k/u/d/m/o switch cash/card/UPI/due/complimentary/other; + splits; change shown). Day end is on the floor
 header: refuses while tables are open, then asks for counted cash and shows the Z-report summary.
 
+## Installer (P1-11)
+`npm run dist -w @dinepos/desktop` → `release/DinePOS-Setup-<version>.exe` (+ `release/win-unpacked/`). Steps:
+server bundle (`apps/server/scripts/bundle.mjs`: one `server.mjs` + migrations + better-sqlite3 Node-API
+prebuild) → desktop build → `scripts/fetch-runtime.mjs` downloads node.exe 24.21.0 and WinSW 2.12.0 into
+`build-cache/` and checks pinned SHA-256s → staged app (bundled main + renderer, no node_modules) →
+electron-builder NSIS (`electron-builder.config.cjs`, `build/installer.nsh`) → `scripts/inspect-release.mjs`
+fails the build if the archive holds node_modules or `resources/server` misses anything the service needs.
+
+- Per-machine install (admin). Page "Install as master" (ticked by default; upgrades keep the previous choice,
+  stored in `HKLM\Software\DinePOS\Master`). Unattended: `DinePOS-Setup.exe /S /MASTER=1` (or `0`).
+- Master: creates `%ProgramData%\DinePOS`, installs + starts service `DinePOSServer`, firewall rule "DinePOS
+  Server" (TCP 7420, private/domain). The desktop app defaults to `http://127.0.0.1:7420`, so it connects with no
+  setup. Terminals: untick master, then enter the master's address in Settings.
+- Uninstall: stops and removes the service and the firewall rule; keeps `%ProgramData%\DinePOS`.
+- Verified without installing: packaged server on the bundled node.exe (production mode), full e2e suite against
+  `win-unpacked\DinePOS.exe` + packaged server (`DINEPOS_E2E_PACKAGED=1 npm run test:e2e …`), WinSW parses the
+  service XML. `node scripts/service-dry-run.mjs` runs the server through WinSW `testwait` with a temp data folder
+  (needs permission to run WinSW; first attempt failed, cause not yet diagnosed).
+- Known gaps: installer and app are not code-signed (SmartScreen warns; needs a certificate), default Electron icon,
+  service runs as LocalSystem, no auto-update, no mDNS discovery for terminals yet.
+
+### Manual acceptance (P1-11) on a test PC or VM, not a live outlet PC
+1. Run `DinePOS-Setup-0.1.0.exe`, keep "Install as master" ticked, finish (DinePOS opens).
+2. The floor shows "Live" without touching Settings; `sc query DinePOSServer` says RUNNING.
+3. Reboot. Without signing in to DinePOS: `sc query DinePOSServer` → RUNNING; open
+   `http://127.0.0.1:7420/v1/health` → `"ok":true`. Open DinePOS → floor is Live.
+4. From another PC on the LAN: `http://<master-ip>:7420/v1/health` answers (firewall rule).
+5. Uninstall → service gone (`sc query` fails), `%ProgramData%\DinePOS\dinepos.db` still present.
+
 ## Conflict handling
 `VERSION_CONFLICT` → if command is "safe" (see `docs/05-sync-offline.md`) resend with the returned
 version; otherwise show `ConflictBanner` with what changed and who did it.
