@@ -15,7 +15,13 @@ const Ctx = createContext<AppContextValue | null>(null);
 
 /** Which cached GET each stream topic refreshes. Events are triggers; data always comes from GETs (docs/04). */
 const TOPIC_QUERIES: Record<string, string[]> = { floor: ['floor'], printers: ['printers'], menu: ['menu'], system: ['health', 'floor'] };
-const TOPICS = Object.keys(TOPIC_QUERIES);
+const TOPICS = [...Object.keys(TOPIC_QUERIES), 'order:*'];
+
+/** Query keys a stream event should refresh. */
+export function queriesFor(topic: string): unknown[][] {
+  if (topic.startsWith('order:')) return [['order', topic.slice('order:'.length)]];
+  return (TOPIC_QUERIES[topic] ?? []).map((k) => [k]);
+}
 
 function storage(): Storage | undefined {
   try {
@@ -36,7 +42,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       url: streamUrl(serverUrl),
       topics: TOPICS,
       onEvent: (e) => {
-        for (const key of TOPIC_QUERIES[e.topic] ?? []) void queryClient.invalidateQueries({ queryKey: [key] });
+        for (const queryKey of queriesFor(e.topic)) void queryClient.invalidateQueries({ queryKey });
       },
       onResync: () => void queryClient.invalidateQueries(),
       onStatus: (s) => {

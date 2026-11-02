@@ -6,7 +6,7 @@
 - Client auto-retry policy:
   | Command | On conflict |
   | --- | --- |
-  | AddItems, FireKOT (new items), SetCovers | rebase silently: resend with new version |
+  | AddItems, FireKOT (new items), SetCovers, UpdateHeldItem, RemoveHeldItem | rebase silently: resend with new version (same commandId, once). Held-item edits are included because the server still refuses them with INVALID_STATE if the item was fired meanwhile |
   | MoveTable, MergeTables, TransferItems, PrintBill, SplitBill, Settle, Void, Cancel/Modify fired | show "Table changed by <user>" and ask |
 
 ## Idempotency

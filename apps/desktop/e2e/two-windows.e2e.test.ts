@@ -120,21 +120,93 @@ describe('desktop app', () => {
     expect(await tileState(second, 'T1')).toBe('SEATED');
   });
 
-  it('seats a free table from the UI and the other window follows', async () => {
+  it('seats a free table from the UI, opens its order, and the other window follows', async () => {
     const [first, second] = app.windows();
     await first!.locator('[data-table="T2"]').click();
     await first!.getByRole('dialog', { name: 'Seat table T2' }).waitFor();
     await first!.getByRole('button', { name: 'One more guest' }).click();
     await first!.getByRole('button', { name: 'Seat guests' }).click();
+    await first!.getByTestId('order-title').getByText('Table T2').waitFor({ timeout: 5_000 });
     await second!.waitForSelector('[data-table="T2"][data-state="SEATED"]', { timeout: 2_000 });
     expect(await second!.locator('[data-table="T2"]').getAttribute('aria-label')).toContain('3 covers');
+    await first!.keyboard.press('Escape'); // back to the floor
+    await first!.waitForSelector('[data-table="T1"]');
   });
 
-  it('typing a table label and Enter opens it', async () => {
+  it('typing a table label and Enter opens that order', async () => {
     const [first] = app.windows();
-    await first!.locator('body').press('Escape');
     await first!.keyboard.type('t1');
     await first!.keyboard.press('Enter');
-    await first!.getByRole('dialog', { name: 'Table T1' }).waitFor({ timeout: 2_000 });
+    await first!.getByTestId('order-title').getByText('Table T1').waitFor({ timeout: 5_000 });
+    await first!.keyboard.press('Escape');
+    await first!.waitForSelector('[data-table="T1"]');
+  });
+
+  // P1-09 acceptance: punch 5 items with modifiers and fire in under 20 s using the keyboard only.
+  it('keyboard only: seat T3, punch 5 items with modifiers, fire, in under 20 s', async () => {
+    const [page, other] = app.windows();
+    const k = page!.keyboard;
+    const sheet = (title: string) => page!.getByRole('dialog', { name: title });
+    const started = Date.now();
+
+    await k.type('t3');
+    await k.press('Enter'); // seat dialog, covers focused
+    await sheet('Seat table T3').waitFor();
+    await k.press('Enter'); // seat with the default covers → order screen, search focused
+    await page!.getByTestId('order-title').getByText('Table T3').waitFor();
+    await page!.getByLabel('Add item').waitFor();
+
+    await k.type('pt');
+    await k.press('Enter'); // spice level is required → sheet
+    await sheet('Paneer Tikka').waitFor();
+    await k.press('1'); // Mild
+    await k.press('Enter');
+
+    await k.type('tc');
+    await k.press('Enter'); // variants → sheet
+    await sheet('Tandoori Chicken').waitFor();
+    await k.press('1'); // Half
+    await k.press('Enter');
+
+    await k.type('bn4');
+    await k.press('Shift+Enter'); // optional extras → ask for the sheet
+    await sheet('Butter Naan').waitFor();
+    await k.press('1'); // Extra cheese
+    await k.press('Enter');
+
+    await k.type('vm2');
+    await k.press('Shift+Enter');
+    await sheet('Virgin Mojito').waitFor();
+    await k.press('1'); // Soda
+    await k.press('Enter');
+
+    await k.type('dm');
+    await k.press('Enter'); // no choices → added directly
+
+    const held = page!.getByTestId('held-items').locator('li');
+    await expect.poll(() => held.count(), { timeout: 5_000 }).toBe(5);
+    await k.press('F8');
+    await expect.poll(() => page!.getByTestId('kot-group').count(), { timeout: 5_000 }).toBeGreaterThan(0);
+    await expect.poll(() => held.count(), { timeout: 5_000 }).toBe(0);
+    const elapsed = Date.now() - started;
+    console.warn(`keyboard-only punch + fire: ${elapsed} ms`);
+    expect(elapsed).toBeLessThan(20_000);
+
+    // The server has exactly what was punched, with modifiers, all fired.
+    const floor = (await (await fetch(`${SERVER}/v1/floor`)).json()) as { tables: Array<{ label: string; orderId?: string }> };
+    const orderId = floor.tables.find((t) => t.label === 'T3')!.orderId!;
+    const order = (await (await fetch(`${SERVER}/v1/orders/${orderId}`)).json()) as {
+      items: Array<{ name: string; qty: number; status: string; addons: Array<{ name: string }> }>;
+      kots: unknown[];
+    };
+    expect(order.items.map((i) => [i.name, i.qty, i.addons.map((a) => a.name).join('+'), i.status])).toEqual([
+      ['Paneer Tikka', 1, 'Mild', 'fired'],
+      ['Tandoori Chicken (Half)', 1, '', 'fired'],
+      ['Butter Naan', 4, 'Extra cheese', 'fired'],
+      ['Virgin Mojito', 2, 'Soda', 'fired'],
+      ['Dal Makhani', 1, '', 'fired'],
+    ]);
+    expect(order.kots).toHaveLength(3); // Tandoor, Kitchen, Bar
+    await other!.waitForSelector('[data-table="T3"][data-state="KOT_RUNNING"]', { timeout: 2_000 });
   });
 });

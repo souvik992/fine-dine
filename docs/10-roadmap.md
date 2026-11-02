@@ -54,9 +54,10 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
   - Build: Electron + Vite + React; settings for server URL; Floor screen from `/v1/floor`; WS client with resume.
   - Accept: two desktop windows show the same table state change within 1 s.
 
-- [ ] **P1-09 Billing screen**
+- [x] **P1-09 Billing screen**
   - Build: categories, items, modifier sheet, held/fired cart, Fire, keyboard shortcuts, short-code search.
   - Accept: punch 5 items with modifiers and fire in under 20 s using keyboard only (manual check).
+    Also automated in `apps/desktop/e2e` (seat + 5 items + fire â‰ˆ 33 keystrokes).
 
 - [ ] **P1-10 PrintBill + Settle + DayEnd**
   - Read first: `08-billing-gst.md`

@@ -11,3 +11,4 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-02 P1-06 OpenTable, AddItems, UpdateHeldItem, RemoveHeldItem, FireKOT: snapshots + area prices, addon min/max, station routing, per-day KOT numbers, KOT template (ESC/POS + preview) and print jobs, table.state events
 - 2026-11-02 P1-07 Bill template (58/80 mm, GST groups, UPI QR), TCP/Windows-spooler/fake transports, durable per-printer print queue with backoff, print.status, backup reroute, GET /v1/printers
 - 2026-11-02 P1-08 WebSocket hub (/v1/stream: hello, replay, resync, heartbeat, origin check) + CORS; Electron desktop shell (locked-down app://, React 19), server settings, live Floor screen with seat dialog; e2e: two windows in sync in ~100 ms
+- 2026-11-02 P1-09 Billing screen: quick-entry short codes, item grid, modifier sheet with hotkeys, held/fired cart, F8 fire, order command queue with silent rebase, GET /v1/orders/:id; keyboard-only e2e

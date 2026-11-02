@@ -7,8 +7,8 @@ import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { Modal } from '../components/Modal.js';
 
-/** Seat guests at a free table (OpenTable). One commandId per dialog, so a double click cannot open twice. */
-export function SeatDialog({ table, onClose }: { table: FloorTable; onClose: () => void }) {
+/** Seat guests at a free table (OpenTable), then open the order. One commandId per dialog, so a double click cannot open twice. */
+export function SeatDialog({ table, onClose, onSeated }: { table: FloorTable; onClose: () => void; onSeated: (orderId: string) => void }) {
   const { api } = useApp();
   const qc = useQueryClient();
   const [covers, setCovers] = useState(Math.min(table.seats ?? 2, 2));
@@ -16,9 +16,10 @@ export function SeatDialog({ table, onClose }: { table: FloorTable; onClose: () 
 
   const seat = useMutation({
     mutationFn: () => api.command('OpenTable', { tableId: table.id, covers }, { commandId: commandId.current }),
-    onSuccess: async () => {
+    onSuccess: async (res) => {
       await qc.invalidateQueries({ queryKey: ['floor'] });
       onClose();
+      if (res.order) onSeated(res.order.id); // straight into the order: seat, then punch
     },
   });
   const error = seat.error instanceof ApiError ? seat.error.message : seat.error ? 'Could not seat the table.' : null;
@@ -41,6 +42,7 @@ export function SeatDialog({ table, onClose }: { table: FloorTable; onClose: () 
           </button>
           <input
             id="covers"
+            data-autofocus
             className="input h-12 text-center text-xl font-semibold tabular-nums"
             inputMode="numeric"
             value={covers}

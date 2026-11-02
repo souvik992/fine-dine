@@ -104,7 +104,7 @@ Rules in `docs/08-billing-gst.md`.
 | --- | --- |
 | `/v1/health` | ok, version, schemaVersion, businessDate, timeZone, serverTime, uptimeSec (licence status: P2-09). `ok` is false while no business date is open |
 | `/v1/floor` | `FloorSnapshot`: serverTime, areas[], tables[] (state via `deriveTableState`, orderId, orderVersion, covers, captainId, since, elapsedMin, amountPaise) |
-| `/v1/orders/:id` | order snapshot (items, KOTs, bills, payments, version) |
+| `/v1/orders/:id` | `OrderSnapshot` (items with addons, KOTs, bills with paid amount, version, running totals); 404 unknown, 400 not a ULID |
 | `/v1/orders?state=open` | open orders |
 | `/v1/menu?areaId=&since=<version>` | `MenuSnapshot` (active items; the area's price list overrides base/variant prices) or `{ menuVersion, unchanged: true }` when `since` is current |
 | `/v1/reports/:name?from=&to=` | report rows (see `docs/10-roadmap.md` P4 list) |

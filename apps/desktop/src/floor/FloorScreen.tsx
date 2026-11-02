@@ -7,7 +7,6 @@ import { useApp } from '../app-context.js';
 import { HealthDots } from '../components/HealthDots.js';
 import { findTable, moveFocus, STATE_META, stateCounts, tablesInArea, type Arrow } from './floor-model.js';
 import { SeatDialog } from './SeatDialog.js';
-import { TablePanel } from './TablePanel.js';
 import { TableTile } from './TableTile.js';
 
 function useClock(intervalMs = 15_000): Date {
@@ -26,7 +25,7 @@ function columnsOf(grid: HTMLElement | null): number {
   return Math.max(1, tiles.filter((t) => (t as HTMLElement).offsetTop === top).length);
 }
 
-export function FloorScreen({ onSettings }: { onSettings: () => void }) {
+export function FloorScreen({ onSettings, onOpenOrder }: { onSettings: () => void; onOpenOrder: (orderId: string) => void }) {
   const { api } = useApp();
   const now = useClock();
   const floor = useQuery({
@@ -39,7 +38,6 @@ export function FloorScreen({ onSettings }: { onSettings: () => void }) {
   const [search, setSearch] = useState('');
   const [searchError, setSearchError] = useState<string | null>(null);
   const [seating, setSeating] = useState<FloorTable | null>(null);
-  const [viewing, setViewing] = useState<string | null>(null);
   const grid = useRef<HTMLDivElement>(null);
   const tileRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const searchBox = useRef<HTMLInputElement>(null);
@@ -48,11 +46,10 @@ export function FloorScreen({ onSettings }: { onSettings: () => void }) {
   const activeArea = areaId ?? data?.areas[0]?.id ?? null;
   const tables = useMemo(() => (data ? tablesInArea(data, activeArea) : []), [data, activeArea]);
   const counts = stateCounts(tables);
-  const viewingTable = viewing ? data?.tables.find((t) => t.id === viewing) : undefined;
 
   const open = (t: FloorTable) => {
     if (t.state === 'FREE' || t.state === 'RESERVED') setSeating(t);
-    else if (t.state !== 'BLOCKED') setViewing(t.id);
+    else if (t.state !== 'BLOCKED' && t.orderId) onOpenOrder(t.orderId);
   };
 
   const focusTile = (i: number) => {
@@ -70,7 +67,7 @@ export function FloorScreen({ onSettings }: { onSettings: () => void }) {
   // Typing a letter or digit anywhere on the floor jumps to the table search (docs/09: type "T7" + Enter).
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (seating || viewing || e.ctrlKey || e.altKey || e.metaKey) return;
+      if (seating || e.ctrlKey || e.altKey || e.metaKey) return;
       if (document.activeElement === searchBox.current) return;
       if (/^[a-z0-9]$/i.test(e.key)) {
         searchBox.current?.focus();
@@ -78,7 +75,7 @@ export function FloorScreen({ onSettings }: { onSettings: () => void }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [seating, viewing]);
+  }, [seating]);
 
   const submitSearch = () => {
     if (!data) return;
@@ -202,8 +199,7 @@ export function FloorScreen({ onSettings }: { onSettings: () => void }) {
         )}
       </main>
 
-      {seating ? <SeatDialog table={seating} onClose={() => setSeating(null)} /> : null}
-      {viewingTable ? <TablePanel table={viewingTable} now={now} onClose={() => setViewing(null)} /> : null}
+      {seating ? <SeatDialog table={seating} onClose={() => setSeating(null)} onSeated={onOpenOrder} /> : null}
     </div>
   );
 }

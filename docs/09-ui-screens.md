@@ -25,7 +25,12 @@ Every state also has a text label and icon — colour is never the only signal.
 - Click: open order (or seat dialog if free). Right-click / long-press: Move, Merge, Split, Print bill, Reprint, Block.
 - Keyboard: arrows move focus, Enter opens, `M` move, `G` merge, `P` print bill.
 
-### 2. Order / billing
+### 2. Order / billing (built in P1-09: `apps/desktop/src/billing/`)
+Keyboard map: type a code + Enter (`pt2`, `pt 2`, `2*pt`; an exact code wins, so `C65` works), Shift+Enter
+opens options for an item that has optional ones; in the sheet 1–9/0 toggle options, + / − quantity,
+[ / ] course, Enter adds, Esc cancels; Alt+↑/↓ pick a held line, + / − its quantity, Delete removes it;
+F8 fires all held items; Esc clears the search, then returns to the floor. Seating a table opens its order.
+Addon options follow the order they were entered in (menu admin), so hotkeys stay stable.
 - Left rail: categories. Middle: item grid (name, price, veg/non-veg dot, out-of-stock greyed) + search box
   with short codes (`pt2` = Paneer Tikka ×2). Right: cart.
 - Cart sections: Held (editable) and Fired (grouped by KOT, read-only; actions via context menu).

@@ -105,6 +105,13 @@ describe('floor + menu queries', () => {
     const menu = await app.inject({ method: 'GET', url: `/v1/menu?areaId=${areaId}` });
     expect(menu.json()).toMatchObject({ areaId, items: [{ id: itemId }] });
     expect((await app.inject({ method: 'GET', url: '/v1/menu?since=abc' })).json()).toMatchObject({ error: { code: 'VALIDATION' } });
+
+    const orderId = seatOrder();
+    const order = await app.inject({ method: 'GET', url: `/v1/orders/${orderId}` });
+    expect(order.statusCode).toBe(200);
+    expect(order.json()).toMatchObject({ id: orderId, version: 1, items: [{ name: 'Dal', qty: 2 }], totals: { totalPaise: 42_000 } });
+    expect((await app.inject({ method: 'GET', url: `/v1/orders/${newId()}` })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: '/v1/orders/nope' })).statusCode).toBe(400);
     await app.close();
   });
 });

@@ -54,6 +54,8 @@ describe('dev seed', () => {
       i.addonGroupIds.forEach((g) => expect(groups.has(g)).toBe(true));
     }
     expect(menu.items.find((i) => i.shortCode === 'TC')?.variants.map((v) => v.name)).toEqual(['Half', 'Full']);
+    // Addons keep the order they were entered in (keyboard hotkeys 1, 2, 3 follow it), not alphabetical.
+    expect(menu.addonGroups.find((g) => g.name === 'Spice level')?.addons.map((a) => a.name)).toEqual(['Mild', 'Medium', 'Hot']);
   });
 
   it('seed ids are stable, valid ULIDs', () => {

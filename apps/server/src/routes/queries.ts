@@ -5,6 +5,7 @@ import { PosError } from '../core/errors.js';
 import type { Db } from '../db/connection.js';
 import { getFloor } from '../queries/floor.js';
 import { getMenu } from '../queries/menu.js';
+import { getOrderSnapshot } from '../queries/order-snapshot.js';
 import { getPrinters } from '../queries/printers.js';
 import type { PrinterStatus } from '../print/print-queue.js';
 
@@ -22,6 +23,14 @@ const menuQuery = z
 export function queryRoutes(app: FastifyInstance, deps: QueryDeps): void {
   app.get('/v1/floor', (_req, reply) => {
     void reply.header('cache-control', 'no-store').send(getFloor(deps.db, deps.now(), deps.timeZone));
+    return reply;
+  });
+
+  app.get<{ Params: { id: string } }>('/v1/orders/:id', (req, reply) => {
+    if (!ulidSchema.safeParse(req.params.id).success) throw new PosError('VALIDATION', 'Order id must be a ULID.');
+    const order = getOrderSnapshot(deps.db, req.params.id);
+    if (!order) throw new PosError('NOT_FOUND', 'Order not found.', { orderId: req.params.id });
+    void reply.header('cache-control', 'no-store').send(order);
     return reply;
   });
 

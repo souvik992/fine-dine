@@ -61,8 +61,9 @@ export function getMenu(db: Db, q: MenuQuery = {}): MenuSnapshot | MenuUnchanged
     }>
   ).map((c) => ({ id: c.id, name: c.name, parentId: opt(c.parent_id), stationId: opt(c.station_id), sort: c.sort ?? 0 }));
 
+  // Addons keep the order the owner entered them in (Mild, Medium, Hot), not alphabetical.
   const addonsByGroup = new Map<string, MenuAddonGroup['addons']>();
-  for (const a of db.prepare('SELECT id, group_id, name, price_paise FROM addon ORDER BY name COLLATE NOCASE').all() as Array<{
+  for (const a of db.prepare('SELECT id, group_id, name, price_paise FROM addon ORDER BY rowid').all() as Array<{
     id: string;
     group_id: string;
     name: string;

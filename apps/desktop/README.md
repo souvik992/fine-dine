@@ -33,6 +33,12 @@ src/
   theme/tokens.css design tokens from docs/09
 ```
 
+## Billing screen (P1-09)
+`src/billing/`: `menu-model.ts` (quick entry, search, sheet options, checks; pure + tested),
+`order-session.ts` (one command at a time on the latest version, silent rebase for safe commands, outside-change
+detection; pure + tested), `BillingScreen.tsx`, `ModifierSheet.tsx`, `Cart.tsx`. Line amounts in the cart use
+the shared `lineAmount`; totals always come from the server snapshot.
+
 ## Conflict handling
 `VERSION_CONFLICT` → if command is "safe" (see `docs/05-sync-offline.md`) resend with the returned
 version; otherwise show `ConflictBanner` with what changed and who did it.
