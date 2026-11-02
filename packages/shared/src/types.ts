@@ -1,6 +1,7 @@
 // Wire types shared by the server and every client (docs/03-command-api.md).
 import type { Right } from './rights.js';
 import type { TableState } from './table-state.js';
+import type { StockUnit } from './stock.js';
 
 export const ERROR_CODES = [
   'VALIDATION',
@@ -255,4 +256,90 @@ export interface RoleInfo {
   discountLimitBp: number;
   rights: RoleRight[];
   members: number;
+}
+
+// ---------- stock (docs/02 "Stock") ----------
+
+export type StockMovementKind = 'opening' | 'purchase' | 'purchase_void' | 'sale' | 'wastage' | 'count' | 'adjust';
+
+/** One raw material in `GET /v1/stock`. Quantities in thousandths of `unit`; costs in paise per whole unit. */
+export interface StockItemView {
+  id: string;
+  name: string;
+  unit: StockUnit;
+  onHandMilli: number;
+  reorderLevelMilli: number;
+  lastUnitCostPaise: number | null;
+  /** On hand at the last cost (display only, not an accounting valuation). */
+  valuePaise: number;
+  /** Below the reorder level. */
+  low: boolean;
+  /** More was used than recorded: needs a physical count. */
+  negative: boolean;
+  active: boolean;
+  /** Recipes (items, variants, add-ons) that use it. */
+  usedIn: number;
+}
+
+export interface StockMovementView {
+  id: string;
+  kind: StockMovementKind;
+  deltaMilli: number;
+  /** KOT number or supplier invoice the movement came from. */
+  refText: string | null;
+  reason: string | null;
+  unitCostPaise: number | null;
+  businessDate: string;
+  at: string;
+  userName: string | null;
+}
+
+export interface PurchaseLineView {
+  stockItemId: string;
+  name: string;
+  unit: StockUnit;
+  qtyMilli: number;
+  unitCostPaise: number;
+  amountPaise: number;
+}
+
+export interface PurchaseView {
+  id: string;
+  supplierName: string;
+  supplierGstin: string | null;
+  invoiceNo: string | null;
+  invoiceDate: string | null;
+  note: string | null;
+  totalPaise: number;
+  status: 'posted' | 'void';
+  businessDate: string;
+  createdAt: string;
+  createdByName: string | null;
+  voidedAt: string | null;
+  voidReason: string | null;
+  lines: PurchaseLineView[];
+}
+
+export interface RecipeLineView {
+  ownerKind: 'item' | 'variant' | 'addon';
+  ownerId: string;
+  stockItemId: string;
+  qtyMilli: number;
+}
+
+/** `GET /v1/stock/usage?from&to`: one row per material over business dates from..to. */
+export interface StockUsageRow {
+  stockItemId: string;
+  name: string;
+  unit: StockUnit;
+  openingMilli: number;
+  purchasedMilli: number;
+  usedMilli: number;
+  wastedMilli: number;
+  /** Counts and corrections (net). */
+  adjustedMilli: number;
+  closingMilli: number;
+  /** Used quantity at the last cost. */
+  usedValuePaise: number;
+  wastedValuePaise: number;
 }

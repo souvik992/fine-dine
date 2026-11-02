@@ -16,6 +16,7 @@
 Menu: Category, MenuItem (vegFlag, shortCode, stationId, taxRateBp, available), Variant, AddonGroup (min/max),
 Addon, PriceList + PriceListEntry (areaId-specific price overrides).
 People: User, Role, RolePermission, Device.
+Stock: StockItem, StockMovement, Purchase + PurchaseLine, RecipeLine (see "Stock" below).
 
 ## Order state machine
 ```
@@ -67,3 +68,18 @@ People: User, Role, RolePermission, Device.
 - Void bill
 - Discount above the role's threshold
 - At day-end: any fired KOT with no billed item (computed report, not an event)
+
+## Stock (P2-10, migration 0005; decision in `adr/0003-stock-deducted-at-kot-fire.md`)
+| Entity | Key fields | Notes |
+| --- | --- | --- |
+| StockItem | id, name, unit (kg/g/l/ml/pcs, fixed), onHandMilli, reorderLevelMilli, lastUnitCostPaise, active | Raw material; balance is a cache of the ledger |
+| StockMovement | seq, id, stockItemId, deltaMilli, kind, refType (kot/purchase), refId, reason, unitCostPaise, businessDate, userId, commandId, at | Append-only ledger (triggers) |
+| Purchase | id, supplierName, supplierGstin, invoiceNo, invoiceDate, note, totalPaise, status (posted/void), businessDate | Immutable; void reverses it |
+| PurchaseLine | purchaseId, lineNo, stockItemId, qtyMilli, unitCostPaise, amountPaise | amount = qty × cost / 1000, half up |
+| RecipeLine | ownerKind (item/variant/addon), ownerId, stockItemId, qtyMilli | Per one unit sold; a variant's recipe replaces its item's |
+
+- Quantities are integer thousandths of the unit (1.5 kg = 1500); costs are integer paise per whole unit.
+- Movement kinds: `opening`, `purchase`, `purchase_void`, `sale` (FireKOT), `wastage`, `count`, `adjust`.
+- Invariant: `stock_item.on_hand_milli` = Σ `stock_movement.delta_milli` for that item (tested).
+- Stock never blocks service: balances may go negative ("Count needed").
+- Sold out (`menu_item.available = 0`) is separate from stock and set by people (`SetItemAvailability`).

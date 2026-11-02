@@ -138,6 +138,25 @@ Sessions: `POST /v1/sessions`, `GET /v1/session`, `DELETE /v1/session`, `GET /v1
 `PrintTestPage` { printerId } (right admin): queues a short test page (outlet name, printer name, width, time)
 on that printer through the normal print queue; result `{ printerId }`.
 
+## Stock commands (P2-10/P2-11; schemas in `packages/shared/src/schemas/commands/stock.ts` and `menu-csv.ts`)
+Quantities are integer thousandths of the material's unit (`qtyMilli`), costs integer paise per whole unit.
+| Type | Payload | Right | Effect |
+| --- | --- | --- | --- |
+| `UpsertStockItem` | id, name, unit (kg/g/l/ml/pcs), reorderLevelMilli, active, opening?{qtyMilli, unitCostPaise} | stock.manage | Opening only on create; unit fixed (`INVALID_STATE`); name unique among active; cannot switch off while in a recipe |
+| `AdjustStock` | kind: wastage{qtyMilli, reason} \| count{qtyMilli, reason?} \| adjust{qtyMilli ±, reason} | stock.manage | One movement (none when a count matches); audited `stock.<kind>` |
+| `RecordPurchase` | id, supplierName, supplierGstin?, invoiceNo?, invoiceDate?, note?, lines[{stockItemId, qtyMilli, unitCostPaise}] | stock.manage | Adds stock, sets last cost; result `{ purchaseId, totalPaise }`; same id twice → `INVALID_STATE` |
+| `VoidPurchase` | purchaseId, reason | stock.manage | Reverses every line; last cost falls back to the latest posted purchase, else the opening cost |
+| `SetRecipe` | ownerKind (item/variant/addon), ownerId, lines[{stockItemId, qtyMilli}] | stock.manage | Replaces the recipe; `[]` removes it |
+| `SetItemAvailability` | itemId, available | menu.stock | Sold out / back on; `menu.changed`; no-op when unchanged |
+| `ImportMenu` | importId, items[{name, category, pricePaise, taxRateBp, shortCode, veg, hsnSac}] (≤ 1000) | admin | All or nothing: name or code already on the menu / repeated → `VALIDATION` with `details.problems[{item, message}]`; categories matched ignoring case and spaces, missing ones created |
+
+`FireKOT` also posts `sale` movements for the fired lines' recipes (ADR-0003) and emits `stock.changed`.
+
+Stock queries (need a session with `stock.manage`): `GET /v1/stock` → `{ items: StockItemView[] }`;
+`GET /v1/stock/:id/movements?limit` → `{ movements }` (newest first, with KOT or supplier text);
+`GET /v1/stock/usage?from&to` (business dates) → `{ rows: StockUsageRow[] }`;
+`GET /v1/purchases?limit&offset` → `{ purchases, suppliers }`; `GET /v1/purchases/:id`; `GET /v1/recipes` → `{ lines }`.
+
 ## Admin endpoints (also commands, admin right)
 `UpsertArea`, `UpsertTable`, `UpsertCategory`, `UpsertMenuItem`, `UpsertAddonGroup`, `UpsertStation`,
 `UpsertPrinter`, `UpsertUser`, `UpsertRole`, `PairDevice`, `RevokeDevice`, `SetConfig`.

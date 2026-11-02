@@ -8,6 +8,7 @@ import { HealthDots } from '../components/HealthDots.js';
 import { UserBadge } from '../components/UserBadge.js';
 import { canvasSize, hasLayout, TILE_H, TILE_W } from '../settings/layout-model.js';
 import { findTable, moveFocus, STATE_META, stateCounts, tablesInArea, type Arrow } from './floor-model.js';
+import { StockButton } from '../stock/StockButton.js';
 import { DayEndDialog } from './DayEndDialog.js';
 import { SeatDialog } from './SeatDialog.js';
 import { TableTile } from './TableTile.js';
@@ -28,7 +29,7 @@ function columnsOf(grid: HTMLElement | null): number {
   return Math.max(1, tiles.filter((t) => (t as HTMLElement).offsetTop === top).length);
 }
 
-export function FloorScreen({ onSettings, onOpenOrder }: { onSettings: () => void; onOpenOrder: (orderId: string) => void }) {
+export function FloorScreen({ onSettings, onStock, onOpenOrder }: { onSettings: () => void; onStock: () => void; onOpenOrder: (orderId: string) => void }) {
   const { api, pinRequest, can } = useApp();
   const now = useClock();
   const floor = useQuery({
@@ -176,6 +177,7 @@ export function FloorScreen({ onSettings, onOpenOrder }: { onSettings: () => voi
         <time className="w-14 text-right text-sm font-semibold tabular-nums" dateTime={now.toISOString()}>
           {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })}
         </time>
+        {can('stock.manage') ? <StockButton onClick={onStock} /> : null}
         {can('dayend', true) ? (
           <button className="btn h-10" onClick={() => setClosingDay(true)} disabled={!data} title="Close the business day and print the Z-report">
             <MoonStar className="h-4 w-4" /> Day end

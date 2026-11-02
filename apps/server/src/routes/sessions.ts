@@ -1,14 +1,10 @@
 import { loginSchema, type RoleInfo, type StaffMember } from '@dinepos/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { requireRight as requireSessionRight, sessionToken as token } from '../auth/require-right.js';
 import { login, logout, resolveSession, roleRights, setupState } from '../auth/sessions.js';
 import { PosError } from '../core/errors.js';
 import { getAdminCatalog } from '../queries/admin-catalog.js';
 import type { Db } from '../db/connection.js';
-
-const token = (req: FastifyRequest) => {
-  const v = req.headers['x-user-session'];
-  return typeof v === 'string' && v ? v : undefined;
-};
 
 export function sessionRoutes(app: FastifyInstance, deps: { db: Db; now: () => Date }): void {
   const { db, now } = deps;
@@ -31,12 +27,7 @@ export function sessionRoutes(app: FastifyInstance, deps: { db: Db; now: () => D
   });
 
   /** Settings reads need a session whose role has the right without a PIN. */
-  const requireRight = (req: FastifyRequest, right: 'users.manage' | 'admin') => {
-    const s = resolveSession(db, token(req), now());
-    if (!s.rights.some((r) => r.right === right && !r.needsPin)) {
-      throw new PosError('FORBIDDEN', `You do not have the "${right}" right.`, { right });
-    }
-  };
+  const requireRight = (req: FastifyRequest, right: 'users.manage' | 'admin') => requireSessionRight(db, req, right, now());
   const requireManageStaff = (req: FastifyRequest) => requireRight(req, 'users.manage');
 
   /** Everything the menu, floor and printer settings edit (inactive items included). */

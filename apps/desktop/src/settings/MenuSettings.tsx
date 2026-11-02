@@ -4,12 +4,13 @@ import { useMemo, useState } from 'react';
 import { bpToPercentText, paiseToInput, rupeesToPaise } from '../billing/money-input.js';
 import { Modal } from '../components/Modal.js';
 import { VegMark } from '../components/VegMark.js';
+import { MenuImport } from './MenuImport.js';
 import { DialogButtons, Empty, ErrorText, Field, GST_RATES, SectionHeader, Toggle, useCatalog, useSave, type AdminCatalog } from './common.js';
 
 type Item = AdminCatalog['items'][number];
 type Category = AdminCatalog['categories'][number];
 type Group = AdminCatalog['addonGroups'][number];
-type Tab = 'items' | 'categories' | 'addons';
+type Tab = 'items' | 'categories' | 'addons' | 'import';
 
 /** Menu: categories, items with options and add-ons (docs/02 menu model). */
 export function MenuSettings() {
@@ -25,6 +26,7 @@ export function MenuSettings() {
             ['items', `Items (${catalog.data.items.length})`],
             ['categories', `Categories (${catalog.data.categories.length})`],
             ['addons', `Add-on groups (${catalog.data.addonGroups.length})`],
+            ['import', 'Bulk upload'],
           ] as const
         ).map(([k, label]) => (
           <button key={k} role="tab" className="tab" aria-selected={tab === k} onClick={() => setTab(k)}>
@@ -35,6 +37,7 @@ export function MenuSettings() {
       {tab === 'items' ? <Items catalog={catalog.data} /> : null}
       {tab === 'categories' ? <Categories catalog={catalog.data} /> : null}
       {tab === 'addons' ? <AddonGroups catalog={catalog.data} /> : null}
+      {tab === 'import' ? <MenuImport catalog={catalog.data} /> : null}
     </div>
   );
 }
@@ -52,7 +55,7 @@ function Items({ catalog }: { catalog: AdminCatalog }) {
     return catalog.items.filter((i) => (!categoryId || i.categoryId === categoryId) && (!term || i.name.toLowerCase().includes(term) || i.shortCode?.toLowerCase().startsWith(term)));
   }, [catalog.items, categoryId, q]);
 
-  if (catalog.categories.length === 0) return <Empty>Add a category first (Categories tab), then its items.</Empty>;
+  if (catalog.categories.length === 0) return <Empty>Add a category first (Categories tab), then its items, or add many at once with Bulk upload.</Empty>;
   return (
     <>
       <div className="mb-3 flex gap-2">

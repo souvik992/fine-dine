@@ -226,7 +226,46 @@ export function devSeedCommands(): SeedCommand[] {
       },
     });
   });
+  // Stock: opening balances only (a purchase cannot be recorded twice, and the seed must re-run cleanly).
+  for (const m of materials) {
+    cmds.push({
+      type: 'UpsertStockItem',
+      payload: { id: seedId(`stock:${m.key}`), name: m.name, unit: m.unit, reorderLevelMilli: m.reorder * 1000, opening: { qtyMilli: m.opening * 1000, unitCostPaise: rupees(m.cost) } },
+    });
+  }
+  for (const [owner, lines] of recipes) {
+    cmds.push({
+      type: 'SetRecipe',
+      payload: { ownerKind: owner.split(':')[0], ownerId: seedId(owner), lines: lines.map(([m, qtyMilli]) => ({ stockItemId: seedId(`stock:${m}`), qtyMilli })) },
+    });
+  }
   return cmds;
 }
+
+/** Demo raw materials: unit, opening stock and reorder level in whole units, cost in rupees per unit. */
+const materials = [
+  { key: 'paneer', name: 'Paneer', unit: 'kg', opening: 8, reorder: 3, cost: 340 },
+  { key: 'chicken', name: 'Chicken', unit: 'kg', opening: 15, reorder: 5, cost: 240 },
+  { key: 'butter', name: 'Butter', unit: 'kg', opening: 4, reorder: 2, cost: 520 },
+  { key: 'cream', name: 'Fresh cream', unit: 'l', opening: 3, reorder: 2, cost: 260 },
+  { key: 'flour', name: 'Maida', unit: 'kg', opening: 20, reorder: 8, cost: 45 },
+  { key: 'urad', name: 'Urad dal', unit: 'kg', opening: 6, reorder: 2, cost: 140 },
+  { key: 'cheese', name: 'Cheese', unit: 'kg', opening: 1, reorder: 2, cost: 600 },
+  { key: 'mint', name: 'Mint', unit: 'g', opening: 500, reorder: 200, cost: 1 },
+] as const;
+
+/** owner (item:CODE, variant:CODE:Name, addon:group:key) → [material, thousandths of its unit per unit sold]. */
+const recipes: Array<[string, Array<[string, number]>]> = [
+  ['item:PT', [['paneer', 200], ['cream', 20]]],
+  ['item:TC', [['chicken', 900]]],
+  ['variant:TC:Half', [['chicken', 450]]],
+  ['item:BN', [['flour', 80], ['butter', 10]]],
+  ['item:CN', [['flour', 80], ['cheese', 40]]],
+  ['item:DM', [['urad', 120], ['butter', 25], ['cream', 30]]],
+  ['item:PBM', [['paneer', 180], ['butter', 30], ['cream', 40]]],
+  ['item:VM', [['mint', 10]]],
+  ['addon:extras:cheese', [['cheese', 30]]],
+  ['addon:extras:butter', [['butter', 15]]],
+];
 
 export const DEV_SEED_COUNTS = { areas: areas.length, tables: 12, stations: stations.length, items: items.length } as const;

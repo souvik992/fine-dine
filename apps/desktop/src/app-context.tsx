@@ -33,7 +33,7 @@ interface AppContextValue {
 const Ctx = createContext<AppContextValue | null>(null);
 
 /** Which cached GET each stream topic refreshes. Events are triggers; data always comes from GETs (docs/04). */
-const TOPIC_QUERIES: Record<string, string[]> = { floor: ['floor', 'catalog'], printers: ['printers', 'catalog'], menu: ['menu', 'catalog'], system: ['health', 'floor', 'config', 'staff', 'roles'] };
+const TOPIC_QUERIES: Record<string, string[]> = { floor: ['floor', 'catalog'], printers: ['printers', 'catalog'], menu: ['menu', 'catalog'], system: ['health', 'floor', 'config', 'staff', 'roles'], stock: ['stock', 'purchases', 'recipes', 'stock-usage', 'stock-moves'] };
 const TOPICS = [...Object.keys(TOPIC_QUERIES), 'order:*'];
 const SESSION_KEY = 'dinepos.session';
 /** docs/07: terminals sign out after 10 idle minutes. */

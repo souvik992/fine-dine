@@ -392,6 +392,97 @@ describe('desktop app', () => {
     await page.getByRole('button', { name: 'Floor', exact: true }).click();
   });
 
+  // ---- Stock and menu upload (P2-10, P2-11) ----
+
+  const get = async <T,>(url: string) => (await (await fetch(`${SERVER}${url}`, { headers: { 'x-user-session': testToken } })).json()) as T;
+  const paneerOnHand = async () => (await get<{ items: Array<{ name: string; onHandMilli: number }> }>('/v1/stock')).items.find((i) => i.name === 'Paneer')!.onHandMilli;
+
+  it('Stock: a purchase adds to stock, and firing Paneer Tikka uses its recipe (live on screen)', async () => {
+    const [page] = app.windows();
+    await page!.getByRole('button', { name: /^Stock/ }).click();
+    const materials = page!.getByRole('table', { name: 'Materials' });
+    const paneerRow = materials.getByRole('row').filter({ has: page!.getByText('Paneer', { exact: true }) });
+    await paneerRow.waitFor();
+    const start = await paneerOnHand();
+
+    await page!.getByRole('tab', { name: /Purchases/ }).click();
+    await page!.getByRole('button', { name: 'Record purchase' }).click();
+    const dlg = page!.getByRole('dialog', { name: 'Record a purchase' });
+    await dlg.getByRole('combobox', { name: 'Supplier' }).fill('Fresh Dairy');
+    await dlg.getByLabel('Line 1 material').selectOption({ label: 'Paneer (kg)' });
+    await dlg.getByLabel('Line 1 quantity').fill('2');
+    await dlg.getByLabel('Line 1 rate').fill('350');
+    await dlg.getByText('₹700.00').first().waitFor(); // amount from the shared calculator
+    await dlg.getByRole('button', { name: 'Record purchase' }).click();
+    await page!.getByRole('table', { name: 'Purchases' }).getByText('Fresh Dairy').waitFor();
+    expect(await paneerOnHand()).toBe(start + 2000);
+
+    // Fire Paneer Tikka (recipe: 0.2 kg paneer) on T6 from outside the app; the Materials tab updates live.
+    await page!.getByRole('tab', { name: /Materials/ }).click();
+    const menu = await get<{ items: Array<{ id: string; shortCode?: string }>; addonGroups: Array<{ name: string; addons: Array<{ id: string }> }> }>('/v1/menu');
+    const pt = menu.items.find((i) => i.shortCode === 'PT')!;
+    const spice = menu.addonGroups.find((g) => g.name.startsWith('Spice'))!.addons[0]!;
+    const floor = await get<{ tables: Array<{ id: string; label: string }> }>('/v1/floor');
+    const open = await fetch(`${SERVER}/v1/commands`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-user-session': testToken },
+      body: JSON.stringify({ commandId: ulid(), type: 'OpenTable', payload: { tableId: floor.tables.find((t) => t.label === 'T6')!.id, covers: 2 }, createdAt: new Date().toISOString() }),
+    });
+    const order = ((await open.json()) as { order: { id: string; version: number } }).order;
+    const orderCommand = async (type: string, payload: unknown, expectedVersion: number) => {
+      const res = await fetch(`${SERVER}/v1/commands`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-user-session': testToken },
+        body: JSON.stringify({ commandId: ulid(), type, payload, orderId: order.id, expectedVersion, createdAt: new Date().toISOString() }),
+      });
+      if (!res.ok) throw new Error(`${type}: ${await res.text()}`);
+    };
+    await orderCommand('AddItems', { items: [{ id: ulid(), itemId: pt.id, qty: 1, addons: [{ addonId: spice.id, qty: 1 }] }] }, order.version);
+    await orderCommand('FireKOT', { all: true }, order.version + 1);
+    const expected = start + 2000 - 200;
+    expect(await paneerOnHand()).toBe(expected);
+    const kg = `${expected / 1000} kg`; // e.g. 9.8 kg
+    await paneerRow.getByText(kg).waitFor({ timeout: 5_000 });
+
+    // History names the KOT.
+    await page!.getByRole('button', { name: 'History of Paneer' }).click();
+    await page!.getByRole('dialog', { name: 'Paneer: history' }).getByText(/Used \(KOT\)/).first().waitFor();
+    await page!.keyboard.press('Escape');
+    await page!.getByRole('button', { name: 'Floor', exact: true }).click();
+  });
+
+  it('Billing: right-click marks an item sold out for everyone, and again puts it back', async () => {
+    const [page] = app.windows();
+    await page!.locator('[data-table="T6"]').click();
+    await page!.getByLabel('Add item').waitFor();
+    await page!.getByLabel('Add item').fill('Masala Papad');
+    const tile = page!.getByRole('button', { name: /Masala Papad/ });
+    await tile.click({ button: 'right' });
+    await tile.getByText('Sold out').waitFor();
+    const avail = async () => (await get<{ items: Array<{ shortCode?: string; available: boolean }> }>('/v1/menu')).items.find((i) => i.shortCode === 'MP')!.available;
+    expect(await avail()).toBe(false);
+    await tile.click({ button: 'right' });
+    await tile.getByText('MP').waitFor();
+    expect(await avail()).toBe(true);
+    await page!.keyboard.press('Escape');
+    await page!.keyboard.press('Escape');
+  });
+
+  it('Menu › Bulk upload: a CSV is checked, then imported all at once', async () => {
+    const page = await openSettings('Menu');
+    await page.getByRole('tab', { name: 'Bulk upload' }).click();
+    const csv = ['name,category,price,gst,code,veg', 'Galouti Kebab,Chef Specials,480,5,GK,non-veg', 'Kesar Phirni,Desserts,180,5,KPH,veg', 'Dal Makhani,Mains,280,5,,veg'].join('\r\n');
+    await page.getByLabel('Menu CSV file').setInputFiles({ name: 'menu.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+    await page.getByRole('list', { name: 'Problems' }).getByText(/Row 4:.*already on the menu/).waitFor();
+    expect(await page.getByRole('button', { name: /^Import/ }).isDisabled()).toBe(true);
+
+    await page.getByLabel('Menu CSV file').setInputFiles({ name: 'menu.csv', mimeType: 'text/csv', buffer: Buffer.from(csv.split('\r\n').slice(0, 3).join('\r\n')) });
+    await page.getByRole('button', { name: 'Import 2 items' }).click();
+    await page.getByRole('status').getByText(/2 items added, 1 new category/).waitFor();
+    expect((await catalog()).items.find((i) => i.shortCode === 'GK')).toMatchObject({ name: 'Galouti Kebab', basePricePaise: 48_000 });
+    await page.getByRole('button', { name: 'Floor', exact: true }).click();
+  });
+
   it('Lock returns every window of the terminal to the sign-in screen', async () => {
     const [page, other] = app.windows();
     await page!.getByRole('button', { name: 'Lock' }).click();

@@ -160,7 +160,7 @@ describe('rights (docs/07)', () => {
     for (let i = 0; i < 5; i++) await send('OpenTable', { tableId: ids.t1, covers: 2 }, { token: cashier, pin: `00${i}0` });
     const r = await send('OpenTable', { tableId: ids.t1, covers: 2 }, { token: cashier, pin: '2345' });
     expect(r.body.error?.details).toMatchObject({ reason: 'too_many_tries' });
-  });
+  }, 20_000); // each wrong PIN is checked against every manager's scrypt hash
 
   it('a discount above the role limit needs a PIN from someone whose limit covers it, and is flagged', async () => {
     const owner = await seeded();
@@ -276,5 +276,33 @@ describe('settings reads and test print', () => {
     expect(job.printer_id).toBe(seedId('printer:bill'));
     expect(job.preview_text).toContain('DinePOS test page');
     expect(job.preview_text).toContain('If you can read this, the printer works.');
+  });
+});
+
+describe('stock reads', () => {
+  it('need stock.manage: Owner and Manager may read, a Cashier or no session gets 403', async () => {
+    const owner = await seeded();
+    const cashier = (await login(ids.cashier, '1111')).body.token;
+    const manager = (await login(ids.manager, '2345')).body.token;
+    for (const url of ['/v1/stock', '/v1/purchases', '/v1/recipes', '/v1/stock/usage?from=2026-11-01&to=2026-11-02']) {
+      expect((await app.inject({ method: 'GET', url })).statusCode, url).toBe(401);
+      expect((await app.inject({ method: 'GET', url, headers: { 'x-user-session': cashier } })).statusCode, url).toBe(403);
+      expect((await app.inject({ method: 'GET', url, headers: { 'x-user-session': manager } })).statusCode, url).toBe(200);
+    }
+    const id = newId();
+    expect((await send('UpsertStockItem', { id, name: 'Ghee', unit: 'kg', opening: { qtyMilli: 2000, unitCostPaise: 60_000 } }, { token: owner })).body.ok).toBe(true);
+    const stock = (await app.inject({ method: 'GET', url: '/v1/stock', headers: { 'x-user-session': owner } })).json<{ items: Array<{ id: string; onHandMilli: number; valuePaise: number }> }>();
+    expect(stock.items.find((s) => s.id === id)).toMatchObject({ onHandMilli: 2000, valuePaise: 120_000 });
+    const moves = (await app.inject({ method: 'GET', url: `/v1/stock/${id}/movements`, headers: { 'x-user-session': owner } })).json<{ movements: Array<{ kind: string; userName: string }> }>();
+    expect(moves.movements).toMatchObject([{ kind: 'opening', userName: 'Asha (Owner)' }]);
+    expect((await app.inject({ method: 'GET', url: '/v1/stock/usage?from=2026-11-03&to=2026-11-01', headers: { 'x-user-session': owner } })).statusCode).toBe(400);
+  });
+
+  it('a Cashier may mark an item sold out (menu.stock) but not record a purchase', async () => {
+    await seeded();
+    const cashier = (await login(ids.cashier, '1111')).body.token;
+    expect((await send('SetItemAvailability', { itemId: ids.dal, available: false }, { token: cashier })).body.ok).toBe(true);
+    const r = await send('RecordPurchase', { id: newId(), supplierName: 'X', lines: [{ stockItemId: newId(), qtyMilli: 1, unitCostPaise: 1 }] }, { token: cashier });
+    expect(r.body.error?.code).toBe('FORBIDDEN');
   });
 });

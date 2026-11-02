@@ -18,6 +18,7 @@ Endpoint: `GET /v1/stream` (WebSocket). Auth: first message `{ "type": "hello", 
 | `kot.status` | `station:<id>`, `order:<id>` | kotId, status | captain, desktop |
 | `print.status` | `printers` | printerId, status (`retrying` \| `offline` \| `ok`), queued, error | desktop |
 | `menu.changed` | `menu` | menuVersion, itemIds | all |
+| `stock.changed` | `stock` | stockItemIds (refetch `/v1/stock`) | desktop Stock screen |
 | `floor.changed` | `floor` | areaId?, tableId? (layout/config changed; refetch `/v1/floor`) | desktop, captain |
 | `printer.changed` | `printers` | printerId | desktop |
 | `online.order` | `online` | orderId, source | desktop (Phase 4) |

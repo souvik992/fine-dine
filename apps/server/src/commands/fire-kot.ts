@@ -2,6 +2,7 @@ import { renderKot, type KotTicket, type PaperWidth } from '@dinepos/printing';
 import { fireKotSchema, isoInZone, newId } from '@dinepos/shared';
 import { defineCommand } from '../core/command-handler.js';
 import { PosError } from '../core/errors.js';
+import { consumeForKot, stockChanged } from './stock-support.js';
 import { emitTableState, nextCounter, orderItemContext, reopenIfBilled, requireEditable, resolveStation } from './order-support.js';
 
 interface HeldRow {
@@ -62,6 +63,7 @@ export const fireKot = defineCommand({
     const printersOf = db.prepare('SELECT p.id, p.width_mm FROM station_printer sp JOIN printer p ON p.id = sp.printer_id WHERE sp.station_id = ? ORDER BY p.name');
     const markFired = db.prepare(`UPDATE order_item SET status = 'fired', kot_id = ?, station_id = ? WHERE id = ?`);
 
+    const stockTouched: string[] = [];
     const kots = stations.map((station) => {
       const items = byStation.get(station.id)!;
       const kotId = newId();
@@ -70,6 +72,8 @@ export const fireKot = defineCommand({
         `INSERT INTO kot (id, order_id, station_id, business_date, kot_no, kind, fired_at, fired_by) VALUES (?, ?, ?, ?, ?, 'new', ?, ?)`,
       ).run(kotId, o.id, station.id, ctx.businessDate, kotNo, ctx.nowIso, ctx.actor.userId);
       for (const i of items) markFired.run(kotId, station.id, i.id);
+      // Recipe ingredients are used when the kitchen gets the ticket (docs/02 "Stock"); stock never blocks a KOT.
+      stockTouched.push(...consumeForKot(ctx, kotId, items.map((i) => i.id)));
 
       const ticket: KotTicket = {
         kotNo,
@@ -93,6 +97,7 @@ export const fireKot = defineCommand({
       return { id: kotId, kotNo, stationId: station.id, orderItemIds: items.map((i) => i.id) };
     });
 
+    if (stockTouched.length) stockChanged(ctx, stockTouched);
     db.prepare('UPDATE "order" SET last_kot_at = ? WHERE id = ?').run(ctx.nowIso, o.id);
     reopenIfBilled(ctx, o);
     emitTableState(ctx, o.table_id);

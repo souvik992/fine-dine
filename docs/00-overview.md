@@ -19,7 +19,8 @@ bars), extending a QSR billing core with table service.
 - Device-bound licence (owner's keygen)
 
 ## Out of scope for v1
-Inventory/recipes, loyalty, aggregator integrations, multi-outlet cloud dashboard (planned Phase 4+).
+Loyalty, aggregator integrations, multi-outlet cloud dashboard (planned Phase 4+). Inventory (materials, purchases,
+recipes, wastage, usage report) was added early with P2-10; see docs/02 "Stock".
 
 ## Glossary
 | Term | Meaning |

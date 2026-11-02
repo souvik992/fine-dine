@@ -10,8 +10,9 @@ import { SetupScreen } from './auth/SetupScreen.js';
 import { BillingScreen } from './billing/BillingScreen.js';
 import { FloorScreen } from './floor/FloorScreen.js';
 import { SettingsScreen } from './settings/SettingsScreen.js';
+import { StockScreen } from './stock/StockScreen.js';
 
-type Screen = { kind: 'floor' } | { kind: 'settings' } | { kind: 'order'; orderId: string };
+type Screen = { kind: 'floor' } | { kind: 'settings' } | { kind: 'stock' } | { kind: 'order'; orderId: string };
 
 export function App() {
   const { api, session } = useApp();
@@ -49,8 +50,10 @@ export function App() {
     <>
       {screen.kind === 'order' ? (
         <BillingScreen key={screen.orderId} orderId={screen.orderId} onBack={toFloor} />
+      ) : screen.kind === 'stock' ? (
+        <StockScreen onBack={toFloor} />
       ) : (
-        <FloorScreen onSettings={() => setScreen({ kind: 'settings' })} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} />
+        <FloorScreen onSettings={() => setScreen({ kind: 'settings' })} onStock={() => setScreen({ kind: 'stock' })} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} />
       )}
       <ManagerPinDialog />
     </>

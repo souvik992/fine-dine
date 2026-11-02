@@ -84,6 +84,11 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria �
 - [ ] **P2-07 Second terminal over LAN + conflict UX** — Accept: two terminals editing T7 never lose an item; conflict banner appears for Move vs PrintBill race.
 - [ ] **P2-08 Backups + restore** — Accept: restore from a 15-min backup reproduces open orders.
 - [ ] **P2-09 Licence verification + seats** — Accept: expired key → warning, grace, then DayEnd/new date blocked; seat limit at pairing.
+- [x] **P2-10 Stock: materials, purchases, recipes, wastage, usage** (added 2026-11-02 at the product owner's request, from
+  TiffinPOS; `02-domain-model.md` "Stock", ADR-0003) — Accept: ledger = cached balance; FireKOT uses variant/item/add-on
+  recipes; purchase void reverses stock and cost; usage report opening + in − out = closing; stock.manage enforced.
+- [x] **P2-11 Menu bulk upload + sold out** (added 2026-11-02, from TiffinPOS) — Accept: CSV checked row by row, imported
+  all or nothing, categories matched ignoring case; `SetItemAvailability` (menu.stock) from the billing screen.
 
 ## Phase 3 — Captain app
 

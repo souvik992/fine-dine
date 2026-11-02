@@ -95,7 +95,8 @@ newer than the build stops startup. `npm run build` copies the SQL into `dist/`.
 
 ## Dev seed (P1-05)
 With the server running: `npm run seed -w @dinepos/server` (`DINEPOS_URL` to target another port). It sends the
-demo outlet (`src/seed/dev-seed.ts`: 2 areas, 12 tables, 3 stations, 4 fake printers, 30 items) as normal admin
+demo outlet (`src/seed/dev-seed.ts`: 2 areas, 12 tables, 3 stations, 4 fake printers, 30 items, 8 stock materials with opening
+stock and recipes) as normal admin
 commands over HTTP, so the server stays the only DB writer. Ids derive from stable keys, so re-running is safe.
 Refuses to run with `NODE_ENV=production`.
 

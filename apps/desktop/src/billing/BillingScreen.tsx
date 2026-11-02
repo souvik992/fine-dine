@@ -1,5 +1,5 @@
 import { formatINR, newId, type MenuItem, type MenuSnapshot, type OrderItemSnapshot, type OutletConfig } from '@dinepos/shared';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Flame, Printer, Search, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
@@ -26,7 +26,8 @@ interface Toast {
  * Alt+↑/↓ pick a held line, + / − its quantity, Delete removes it, Esc clears the search or goes back.
  */
 export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: () => void }) {
-  const { api, pinRequest } = useApp();
+  const { api, pinRequest, can } = useApp();
+  const queryClient = useQueryClient();
   const { session, order, error, changedElsewhere, dismissChange } = useOrderSession(orderId);
   const areaId = order?.table?.areaId;
   const menuQuery = useQuery({
@@ -95,10 +96,22 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
     });
   };
 
+  /** Right-click a tile (menu.stock right): sold out / back on, for every terminal at once. */
+  const toggleSoldOut = (item: MenuItem) => {
+    if (!can('menu.stock', true)) return;
+    api
+      .command('SetItemAvailability', { itemId: item.id, available: !item.available })
+      .then(() => {
+        setToast({ kind: 'ok', text: item.available ? `${item.name} marked sold out.` : `${item.name} is back on.` });
+        return queryClient.invalidateQueries({ queryKey: ['menu'] });
+      })
+      .catch((e: unknown) => setToast({ kind: 'error', text: e instanceof ApiError ? e.message : 'Could not change it. Try again.' }));
+  };
+
   const choose = (item: MenuItem, qty: number, forceSheet: boolean) => {
     if (!menu) return;
     if (!item.available) {
-      setToast({ kind: 'error', text: `${item.name} is not available right now.` });
+      setToast({ kind: 'error', text: `${item.name} is sold out.${can('menu.stock', true) ? ' Right-click it to put it back on.' : ''}` });
       return;
     }
     if (needsChoices(menu, item) || (forceSheet && hasChoices(menu, item))) setSheet({ item, qty });
@@ -260,17 +273,20 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
             {items.map((it) => (
               <button
                 key={it.id}
-                disabled={!it.available}
                 onClick={() => choose(it, 1, true)}
-                className="flex min-h-20 flex-col justify-between rounded-xl border border-border bg-card p-3 text-left hover:border-ring disabled:opacity-40"
-                title={it.available ? undefined : 'Not available right now'}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  toggleSoldOut(it);
+                }}
+                className={`flex min-h-20 flex-col justify-between rounded-xl border border-border bg-card p-3 text-left hover:border-ring ${it.available ? '' : 'opacity-50'}`}
+                title={it.available ? (can('menu.stock', true) ? 'Right-click: mark sold out' : undefined) : 'Sold out'}
               >
                 <span className="flex items-start gap-2 text-sm font-semibold">
                   <VegMark veg={it.veg} />
                   {it.name}
                 </span>
                 <span className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="font-mono">{it.shortCode}</span>
+                  {it.available ? <span className="font-mono">{it.shortCode}</span> : <span className="rounded bg-danger px-1.5 font-bold uppercase text-white">Sold out</span>}
                   <span className="font-semibold tabular-nums text-foreground">{it.variants.length ? `from ${formatINR(Math.min(...it.variants.map((v) => v.pricePaise)))}` : formatINR(it.pricePaise)}</span>
                 </span>
               </button>

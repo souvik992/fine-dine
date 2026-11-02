@@ -40,6 +40,8 @@ Addon options follow the order they were entered in (menu admin), so hotkeys sta
 - Footer buttons: Fire (F8), Fire course… , Print bill (F9), Settle (F10), More (discount, covers, captain,
   customer, transfer items).
 - Conflict banner when the order changed elsewhere.
+- Sold out (P2-11): right-click an item tile to mark it sold out or back on (`menu.stock`). Sold-out tiles stay
+  visible, greyed, with a "Sold out" label; choosing one explains why.
 
 ### 3. Settle
 - Bill parts as tabs if split. Tender rows: Cash (with change calc), Card, UPI (shows QR), Due (customer
@@ -65,7 +67,8 @@ Sections are shown by right; every save is a command, so it is audited and other
   in a tray, "Save layout (n moved)" sends one `UpsertTable` per moved table. A table with an open order cannot
   be deactivated.
 - **Menu** (admin): items (code, name, category, price, GST rate, veg, station override, variants, add-on
-  groups, active), categories (station, sort), add-on groups (min/max, options). Saved variants and options can
+  groups, active), categories (station, sort), add-on groups (min/max, options), **Bulk upload** (CSV template,
+  row-by-row check against the file and the menu, then `ImportMenu`, all or nothing). Saved variants and options can
   be deactivated but not removed, so old orders keep their meaning.
 - **Kitchen & printers** (admin): printers (network IP/port, Windows USB name, or preview-only; paper width;
   KOT/bill role; copies; cutter; backup printer) with live status and **Test print** (`PrintTestPage`);
@@ -74,6 +77,18 @@ Sections are shown by right; every save is a command, so it is audited and other
   allowed / allowed with manager PIN / not allowed).
 - **This terminal** (everyone): server address and connection test.
 - Later: devices (P2-02), tax, licence, backup.
+
+### 8. Stock (built in P2-10: `apps/desktop/src/stock/`; Floor header "Stock" button for `stock.manage`)
+The button shows how many materials are low or need a count. Tabs:
+- **Materials**: balance, reorder level, status (OK / Low / Count needed / Off), last cost, value; search; "Needs
+  attention" filter; add (unit, reorder level, opening stock and cost), edit, adjust (Wastage / Physical count /
+  Correction with a reason), history (each movement with KOT or supplier, reason and person).
+- **Purchases**: latest 100 invoices; record a purchase (supplier with suggestions and remembered GSTIN, invoice
+  no./date, lines with live amounts from the shared `stockAmount`); open one to see it or void it with a reason.
+- **Recipes**: every dish with its ingredient count, food cost at last prices and food-cost %; a dialog per dish
+  with a tab per size (variant recipes replace the dish recipe); add-on recipes below.
+- **Usage report**: business-date range; opening, received, used, wasted, adjusted, closing per material, used
+  and wasted value; Download CSV.
 
 ## Captain PWA (phone/tablet)
 - Login with PIN → My tables (assigned areas first) → table → order screen.

@@ -52,6 +52,11 @@ server at start, shared by all windows, and locks after 10 idle minutes (or Lock
 `src/settings/`: one file per section (Outlet, Floor, Menu, Kitchen, Staff, Terminal) plus `common.tsx`;
 `layout-model.ts` holds the layout editor geometry (pure + tested). Sections follow `docs/09-ui-screens.md` §7.
 
+## Stock and menu upload (P2-10, P2-11)
+`src/stock/`: `StockScreen.tsx` (tabs), `MaterialsTab`, `PurchasesTab`, `RecipesTab`, `UsageTab`, `StockButton`
+(floor header badge) and `common.tsx` (queries, `useStockCommand`). `src/settings/MenuImport.tsx` is the Menu ›
+Bulk upload tab (CSV parsed by the shared `parseMenuCsv`). Right-click an item tile in billing to mark it sold out.
+
 ## Installer (P1-11)
 `npm run dist -w @dinepos/desktop` → `release/DinePOS-Setup-<version>.exe` (+ `release/win-unpacked/`). Steps:
 server bundle (`apps/server/scripts/bundle.mjs`: one `server.mjs` + migrations + better-sqlite3 Node-API
