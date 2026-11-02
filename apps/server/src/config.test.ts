@@ -14,6 +14,7 @@ describe('loadConfig', () => {
       timeZone: 'Asia/Kolkata',
       logLevel: 'info',
       allowedOrigins: ['app://dinepos', 'http://localhost:5173', 'http://127.0.0.1:5173'],
+      logToFile: false,
     });
   });
 
@@ -27,6 +28,13 @@ describe('loadConfig', () => {
     const c = loadConfig({ DATA_DIR: './x', DINEPOS_PORT: '8000' }, '/work', 'linux');
     expect(c.dataDir).toBe(path.resolve('/work', 'x'));
     expect(c.port).toBe(8000);
+  });
+
+  it('the installer bundle defaults to production with logs in a file, no env needed', () => {
+    const c = loadConfig({ ProgramData: 'C:\\ProgramData' }, 'C:\\app', 'win32', true);
+    expect(c).toMatchObject({ env: 'production', dataDir: 'C:\\ProgramData\\DinePOS', dbFile: 'dinepos.db', port: 7420, logToFile: true });
+    expect(loadConfig({ NODE_ENV: 'development' }, '/w', 'linux', true).env).toBe('development');
+    expect(loadConfig({ DINEPOS_LOG_TO_FILE: '0' }, '/w', 'linux', true).logToFile).toBe(false);
   });
 
   it('reads allowed origins as a list', () => {

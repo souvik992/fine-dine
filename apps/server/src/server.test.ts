@@ -23,6 +23,7 @@ const config = (): ServerConfig => ({
   timeZone: 'Asia/Kolkata',
   logLevel: 'silent',
   allowedOrigins: ['app://dinepos'],
+  logToFile: false,
 });
 
 beforeEach(() => {

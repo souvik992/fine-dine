@@ -82,7 +82,7 @@ export class ApiClient {
     try {
       res = await this.fetchImpl(`${this.baseUrl}${path}`, { ...init, signal: ctrl.signal });
     } catch {
-      throw new ApiError('NETWORK', 'Cannot reach the outlet server. Check that it is running and the network is connected.');
+      throw new ApiError('NETWORK', 'Cannot reach the outlet server. On the master PC, open “DinePOS Server” from the Start menu; on a billing terminal, check the network and the server address in Settings.');
     } finally {
       clearTimeout(timer);
     }

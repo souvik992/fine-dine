@@ -76,10 +76,13 @@ POST /v1/commands
 ## Data directory (master)
 `%ProgramData%\DinePOS\` → `dinepos.db`, `backups\`, `logs\`, `prints\`, `config.json`, `license.key`.
 
-## Windows service (P1-11)
-The installer's "Install as master" option registers the server as the Windows service `DinePOSServer`
-(WinSW 2.12 wrapper, `resources\server\DinePOS-Server.xml`): automatic start at boot, restart on failure
-(5 s / 10 s / 30 s), stop by Ctrl+C with a 15 s limit (graceful shutdown), rolling logs in
-`%ProgramData%\DinePOS\logs`, runtime = bundled Node 24.21.0 (`resources\server\node.exe`). Firewall: inbound
-TCP 7420 on private/domain profiles only. Uninstall removes the service and rule, never the data folder.
-The service runs as LocalSystem for now; a least-privilege account (LocalService + folder ACL) is a follow-up.
+## Running the server on the master (P1-11)
+Decided 2026-11-02 by the product owner: the server runs as a **standalone local process, like the Tiffin order
+hub**, not as a Windows service. The installer's "Install as master" option adds a **DinePOS Server** shortcut
+(Start menu + desktop) that opens the bundled server (`resources\server\node.exe server.mjs`, Node 24.21.0) in its
+own window: production settings by default, data in `%ProgramData%\DinePOS`, JSON logs in
+`%ProgramData%\DinePOS\logs\server-<date>.log`, a start-up banner with the LAN address for terminals. Closing the
+window or Ctrl+C stops it cleanly. "Start with Windows" puts the shortcut in the all-users Startup folder, so the
+server starts when someone signs in (not before sign-in, which only a service could do). Firewall: inbound TCP 7420
+on private/domain profiles only. Users get modify rights on the data folder. Uninstall stops the server and removes
+shortcuts and the rule, never the data folder. Developers run it with `npm start` (bundle) or `npm run dev:server`.

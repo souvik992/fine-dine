@@ -26,6 +26,7 @@ describe('bill numbering across restart', () => {
     timeZone: 'Asia/Kolkata',
     logLevel: 'silent',
     allowedOrigins: [],
+    logToFile: false,
   });
   const now = () => new Date('2026-11-02T08:00:00Z');
 

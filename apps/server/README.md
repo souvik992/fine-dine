@@ -79,6 +79,7 @@ DUPLICATE replay, INVALID_STATE.
 | `DATA_DIR` | dev `./data`, prod `%ProgramData%\DinePOS` (`/var/lib/dinepos` elsewhere) | holds DB, `backups/`, `logs/`, lock |
 | `DINEPOS_TIMEZONE` | `Asia/Kolkata` | business date and `serverTime` |
 | `LOG_LEVEL` | `info` | JSON logs (pino); auth headers are redacted |
+| `DINEPOS_LOG_TO_FILE` | `1` in production | `1`: JSON logs to `<DATA_DIR>/logs/server-<date>.log`, console shows the banner |
 | `DINEPOS_ALLOWED_ORIGINS` | `app://dinepos,http://localhost:5173,http://127.0.0.1:5173` | browser origins for CORS and `/v1/stream` |
 
 Startup: data dir → `dinepos.lock` (refuses a second server; a lock from a crashed pid is taken over; a lock
@@ -97,6 +98,13 @@ With the server running: `npm run seed -w @dinepos/server` (`DINEPOS_URL` to tar
 demo outlet (`src/seed/dev-seed.ts`: 2 areas, 12 tables, 3 stations, 4 fake printers, 30 items) as normal admin
 commands over HTTP, so the server stays the only DB writer. Ids derive from stable keys, so re-running is safe.
 Refuses to run with `NODE_ENV=production`.
+
+## Run it like the order hub
+`npm start` (repo root) bundles the server and runs it in production mode: data in `%ProgramData%\DinePOS`
+(`DATA_DIR` to change), port 7420 (`DINEPOS_PORT`). It prints the addresses for this PC and for billing terminals,
+the data folder and the log file; Ctrl+C or closing the window stops it cleanly. On shop PCs the installer's
+"DinePOS Server" shortcut does the same with the bundled node.exe (the bundle defaults to production, so the
+shortcut needs no environment variables).
 
 ## Dev
 `npm run dev -w @dinepos/server` → `tsx watch src/index.ts` with `apps/server/data/dev.db`, fake printers.

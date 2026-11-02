@@ -1,5 +1,5 @@
 // Checks a built release folder: the app archive holds only bundled code, and resources/server has everything the
-// Windows service needs. Exits non-zero with the problems listed. Run after `npm run dist`.
+// "DinePOS Server" shortcut needs. Exits non-zero with the problems listed. Run after `npm run dist`.
 import { existsSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -19,8 +19,7 @@ for (const need of [
   'node.exe',
   'server.mjs',
   'package.json',
-  'DinePOS-Server.exe',
-  'DinePOS-Server.xml',
+  'stop-server.ps1',
   'migrations/0001_init.sql',
   'node_modules/better-sqlite3/package.json',
   'node_modules/better-sqlite3/lib/index.js',

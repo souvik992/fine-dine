@@ -66,11 +66,12 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria �
   - Accept: bill math tests incl. discount allocation and round-off; bill numbers gap-free across restart;
     table returns FREE after settle; DayEnd blocked with open orders.
 
-- [ ] **P1-11 Windows service + installer (master)** — built 2026-11-02 (installer, service definition, packaged
-  e2e); waiting for the on-PC reboot acceptance in `apps/desktop/README.md` before ticking.
-  - Build: run server as a Windows service; electron-builder NSIS installer with "Install as master" option;
-    data dir `%ProgramData%\DinePOS`.
-  - Accept: reboot → service auto-starts; desktop connects without manual steps.
+- [ ] **P1-11 Server on the master + installer** — built 2026-11-02. Changed by the product owner the same day:
+  the server runs standalone like the order hub (shortcut + optional start with Windows), not as a Windows service.
+  Waiting for the on-PC acceptance in `apps/desktop/README.md` before ticking.
+  - Build: standalone server (DinePOS Server shortcut, optional start with Windows); electron-builder NSIS
+    installer with "Install as master" option; data dir `%ProgramData%\DinePOS`.
+  - Accept: reboot + sign in → server starts by itself; desktop connects without manual steps.
 
 ## Phase 2 — Bill operations + multi-terminal + rights
 

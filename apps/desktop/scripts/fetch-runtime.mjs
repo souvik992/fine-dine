@@ -1,10 +1,7 @@
-// Downloads the two third-party binaries the installer ships, verifies them against pinned SHA-256 hashes and
-// caches them in build-cache/. A changed or corrupted download stops the build.
+// Downloads the third-party runtime the installer ships, verifies it against a pinned SHA-256 hash and caches it in
+// build-cache/. A changed or corrupted download stops the build.
 //
 //   node.exe   Node.js 24.21.0 win-x64 (the version the whole test suite runs on). Hash from nodejs.org SHASUMS256.
-//   WinSW      Windows service wrapper 2.12.0, .NET 4.6.1 build (in-box on Windows 10/11), MIT licence.
-//              That release predates GitHub asset digests; the hash was recorded from the official release
-//              (655,872 bytes, FileVersion 2.12.0.0) on 2026-11-02.
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -15,11 +12,6 @@ export const BINARIES = [
     file: 'node.exe',
     url: `https://nodejs.org/dist/v${NODE_VERSION}/win-x64/node.exe`,
     sha256: 'ba4e6d110e8c1592a1ecd390f6b05f3da124b13871a5be62b341a07a853c6c32',
-  },
-  {
-    file: 'WinSW.NET461.exe',
-    url: 'https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW.NET461.exe',
-    sha256: 'b5066b7bbdfba1293e5d15cda3caaea88fbeab35bd5b38c41c913d492aadfc4f',
   },
 ];
 

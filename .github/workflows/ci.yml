@@ -32,7 +32,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # Bundles the server, verifies node.exe + WinSW against pinned SHA-256, builds the NSIS installer and
+      # Bundles the server, verifies node.exe against its pinned SHA-256, builds the NSIS installer and
       # checks the release contents (scripts/inspect-release.mjs).
       - run: npm run dist -w @dinepos/desktop
       - uses: actions/upload-artifact@v4
