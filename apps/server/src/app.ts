@@ -117,7 +117,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
     },
     deps.auth ?? sessionAuth(db, now),
   );
-  sessionRoutes(app, { db, now });
+  sessionRoutes(app, { db, now, timeZone });
   stockRoutes(app, { db, now });
   streamRoutes(app, hub, allowedOrigins);
   return Object.assign(app, { realtime: hub });

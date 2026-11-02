@@ -95,8 +95,8 @@ describe('desktop app', () => {
 
     const electron = createRequire(import.meta.url)('electron') as unknown as string;
     app = PACKAGED
-      ? await _electron.launch({ executablePath: path.join(unpacked, 'DinePOS.exe'), args: [], cwd: unpacked, env: cleanEnv({ DINEPOS_SERVER_URL: SERVER }) })
-      : await _electron.launch({ executablePath: electron, args: [here], cwd: here, env: cleanEnv({ DINEPOS_SERVER_URL: SERVER }) });
+      ? await _electron.launch({ executablePath: path.join(unpacked, 'DinePOS.exe'), args: [], cwd: unpacked, env: cleanEnv({ DINEPOS_SERVER_URL: SERVER, DINEPOS_USER_DATA_DIR: path.join(dataDir, 'profile') }) })
+      : await _electron.launch({ executablePath: electron, args: [here], cwd: here, env: cleanEnv({ DINEPOS_SERVER_URL: SERVER, DINEPOS_USER_DATA_DIR: path.join(dataDir, 'profile') }) });
   }, 120_000);
 
   afterAll(async () => {
@@ -480,6 +480,34 @@ describe('desktop app', () => {
     await page.getByRole('button', { name: 'Import 2 items' }).click();
     await page.getByRole('status').getByText(/2 items added, 1 new category/).waitFor();
     expect((await catalog()).items.find((i) => i.shortCode === 'GK')).toMatchObject({ name: 'Galouti Kebab', basePricePaise: 48_000 });
+    await page.getByRole('button', { name: 'Floor', exact: true }).click();
+  });
+
+  it('Bill design: the preview follows unsaved changes; saved settings print on a sample', async () => {
+    const page = await openSettings('Bill design');
+    const preview = page.getByTestId('bill-preview');
+    await preview.getByText('Captain:').first().waitFor();
+    await page.getByText('Captain', { exact: true }).click();
+    await page.getByLabel('Lines under the name').fill('A unit of Spice Hospitality');
+    await preview.getByText('A unit of Spice Hospitality').waitFor();
+    expect(await preview.getByText('Captain:').count()).toBe(0);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByRole('status').getByText(/Saved/).waitFor();
+    const cfg = await get<{ 'bill.display': { showCaptain: boolean; headerLines: string[] } }>('/v1/config');
+    expect(cfg['bill.display']).toMatchObject({ showCaptain: false, headerLines: ['A unit of Spice Hospitality'] });
+
+    await page.getByRole('button', { name: 'Print sample' }).click();
+    await page.getByText('Sample sent to the printer.').waitFor();
+    await expect
+      .poll(() => {
+        const dir = path.join(dataDir, 'prints');
+        const files = readdirSync(dir, { recursive: true }).map(String).filter((f) => f.endsWith('.txt'));
+        return files.some((f) => {
+          const t = readFileSync(path.join(dir, f), 'utf8');
+          return t.includes('SAMPLE - NOT A BILL') && t.includes('A unit of Spice Hospitality');
+        });
+      }, { timeout: 5_000 })
+      .toBe(true);
     await page.getByRole('button', { name: 'Floor', exact: true }).click();
   });
 

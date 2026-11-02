@@ -7,6 +7,7 @@ import { fireKot } from './fire-kot.js';
 import { importMenu } from './import-menu.js';
 import { openTable } from './open-table.js';
 import { printBill } from './print-bill.js';
+import { printSampleBill } from './print-sample-bill.js';
 import { printTestPage } from './print-test-page.js';
 import { recordPurchase } from './record-purchase.js';
 import { removeHeldItem } from './remove-held-item.js';
@@ -40,6 +41,7 @@ const handlers = [
   importMenu,
   setConfig,
   printTestPage,
+  printSampleBill,
   // menu availability + stock
   setItemAvailability,
   upsertStockItem,

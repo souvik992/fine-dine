@@ -1,8 +1,9 @@
 import type { Right } from '@dinepos/shared';
-import { ArrowLeft, ChefHat, LayoutGrid, MonitorSmartphone, Store, Users, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, ChefHat, LayoutGrid, MonitorSmartphone, ReceiptText, Store, Users, UtensilsCrossed } from 'lucide-react';
 import { useState, type ComponentType } from 'react';
 import { useApp } from '../app-context.js';
 import { UserBadge } from '../components/UserBadge.js';
+import { BillDesignSettings } from './BillDesignSettings.js';
 import { FloorSettings } from './FloorSettings.js';
 import { KitchenSettings } from './KitchenSettings.js';
 import { MenuSettings } from './MenuSettings.js';
@@ -10,10 +11,11 @@ import { OutletSettings } from './OutletSettings.js';
 import { StaffSettings } from './StaffSettings.js';
 import { TerminalSettings } from './TerminalSettings.js';
 
-type SectionKey = 'outlet' | 'floor' | 'menu' | 'kitchen' | 'staff' | 'terminal';
+type SectionKey = 'outlet' | 'bill' | 'floor' | 'menu' | 'kitchen' | 'staff' | 'terminal';
 
 const SECTIONS: Array<{ key: SectionKey; label: string; hint: string; icon: ComponentType<{ className?: string }>; right: Right | null }> = [
   { key: 'outlet', label: 'Outlet & bills', hint: 'Name, GSTIN, bill number, round-off, UPI', icon: Store, right: 'admin' },
+  { key: 'bill', label: 'Bill design', hint: 'Logo, what the bill shows, footer, preview', icon: ReceiptText, right: 'admin' },
   { key: 'floor', label: 'Floor & tables', hint: 'Areas, tables and the floor layout', icon: LayoutGrid, right: 'admin' },
   { key: 'menu', label: 'Menu', hint: 'Categories, items, options and add-ons', icon: UtensilsCrossed, right: 'admin' },
   { key: 'kitchen', label: 'Kitchen & printers', hint: 'Stations, printers, test print', icon: ChefHat, right: 'admin' },
@@ -58,6 +60,7 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
         </nav>
         <main className="min-w-0 flex-1 overflow-y-auto px-8 py-6">
           {current.key === 'outlet' ? <OutletSettings /> : null}
+          {current.key === 'bill' ? <BillDesignSettings /> : null}
           {current.key === 'floor' ? <FloorSettings /> : null}
           {current.key === 'menu' ? <MenuSettings /> : null}
           {current.key === 'kitchen' ? <KitchenSettings /> : null}

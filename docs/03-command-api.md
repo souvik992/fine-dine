@@ -98,8 +98,9 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 - `Settle` result `{ billId, paidPaise, changePaise }`. `DayEnd` result `{ closedDate, nextDate, zReport }`.
 - `SetConfig` `{ values: { "<key>": value } }`, keys: `outlet.name`, `outlet.addressLines`, `outlet.gstin`,
   `outlet.fssai`, `outlet.phone`, `bill.prefix`, `bill.footerLines`, `bill.roundOffStep`, `bill.roundOffTie`,
-  `bill.serviceChargeBp`, `bill.upiVpa`, `bill.upiPayeeName`, `bill.printerId`, `kot.default_station_id`. Only
-  changed keys are written and audited; result `{ changed }`; emits `config.changed` on `system`.
+  `bill.serviceChargeBp`, `bill.upiVpa`, `bill.upiPayeeName`, `bill.printerId`, `bill.display`, `bill.logo`,
+  `kot.default_station_id`. Only changed keys are written and audited; result `{ changed }`; emits `config.changed`
+  on `system`. `bill.display` and `bill.logo` are described in `packages/shared/src/bill-display.ts` (P2-12).
 
 ### SplitBill payloads
 ```json
@@ -137,6 +138,11 @@ Sessions: `POST /v1/sessions`, `GET /v1/session`, `DELETE /v1/session`, `GET /v1
 
 `PrintTestPage` { printerId } (right admin): queues a short test page (outlet name, printer name, width, time)
 on that printer through the normal print queue; result `{ printerId }`.
+
+`PrintSampleBill` { printerId } (right admin, P2-12): prints a made-up dine-in bill with the saved bill design,
+marked `*** SAMPLE - NOT A BILL ***` at the top and bottom; it takes no bill number and stores no bill.
+`POST /v1/bill-preview` { widthMm: 58|80, config?: partial config } (admin; a read, nothing is stored) returns
+`{ preview }`: the same sample rendered with the saved settings overlaid by the unsaved ones (the live preview).
 
 ## Stock commands (P2-10/P2-11; schemas in `packages/shared/src/schemas/commands/stock.ts` and `menu-csv.ts`)
 Quantities are integer thousandths of the material's unit (`qtyMilli`), costs integer paise per whole unit.

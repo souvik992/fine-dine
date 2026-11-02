@@ -55,6 +55,14 @@ line that does not fit is wrapped, never cut (bill numbers, GSTINs). Text mode h
 print as `Rs 1,680.00`; Hindi/Bengali bitmap lines are still to do (`bitmap-text.ts`). Not yet verified on a
 physical printer.
 
+Bill design (P2-12, from TiffinPOS; `BillDocument.display`, stored with each bill so a reprint looks the same):
+optional logo, printed first as a 1-bit raster (`GS v 0`, at most 384 × 240 dots, centred; the preview shows
+`[logo]`); name in large or normal size; up to 2 lines under the name; show or hide phone, table/area, covers,
+captain, cashier, guest name/phone, the Rate column (`qty x rate` on 58 mm), free add-ons, "on <taxable>" after
+GST lines, and an "Items n / Qty m" line. Never optional: outlet name, address, GSTIN, FSSAI, TAX INVOICE, bill
+number, date/time, every tax line, round-off, total, a guest GSTIN, priced add-ons. Defaults print the standard
+bill byte for byte.
+
 ### Z-report (day-end)
 Sales by mode, by area, by category; discounts; voids; cancelled-after-fire count; cash expected vs counted.
 

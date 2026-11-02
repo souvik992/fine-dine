@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { gstinProblem } from '../../gstin.js';
 import { BILL_PREFIX_RE } from '../../numbering.js';
+import { billDisplaySchema, billLogoSchema } from '../../bill-display.js';
 import { ulidSchema } from '../envelope.js';
 
 const paise = z.number().int().min(0).max(100_000_000_000);
@@ -86,6 +87,8 @@ export const configSchemas = {
   'bill.upiVpa': z.string().trim().regex(/^[\w.-]{2,64}@[\w.-]{2,64}$/, 'not a UPI id').nullable(),
   'bill.upiPayeeName': z.string().trim().max(40).nullable(),
   'bill.printerId': ulidSchema.nullable(),
+  'bill.display': billDisplaySchema,
+  'bill.logo': billLogoSchema.nullable(),
   'kot.default_station_id': ulidSchema.nullable(),
 } as const;
 

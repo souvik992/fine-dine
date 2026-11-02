@@ -158,6 +158,26 @@ export class EscPos {
     return this;
   }
 
+  /**
+   * A 1-bit picture (rows of width/8 bytes, MSB first, 1 = black), centred on the paper with GS v 0 (from TiffinPOS).
+   * Font A is 12 dots wide, so the paper is cols × 12 dots (576 on 80 mm, 384 on 58 mm). The preview shows `[logo]`.
+   */
+  logo(width: number, height: number, data: Uint8Array): this {
+    const rowBytes = width / 8;
+    if (!Number.isInteger(rowBytes) || data.length !== rowBytes * height) throw new RangeError('logo data does not match its size');
+    const paperBytes = (this.cols * 12) / 8;
+    if (rowBytes > paperBytes) throw new RangeError('logo wider than the paper');
+    const pad = Math.floor((paperBytes - rowBytes) / 2);
+    const outRow = rowBytes + pad;
+    const out = new Uint8Array(outRow * height);
+    for (let y = 0; y < height; y++) out.set(data.subarray(y * rowBytes, (y + 1) * rowBytes), y * outRow + pad);
+    this.raw(GS, 0x76, 0x30, 0, outRow & 0xff, outRow >> 8, height & 0xff, height >> 8);
+    for (const b of out) this.buf.push(b);
+    const w = this.width();
+    this.previewLines.push(' '.repeat(Math.floor((w - 6) / 2)) + '[logo]');
+    return this;
+  }
+
   /** Prepends a ready-made job (used when rerouting to a backup printer). */
   static prefix(header: Uint8Array, job: Uint8Array): Uint8Array {
     const out = new Uint8Array(header.length + job.length);

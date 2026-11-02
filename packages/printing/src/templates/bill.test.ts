@@ -1,4 +1,4 @@
-import { calculateBill } from '@dinepos/shared';
+import { calculateBill, DEFAULT_BILL_DISPLAY } from '@dinepos/shared';
 import { describe, expect, it } from 'vitest';
 import { halfPercent, percent, plainRupees } from '../layout.js';
 import { renderBill, upiUri, type BillDocument } from './bill.js';
@@ -166,5 +166,57 @@ describe('free addons', () => {
   it('print without an amount', () => {
     const preview = renderBill({ ...doc, lines: [{ name: 'Paneer Tikka', qty: 1, unitPricePaise: 32_000, amountPaise: 32_000, addons: [{ name: 'Mild', qty: 1, amountPaise: 0 }] }] }, { paper: 80 }).preview;
     expect(preview.split('\n')).toContain('  + Mild'); // indented, no amount, no trailing spaces
+  });
+});
+
+describe('bill display options (Settings › Bill design)', () => {
+  const free = { ...doc, lines: [...doc.lines, { name: 'Dal Makhani', qty: 1, unitPricePaise: 0, amountPaise: 0, addons: [{ name: 'Mild', qty: 1, amountPaise: 0 }] }] };
+  const show = (display: BillDocument['display'], paper: 58 | 80 = 80, d: BillDocument = doc) => renderBill({ ...d, display }, { paper }).preview;
+
+  it('the default display is exactly the standard bill', () => {
+    expect(show(null)).toBe(renderBill(doc, { paper: 80 }).preview);
+    expect(show({ ...DEFAULT_BILL_DISPLAY })).toBe(renderBill(doc, { paper: 80 }).preview);
+    for (const paper of [58, 80] as const) {
+      expect(renderBill({ ...doc, display: DEFAULT_BILL_DISPLAY }, { paper }).bytes).toEqual(renderBill(doc, { paper }).bytes);
+    }
+  });
+
+  it('hides what is switched off and never the legal fields', () => {
+    const p = show({ ...DEFAULT_BILL_DISPLAY, showPhone: false, showCaptain: false, showCashier: false, showCovers: false, showTable: false, showTaxableAmount: false });
+    for (const gone of ['Ph:', 'Captain', 'Cashier', 'Covers', 'Table T7', ' on ']) expect(p, gone).not.toContain(gone);
+    for (const kept of ['GSTIN: 19ABCDE1234F1Z5', 'FSSAI:', 'TAX INVOICE', 'Bill: T1/26-27/000123', 'CGST @2.5%', 'TOTAL']) expect(p, kept).toContain(kept);
+  });
+
+  it('header lines, normal-size name, item count, no rate column', () => {
+    const p = show({ ...DEFAULT_BILL_DISPLAY, nameSize: 'normal', headerLines: ['A unit of Spice Hospitality'], showItemCount: true, showRate: false });
+    const lines = p.split('\n');
+    expect(lines.findIndex((l) => l.includes('A unit of Spice Hospitality'))).toBeGreaterThan(lines.findIndex((l) => l.includes('Spice Garden')));
+    expect(p).toContain('Items 3');
+    expect(p).toMatch(/Qty 7\n/);
+    expect(p).not.toContain('Rate');
+    expect(p).toMatch(/Paneer Tikka\s+2\s+640\.00/);
+    expect(show({ ...DEFAULT_BILL_DISPLAY, showRate: false }, 58)).toContain('  Qty 2');
+  });
+
+  it('free choices can be left off; priced add-ons always print', () => {
+    expect(show(null, 80, free)).toContain('  + Mild');
+    const p = show({ ...DEFAULT_BILL_DISPLAY, showFreeChoices: false }, 80, free);
+    expect(p).not.toContain('Mild');
+    expect(p).toContain('+ Extra cheese');
+  });
+
+  it('a logo prints as a centred raster image; a sample is marked top and bottom', () => {
+    const logo = { width: 16, height: 2, data: new Uint8Array([0xff, 0x0f, 0xf0, 0xff]) };
+    const r = renderBill({ ...doc, sample: true }, { paper: 58, logo });
+    const lines = r.preview.split('\n');
+    expect(lines[0]).toContain('SAMPLE - NOT A BILL');
+    expect(lines[1]!.trim()).toBe('[logo]');
+    expect(r.preview.trimEnd().split('\n').at(-1)).toContain('SAMPLE - NOT A BILL');
+    // GS v 0, 48 bytes per row on 58 mm (384 dots): 23 bytes of padding, then the two logo bytes.
+    const bytes = Array.from(r.bytes);
+    const at = bytes.findIndex((b, i) => b === 0x1d && bytes[i + 1] === 0x76 && bytes[i + 2] === 0x30);
+    expect(bytes.slice(at + 4, at + 8)).toEqual([25, 0, 2, 0]);
+    expect(bytes.slice(at + 8 + 23, at + 8 + 25)).toEqual([0xff, 0x0f]);
+    expect(() => renderBill(doc, { paper: 58, logo: { width: 392, height: 1, data: new Uint8Array(49) } })).toThrow(/wider than the paper/);
   });
 });

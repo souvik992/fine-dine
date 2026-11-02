@@ -3,6 +3,7 @@ import { calculateBill, financialYearAt, formatBillNo, newId, printBillSchema, t
 import { defineCommand } from '../core/command-handler.js';
 import { PosError } from '../core/errors.js';
 import { getConfig } from '../core/outlet-config.js';
+import { billLogoBits, billOutlet } from './bill-design.js';
 import { billableItems, billPrinter, orderPlace, printedDateTime, toBillLines, userName } from './billing-support.js';
 import { emitTableState, nextCounter } from './order-support.js';
 
@@ -111,14 +112,7 @@ export const printBill = defineCommand({
 
     const when = printedDateTime(ctx.now, ctx.timeZone);
     const doc: BillDocument = {
-      outlet: {
-        name: cfg['outlet.name'],
-        addressLines: cfg['outlet.addressLines'],
-        gstin: cfg['outlet.gstin'],
-        fssai: cfg['outlet.fssai'],
-        phone: cfg['outlet.phone'],
-        footerLines: cfg['bill.footerLines'],
-      },
+      outlet: billOutlet(cfg),
       billNo: billNoText,
       date: when.date,
       time: when.time,
@@ -141,6 +135,7 @@ export const printBill = defineCommand({
       serviceChargeBp: serviceChargeBp || null,
       interState: false,
       upi: cfg['bill.upiVpa'] ? { vpa: cfg['bill.upiVpa'], payeeName: cfg['bill.upiPayeeName'] ?? cfg['outlet.name'] } : null,
+      display: cfg['bill.display'],
     };
     db.prepare('INSERT INTO bill_document (bill_id, revision, bill_no_text, doc_json, created_at, command_id) VALUES (?, ?, ?, ?, ?, ?)').run(
       billId,
@@ -153,7 +148,7 @@ export const printBill = defineCommand({
 
     const printer = billPrinter(db, cfg);
     if (printer) {
-      const { bytes, preview } = renderBill(doc, { paper: printer.paper });
+      const { bytes, preview } = renderBill(doc, { paper: printer.paper, logo: billLogoBits(cfg) });
       ctx.print({ printerId: printer.id, docKind: 'bill', refId: billId, bytes, previewText: preview });
     }
 

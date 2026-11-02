@@ -1,13 +1,21 @@
-import { loginSchema, type RoleInfo, type StaffMember } from '@dinepos/shared';
+import { renderBill } from '@dinepos/printing';
+import { configSchemas, loginSchema, type OutletConfig, type RoleInfo, type StaffMember } from '@dinepos/shared';
+import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { requireRight as requireSessionRight, sessionToken as token } from '../auth/require-right.js';
 import { login, logout, resolveSession, roleRights, setupState } from '../auth/sessions.js';
+import { billLogoBits, sampleBillDocument } from '../commands/bill-design.js';
 import { PosError } from '../core/errors.js';
+import { getConfig } from '../core/outlet-config.js';
 import { getAdminCatalog } from '../queries/admin-catalog.js';
 import type { Db } from '../db/connection.js';
 
-export function sessionRoutes(app: FastifyInstance, deps: { db: Db; now: () => Date }): void {
-  const { db, now } = deps;
+const billPreviewSchema = z
+  .object({ widthMm: z.union([z.literal(58), z.literal(80)]), config: z.object(configSchemas).partial().strict().default({}) })
+  .strict();
+
+export function sessionRoutes(app: FastifyInstance, deps: { db: Db; now: () => Date; timeZone: string }): void {
+  const { db, now, timeZone } = deps;
   const noStore = { 'cache-control': 'no-store' };
 
   /** Public: what the terminal shows before sign-in (first-run setup, or the staff list). No PINs or hashes. */
@@ -34,6 +42,21 @@ export function sessionRoutes(app: FastifyInstance, deps: { db: Db; now: () => D
   app.get('/v1/admin/catalog', (req, reply) => {
     requireRight(req, 'admin');
     return reply.headers(noStore).send(getAdminCatalog(db));
+  });
+
+  /**
+   * Bill design preview (not a write): the sample bill rendered with the saved settings plus the unsaved ones in
+   * the body, so the settings screen shows changes before they are saved.
+   */
+  app.post('/v1/bill-preview', (req, reply) => {
+    requireRight(req, 'admin');
+    const body = billPreviewSchema.safeParse(req.body);
+    if (!body.success) {
+      throw new PosError('VALIDATION', 'Invalid bill settings.', body.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })));
+    }
+    const cfg = { ...getConfig(db), ...body.data.config } as OutletConfig;
+    const { preview } = renderBill(sampleBillDocument(cfg, now(), timeZone), { paper: body.data.widthMm, logo: billLogoBits(cfg) });
+    return reply.headers(noStore).send({ preview });
   });
 
   app.get('/v1/staff', (req, reply) => {

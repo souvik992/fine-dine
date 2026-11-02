@@ -57,6 +57,11 @@ server at start, shared by all windows, and locks after 10 idle minutes (or Lock
 (floor header badge) and `common.tsx` (queries, `useStockCommand`). `src/settings/MenuImport.tsx` is the Menu ›
 Bulk upload tab (CSV parsed by the shared `parseMenuCsv`). Right-click an item tile in billing to mark it sold out.
 
+## Bill design (P2-12)
+`src/settings/BillDesignSettings.tsx` (options, live preview, sample print) and `logo.ts` (picture → 1-bit printer
+dots, from TiffinPOS; pure + tested). `DINEPOS_USER_DATA_DIR` gives the app its own profile (the e2e suite uses a
+temporary one so it never shares a session or the single-instance lock with another copy).
+
 ## Installer (P1-11)
 `npm run dist -w @dinepos/desktop` → `release/DinePOS-Setup-<version>.exe` (+ `release/win-unpacked/`). Steps:
 server bundle (`apps/server/scripts/bundle.mjs`: one `server.mjs` + migrations + better-sqlite3 Node-API

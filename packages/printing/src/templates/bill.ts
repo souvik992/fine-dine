@@ -1,6 +1,6 @@
 // Customer bill (docs/06-printing-kds.md "Bill"). The template only arranges figures the server computed with
 // calculateBill; it never adds, rounds or taxes anything itself.
-import type { BillBreakup } from '@dinepos/shared';
+import { DEFAULT_BILL_DISPLAY, type BillBreakup, type BillDisplay } from '@dinepos/shared';
 import { EscPos, wrapText, type PaperWidth } from '../escpos.js';
 import { halfPercent, money, padLeft, percent, plainRupees } from '../layout.js';
 
@@ -43,6 +43,16 @@ export interface BillDocument {
   upi?: { vpa: string; payeeName: string } | null;
   part?: { no: number; of: number } | null;
   duplicate?: boolean;
+  /** What to show (Settings › Bill design). Stored with the bill so a reprint looks the same; missing = standard. */
+  display?: BillDisplay | null;
+  /** Settings › Bill design "Print a sample": marked so it cannot pass as a bill. */
+  sample?: boolean;
+}
+
+export interface BillLogoBits {
+  width: number;
+  height: number;
+  data: Uint8Array;
 }
 
 export function upiUri(vpa: string, payeeName: string, amountPaise: number, note: string): string {
@@ -50,16 +60,23 @@ export function upiUri(vpa: string, payeeName: string, amountPaise: number, note
   return `upi://pay?pa=${q(vpa)}&pn=${q(payeeName)}&am=${plainRupees(amountPaise)}&cu=INR&tn=${q(note)}`;
 }
 
-export function renderBill(doc: BillDocument, opts: { paper: PaperWidth; feed?: number }): { bytes: Uint8Array; preview: string } {
+const SAMPLE = '*** SAMPLE - NOT A BILL ***';
+
+export function renderBill(doc: BillDocument, opts: { paper: PaperWidth; feed?: number; logo?: BillLogoBits | null }): { bytes: Uint8Array; preview: string } {
   const p = new EscPos(opts.paper).init();
   const wide = opts.paper === 80;
   const b = doc.breakup;
+  const d = { ...DEFAULT_BILL_DISPLAY, ...doc.display };
 
   // Header
+  if (doc.sample) p.bold(true).center(SAMPLE).bold(false);
   if (doc.duplicate) p.center('** DUPLICATE **');
-  p.bold(true).size(1, 2).center(doc.outlet.name).size(1, 1).bold(false);
+  if (opts.logo) p.logo(opts.logo.width, opts.logo.height, opts.logo.data);
+  if (d.nameSize === 'large') p.bold(true).size(1, 2).center(doc.outlet.name).size(1, 1).bold(false);
+  else p.bold(true).center(doc.outlet.name).bold(false);
+  for (const h of d.headerLines) p.center(h);
   for (const a of doc.outlet.addressLines) p.center(a);
-  if (doc.outlet.phone) p.center(`Ph: ${doc.outlet.phone}`);
+  if (doc.outlet.phone && d.showPhone) p.center(`Ph: ${doc.outlet.phone}`);
   if (doc.outlet.gstin) p.center(`GSTIN: ${doc.outlet.gstin}`);
   if (doc.outlet.fssai) p.center(`FSSAI: ${doc.outlet.fssai}`);
   p.bold(true).center('TAX INVOICE').bold(false);
@@ -67,36 +84,44 @@ export function renderBill(doc: BillDocument, opts: { paper: PaperWidth; feed?: 
   p.rule();
 
   p.twoCol(`Bill: ${doc.billNo}`, `${doc.date} ${doc.time}`);
-  if (doc.tableLabel) p.twoCol(`Table ${doc.tableLabel}${doc.areaName ? ` (${doc.areaName})` : ''}`, doc.covers ? `Covers ${doc.covers}` : '');
-  else p.line(doc.orderType === 'takeaway' ? 'Takeaway' : doc.orderType === 'delivery' ? 'Delivery' : 'Online order');
-  if (doc.captainName || doc.cashierName) {
-    p.twoCol(doc.captainName ? `Captain: ${doc.captainName}` : '', doc.cashierName ? `Cashier: ${doc.cashierName}` : '');
-  }
-  if (doc.customer?.name || doc.customer?.phone) p.line(`Guest: ${[doc.customer.name, doc.customer.phone].filter(Boolean).join(', ')}`);
+  const covers = doc.covers && d.showCovers ? `Covers ${doc.covers}` : '';
+  if (doc.tableLabel && d.showTable) p.twoCol(`Table ${doc.tableLabel}${doc.areaName ? ` (${doc.areaName})` : ''}`, covers);
+  else if (doc.tableLabel) {
+    if (covers) p.line(covers);
+  } else p.line(doc.orderType === 'takeaway' ? 'Takeaway' : doc.orderType === 'delivery' ? 'Delivery' : 'Online order');
+  const captain = doc.captainName && d.showCaptain ? `Captain: ${doc.captainName}` : '';
+  const cashier = doc.cashierName && d.showCashier ? `Cashier: ${doc.cashierName}` : '';
+  if (captain || cashier) p.twoCol(captain, cashier);
+  if (d.showGuest && (doc.customer?.name || doc.customer?.phone)) p.line(`Guest: ${[doc.customer.name, doc.customer.phone].filter(Boolean).join(', ')}`);
   if (doc.customer?.gstin) p.line(`Guest GSTIN: ${doc.customer.gstin}`);
   p.rule();
 
-  // Lines
+  // Lines. Free choices (spice level, no onion) print without an amount, or not at all.
+  const addons = (l: BillDocLine) => {
+    for (const a of l.addons ?? []) {
+      if (a.amountPaise || d.showFreeChoices) p.twoCol(`  + ${a.qty > 1 ? `${a.qty} x ` : ''}${a.name}`, a.amountPaise ? money(a.amountPaise) : '');
+    }
+  };
   if (wide) {
-    p.bold(true).line(`${'Item'.padEnd(22)} ${padLeft('Qty', 4)} ${padLeft('Rate', 9)} ${padLeft('Amount', 10)}`).bold(false);
+    const nameW = d.showRate ? 22 : 32;
+    p.bold(true).line(`${'Item'.padEnd(nameW)} ${padLeft('Qty', 4)}${d.showRate ? ` ${padLeft('Rate', 9)}` : ''} ${padLeft('Amount', 10)}`).bold(false);
     for (const l of doc.lines) {
-      const parts = wrapText(l.name, 22);
-      p.line(`${parts[0]!.padEnd(22)} ${padLeft(String(l.qty), 4)} ${padLeft(money(l.unitPricePaise), 9)} ${padLeft(money(l.amountPaise), 10)}`);
+      const parts = wrapText(l.name, nameW);
+      p.line(`${parts[0]!.padEnd(nameW)} ${padLeft(String(l.qty), 4)}${d.showRate ? ` ${padLeft(money(l.unitPricePaise), 9)}` : ''} ${padLeft(money(l.amountPaise), 10)}`);
       for (const rest of parts.slice(1)) p.line(rest);
-      // Free choices (spice level, no onion) print without an amount.
-      for (const a of l.addons ?? []) p.twoCol(`  + ${a.qty > 1 ? `${a.qty} x ` : ''}${a.name}`, a.amountPaise ? money(a.amountPaise) : '');
+      addons(l);
     }
   } else {
     for (const l of doc.lines) {
       p.wrapped(l.name);
-      p.twoCol(`  ${l.qty} x ${money(l.unitPricePaise)}`, money(l.amountPaise));
-      // Free choices (spice level, no onion) print without an amount.
-      for (const a of l.addons ?? []) p.twoCol(`  + ${a.qty > 1 ? `${a.qty} x ` : ''}${a.name}`, a.amountPaise ? money(a.amountPaise) : '');
+      p.twoCol(d.showRate ? `  ${l.qty} x ${money(l.unitPricePaise)}` : `  Qty ${l.qty}`, money(l.amountPaise));
+      addons(l);
     }
   }
   p.rule();
 
   // Totals (all from calculateBill)
+  if (d.showItemCount) p.twoCol(`Items ${doc.lines.length}`, `Qty ${doc.lines.reduce((s, l) => s + l.qty, 0)}`);
   p.twoCol('Subtotal', money(b.subtotal));
   if (b.discount > 0) p.twoCol(`Discount${doc.discountReason ? ` (${doc.discountReason})` : ''}`, `-${money(b.discount)}`);
   if (b.serviceCharge > 0) {
@@ -104,7 +129,7 @@ export function renderBill(doc: BillDocument, opts: { paper: PaperWidth; feed?: 
   }
   for (const g of b.taxGroups) {
     if (g.tax === 0) continue;
-    const on = wide ? ` on ${money(g.taxable)}` : '';
+    const on = wide && d.showTaxableAmount ? ` on ${money(g.taxable)}` : '';
     if (doc.interState) p.twoCol(`IGST @${percent(g.rateBp)}%${on}`, money(g.igst));
     else {
       p.twoCol(`CGST @${halfPercent(g.rateBp)}%${on}`, money(g.cgst));
@@ -123,6 +148,7 @@ export function renderBill(doc: BillDocument, opts: { paper: PaperWidth; feed?: 
     p.qr(upiUri(doc.upi.vpa, doc.upi.payeeName, b.total, `Bill ${doc.billNo}`), 'UPI QR');
   }
   for (const f of doc.outlet.footerLines ?? []) p.center(f);
+  if (doc.sample) p.bold(true).center(SAMPLE).bold(false);
   p.feed(opts.feed ?? 3).cut();
   return { bytes: p.bytes(), preview: p.preview() };
 }

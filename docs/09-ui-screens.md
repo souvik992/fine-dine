@@ -60,8 +60,12 @@ Addon options follow the order they were entered in (menu admin), so hotkeys sta
 ### 7. Settings (built with P2-01: `apps/desktop/src/settings/`)
 Sections are shown by right; every save is a command, so it is audited and other terminals update live.
 - **Outlet & bills** (admin): outlet name, phone, address, GSTIN, FSSAI, bill prefix, service charge, round-off and tie rule,
-  UPI id/payee for the QR, footer, bill printer, default kitchen station.
+  UPI id/payee for the QR, bill printer, default kitchen station.
   Only changed keys are sent in one `SetConfig`.
+- **Bill design** (admin, P2-12): logo (choose a picture; size Small/Medium/Large, darkness, photo dithering;
+  converted to printer dots on the terminal), name size, lines under the name, "Show on the bill" switches,
+  "Back to the standard choices", footer lines; a live preview at 80/58 mm that follows unsaved changes
+  (`POST /v1/bill-preview`, debounced) and **Print a sample** (`PrintSampleBill`) on any bill printer.
 - **Floor & tables** (admin): areas (name, price list), tables (label, seats, active), "Add several" (prefix +
   range, skips labels that exist, at most 100). Layout editor: drag tiles on a 20-unit grid, unplaced tables wait
   in a tray, "Save layout (n moved)" sends one `UpsertTable` per moved table. A table with an open order cannot

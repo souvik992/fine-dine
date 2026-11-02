@@ -1,5 +1,5 @@
 // Outlet settings from the `config` table, with safe defaults (docs/08; keys in shared configSchemas).
-import { configSchemas, DEFAULT_BILL_PREFIX, type ConfigKey, type OutletConfig } from '@dinepos/shared';
+import { configSchemas, DEFAULT_BILL_DISPLAY, DEFAULT_BILL_PREFIX, type ConfigKey, type OutletConfig } from '@dinepos/shared';
 import type { Db } from '../db/connection.js';
 
 export const CONFIG_DEFAULTS: OutletConfig = {
@@ -16,6 +16,8 @@ export const CONFIG_DEFAULTS: OutletConfig = {
   'bill.upiVpa': null,
   'bill.upiPayeeName': null,
   'bill.printerId': null,
+  'bill.display': DEFAULT_BILL_DISPLAY,
+  'bill.logo': null,
   'kot.default_station_id': null,
 };
 

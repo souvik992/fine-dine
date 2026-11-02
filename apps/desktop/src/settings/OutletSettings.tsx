@@ -12,7 +12,6 @@ interface Form {
   gstin: string;
   fssai: string;
   prefix: string;
-  footer: string;
   roundOffStep: '0' | '50' | '100';
   roundOffTie: 'up' | 'down';
   serviceCharge: string;
@@ -33,7 +32,6 @@ function toForm(c: OutletConfig): Form {
     gstin: c['outlet.gstin'] ?? '',
     fssai: c['outlet.fssai'] ?? '',
     prefix: c['bill.prefix'],
-    footer: c['bill.footerLines'].join('\n'),
     roundOffStep: String(c['bill.roundOffStep']) as Form['roundOffStep'],
     roundOffTie: c['bill.roundOffTie'],
     serviceCharge: bpToPercentText(c['bill.serviceChargeBp']),
@@ -76,7 +74,6 @@ export function OutletSettings() {
       'outlet.gstin': orNull(form.gstin.toUpperCase()),
       'outlet.fssai': orNull(form.fssai),
       'bill.prefix': form.prefix.trim().toUpperCase(),
-      'bill.footerLines': lines(form.footer).slice(0, 3),
       'bill.roundOffStep': Number(form.roundOffStep) as 0 | 50 | 100,
       'bill.roundOffTie': form.roundOffTie,
       'bill.serviceChargeBp': scBp,
@@ -152,31 +149,26 @@ export function OutletSettings() {
         <Field label="UPI payee name">
           <input className="input" value={form.upiPayee} maxLength={40} onChange={(e) => set({ upiPayee: e.target.value })} />
         </Field>
-        <Field label="Footer" hint="Up to 3 lines at the bottom of the bill.">
-          <textarea className="input h-20 py-2" value={form.footer} onChange={(e) => set({ footer: e.target.value })} />
+        <Field label="Bill printer" hint="Logo, footer and what the bill shows are in Bill design.">
+          <select className="input" value={form.billPrinterId} onChange={(e) => set({ billPrinterId: e.target.value })}>
+            <option value="">First printer set for bills</option>
+            {printers.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
         </Field>
-        <div className="space-y-4">
-          <Field label="Bill printer">
-            <select className="input" value={form.billPrinterId} onChange={(e) => set({ billPrinterId: e.target.value })}>
-              <option value="">First printer set for bills</option>
-              {printers.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Kitchen station for items without one">
-            <select className="input" value={form.defaultStationId} onChange={(e) => set({ defaultStationId: e.target.value })}>
-              <option value="">None (refuse to send)</option>
-              {catalog.data?.stations.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
+        <Field label="Kitchen station for items without one">
+          <select className="input" value={form.defaultStationId} onChange={(e) => set({ defaultStationId: e.target.value })}>
+            <option value="">None (refuse to send)</option>
+            {catalog.data?.stations.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </Field>
       </fieldset>
 
       <ErrorText error={error} />

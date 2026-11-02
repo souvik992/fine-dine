@@ -89,6 +89,9 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria �
   recipes; purchase void reverses stock and cost; usage report opening + in − out = closing; stock.manage enforced.
 - [x] **P2-11 Menu bulk upload + sold out** (added 2026-11-02, from TiffinPOS) — Accept: CSV checked row by row, imported
   all or nothing, categories matched ignoring case; `SetItemAvailability` (menu.stock) from the billing screen.
+- [x] **P2-12 Bill design** (added 2026-11-02, from TiffinPOS; `06-printing-kds.md` "Bill design") — Accept: defaults
+  print the standard bill unchanged; each display option tested; logo prints as GS v 0 raster; live preview of
+  unsaved settings; sample bill marked and unnumbered; legal fields cannot be hidden.
 
 ## Phase 3 — Captain app
 

@@ -306,3 +306,57 @@ describe('stock reads', () => {
     expect(r.body.error?.code).toBe('FORBIDDEN');
   });
 });
+
+describe('bill design (Settings › Bill design)', () => {
+  const logo = { width: 16, height: 8, bits: '/////////////////////w==' }; // 16 bytes, all black
+
+  it('POST /v1/bill-preview renders the sample bill with unsaved settings; admin only; nothing is stored', async () => {
+    const owner = await seeded();
+    const cashier = (await login(ids.cashier, '1111')).body.token;
+    const preview = (token: string, body: Record<string, unknown>) => app.inject({ method: 'POST', url: '/v1/bill-preview', headers: { 'x-user-session': token }, payload: body });
+    expect((await preview(cashier, { widthMm: 80 })).statusCode).toBe(403);
+    const plain = (await preview(owner, { widthMm: 80 })).json<{ preview: string }>().preview;
+    expect(plain).toContain('SAMPLE - NOT A BILL');
+    expect(plain).toContain('Captain: Ravi');
+    const changed = (
+      await preview(owner, { widthMm: 58, config: { 'bill.display': { showCaptain: false, headerLines: ['A unit of Spice Hospitality'] }, 'bill.logo': logo } })
+    ).json<{ preview: string }>().preview;
+    expect(changed).not.toContain('Captain');
+    expect(changed).toContain('A unit of Spice Hospitality');
+    expect(changed).toContain('[logo]');
+    expect((await preview(owner, { widthMm: 80, config: { 'bill.display': { hideGstin: true } } })).statusCode).toBe(400);
+    expect(db.prepare("SELECT count(*) FROM config WHERE key LIKE 'bill.display%' OR key = 'bill.logo'").pluck().get()).toBe(0);
+    expect(db.prepare('SELECT count(*) FROM bill').pluck().get()).toBe(0);
+  });
+
+  it('PrintSampleBill prints the saved design on the chosen printer without taking a bill number', async () => {
+    const owner = await seeded();
+    expect((await send('SetConfig', { values: { 'bill.display': { showCashier: false }, 'bill.logo': logo } }, { token: owner })).body.ok).toBe(true);
+    const r = await send('PrintSampleBill', { printerId: seedId('printer:bill') }, { token: owner });
+    expect(r.body.ok).toBe(true);
+    const job = db.prepare("SELECT preview_text FROM print_job WHERE doc_kind = 'test'").pluck().get() as string;
+    expect(job).toContain('SAMPLE - NOT A BILL');
+    expect(job).toContain('[logo]');
+    expect(job).not.toContain('Cashier');
+    expect(db.prepare("SELECT value FROM counter WHERE name LIKE 'bill_no:%'").pluck().get()).toBeUndefined();
+    const cashier = (await login(ids.cashier, '1111')).body.token;
+    expect((await send('PrintSampleBill', { printerId: seedId('printer:bill') }, { token: cashier })).body.error?.code).toBe('FORBIDDEN');
+    expect((await send('PrintSampleBill', { printerId: newId() }, { token: owner })).body.error?.code).toBe('NOT_FOUND');
+  });
+
+  it('PrintBill uses the saved display settings and logo, and stores them with the bill', async () => {
+    const owner = await seeded();
+    await send('SetConfig', { values: { 'bill.display': { showCaptain: false, showItemCount: true }, 'bill.logo': logo } }, { token: owner });
+    const open = await send('OpenTable', { tableId: ids.t1, covers: 2 }, { token: owner });
+    const orderId = open.body.order!.id;
+    const added = await send('AddItems', { items: [{ id: newId(), itemId: ids.dal, qty: 2 }] }, { token: owner, orderId, expectedVersion: 1 });
+    await send('FireKOT', { all: true }, { token: owner, orderId, expectedVersion: added.body.order!.version });
+    expect((await send('PrintBill', {}, { token: owner, orderId, expectedVersion: 3 })).body.ok).toBe(true);
+    const job = db.prepare("SELECT preview_text FROM print_job WHERE doc_kind = 'bill'").pluck().get() as string;
+    expect(job).toContain('[logo]');
+    expect(job).toContain('Items 1');
+    expect(job).not.toContain('SAMPLE');
+    const stored = JSON.parse(db.prepare('SELECT doc_json FROM bill_document').pluck().get() as string) as { display: { showCaptain: boolean } };
+    expect(stored.display.showCaptain).toBe(false);
+  }, 20_000);
+});

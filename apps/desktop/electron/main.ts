@@ -18,6 +18,10 @@ protocol.registerSchemesAsPrivileged([
   { scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
 ]);
 
+// Tests run the app in their own profile, so another copy (a dev window, the installed app) shares neither the
+// single-instance lock nor the stored session.
+if (process.env.DINEPOS_USER_DATA_DIR) app.setPath('userData', process.env.DINEPOS_USER_DATA_DIR);
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 }
