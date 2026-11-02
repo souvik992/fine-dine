@@ -1,0 +1,43 @@
+{
+  "name": "dinepos",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w @dinepos/server",
+    "dev:desktop": "npm run dev -w @dinepos/desktop",
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "check": "npm run typecheck && npm run lint && npm run test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.0.0",
+    "eslint": "^10.14.0",
+    "fast-check": "^4.10.2",
+    "globals": "^17.14.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "better-sqlite3": false
+  }
+}

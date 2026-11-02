@@ -1,0 +1,91 @@
+import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import { ulid } from 'ulid';
+import { singleTerminalAuth, type Authenticator } from './auth/authenticate.js';
+import { commandRegistry } from './commands/registry.js';
+import type { CommandRegistry } from './core/command-handler.js';
+import { PosError } from './core/errors.js';
+import { EventBus, noopPrintWaker, type PrintWaker } from './core/events.js';
+import { allowAllRights, type RightsPolicy } from './core/rights.js';
+import type { Db } from './db/connection.js';
+import { commandRoutes } from './routes/commands.js';
+import { healthRoutes } from './routes/health.js';
+
+export interface AppDeps {
+  db: Db;
+  timeZone: string;
+  now?: () => Date;
+  startedAt?: Date;
+  logger?: FastifyServerOptions['logger'];
+  registry?: CommandRegistry;
+  rights?: RightsPolicy;
+  auth?: Authenticator;
+  bus?: EventBus;
+  printWaker?: PrintWaker;
+}
+
+// Secrets never reach the log (docs/07-security-licensing.md).
+export const LOG_REDACT = [
+  'req.headers.authorization',
+  'req.headers["x-user-session"]',
+  'req.headers["x-manager-pin"]',
+];
+
+/** Builds the HTTP app without listening, so tests can use `app.inject()`. */
+export function buildApp(deps: AppDeps): FastifyInstance {
+  const { db, timeZone, now = () => new Date(), logger = false } = deps;
+  const startedAt = deps.startedAt ?? now();
+  const app = Fastify({
+    logger,
+    bodyLimit: 1024 * 1024,
+    genReqId: () => ulid(),
+    requestIdHeader: false,
+  });
+
+  app.addHook('onSend', async (req, reply) => {
+    void reply.header('x-request-id', req.id);
+  });
+
+  app.setErrorHandler((err, req, reply) => {
+    if (err instanceof PosError) {
+      if (err.httpStatus >= 500) req.log.error({ err }, 'command failed');
+      return reply
+        .status(err.httpStatus)
+        .send({ ...errorBody(err.code, err.message, err.details), ...(err.order ? { order: err.order } : {}) });
+    }
+    const e = err as { validation?: unknown; statusCode?: number; message?: string };
+    if (e.validation) {
+      return reply.status(400).send(errorBody('VALIDATION', e.message ?? 'Invalid request.', e.validation));
+    }
+    if (typeof e.statusCode === 'number' && e.statusCode >= 400 && e.statusCode < 500) {
+      // Fastify's own client errors (bad JSON, body too large, wrong content type).
+      return reply.status(e.statusCode).send(errorBody('VALIDATION', e.message ?? 'Bad request.'));
+    }
+    req.log.error({ err }, 'unhandled error');
+    return reply.status(500).send(errorBody('INTERNAL', 'Something went wrong on the server. Please try again.'));
+  });
+
+  app.setNotFoundHandler((req, reply) =>
+    reply.status(404).send(errorBody('NOT_FOUND', `No route for ${req.method} ${req.url.split('?')[0]}.`)),
+  );
+
+  healthRoutes(app, { db, timeZone, now, startedAt });
+  commandRoutes(
+    app,
+    {
+      db,
+      timeZone,
+      now,
+      registry: deps.registry ?? commandRegistry,
+      rights: deps.rights ?? allowAllRights,
+      bus: deps.bus ?? new EventBus(),
+      printWaker: deps.printWaker ?? noopPrintWaker,
+      onPostCommitError: (err, stage) => app.log.error({ err, stage }, 'post-commit step failed'),
+    },
+    deps.auth ?? singleTerminalAuth,
+  );
+  return app;
+}
+
+function errorBody(code: string, message: string, details?: unknown) {
+  return { ok: false as const, error: { code, message, ...(details === undefined ? {} : { details }) } };
+}

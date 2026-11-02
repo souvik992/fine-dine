@@ -1,0 +1,9 @@
+# Changelog
+
+One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
+
+- 2026-11-02 P0-00 Scaffold, docs and Claude Code commands created
+- 2026-11-02 P1-01 Workspace tooling: package exports, strict tsconfigs (platform-neutral shared), type-aware ESLint flat config, vitest 5 with source aliases, per-workspace test scripts, CI workflow, 0 audit findings
+- 2026-11-02 P1-02 Fastify server on :7420 with /v1/health, verified SQLite pragmas, data-dir lock, checksummed migration runner (new 0002_migration_checksums), business-day bootstrap, graceful shutdown
+- 2026-11-02 P1-03 Shared money/tax/bill-calc (from Tiffin core): BigInt-safe rounding, largest-remainder allocation, exclusive/inclusive GST, per-line-rate service charge, configurable round-off tie; property tests
+- 2026-11-02 P1-04 Command pipeline: shared envelope schema, PosError, executeCommand (IMMEDIATE tx, idempotent replay with request hash, version check, rights hook, audit/event_log/print_job/outbox, post-commit publish), registry, POST /v1/commands, order snapshot query

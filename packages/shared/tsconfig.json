@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    // Platform-neutral: no Node or DOM globals. Code here must run in Node, Electron renderer and PWAs.
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["src"]
+}

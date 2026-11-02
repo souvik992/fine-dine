@@ -1,0 +1,30 @@
+{
+  "name": "@dinepos/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "build": "tsc -b && node scripts/copy-assets.mjs",
+    "clean": "tsc -b --clean",
+    "start": "node dist/index.js",
+    "seed": "tsx scripts/seed-dev.ts",
+    "test": "vitest run --root ../.. apps/server/"
+  },
+  "dependencies": {
+    "@dinepos/printing": "0.1.0",
+    "@dinepos/shared": "0.1.0",
+    "better-sqlite3": "^13.0.3",
+    "fastify": "^5.12.7",
+    "ulid": "^3.0.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "tsx": "^4.23.15"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
