@@ -37,7 +37,7 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
     (Seed lives in `apps/server/src/seed/` and runs over HTTP: `npm run seed -w @dinepos/server`.)
   - Accept: seed runs idempotently; floor returns 12 FREE tables.
 
-- [ ] **P1-06 Order commands: OpenTable, AddItems, Update/RemoveHeldItem, FireKOT**
+- [x] **P1-06 Order commands: OpenTable, AddItems, Update/RemoveHeldItem, FireKOT**
   - Read first: `02-domain-model.md`, `03-command-api.md`, `06-printing-kds.md` (routing)
   - Build: handlers + `deriveTableState` in shared + KOT numbering + station routing + print_job rows.
   - Accept: firing items for 2 stations creates 2 KOTs with consecutive numbers; table state transitions

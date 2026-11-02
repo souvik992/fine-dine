@@ -6,7 +6,12 @@ commit, retry until confirmed.
 ## Station routing
 - Each `MenuItem` has a default `stationId`; a `Category` can set one for all its items; an `Area` can
   override per category (e.g. Bar area sends mocktails to the bar counter).
-- Resolution order: area override → item → category → outlet default station.
+- Resolution order: area override → item → category → outlet default station. Area overrides and category
+  stations are inherited from parent categories. The outlet default is `config` key `kot.default_station_id`;
+  with no station at all `FireKOT` refuses with `INVALID_STATE`. The station is resolved when the item is fired
+  (so a table move before firing routes by the new area) and stored on `order_item.station_id`.
+- KOT numbers come from `counter` row `kot_no:<businessDate>`: one sequence per day across all stations, so
+  one FireKOT on 3 stations prints KOT 41, 42, 43.
 - `FireKOT` groups fired items by resolved station → one `kot` row per station → one `print_job` per printer
   linked to that station (a station may have 0..n printers and/or a KDS).
 

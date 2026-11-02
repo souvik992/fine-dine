@@ -84,7 +84,7 @@ export function getOrderSnapshot(db: Db, orderId: string): OrderSnapshot | undef
   const itemRows = db
     .prepare(
       `SELECT oi.*, k.kot_no FROM order_item oi LEFT JOIN kot k ON k.id = oi.kot_id
-       WHERE oi.order_id = ? ORDER BY oi.added_at, oi.id`,
+       WHERE oi.order_id = ? ORDER BY oi.added_at, oi.rowid`,
     )
     .all(orderId) as ItemRow[];
   const addonRows = db

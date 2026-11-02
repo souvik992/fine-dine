@@ -78,6 +78,19 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 
 `cfg` = configurable per role in settings.
 
+### Order command notes (P1-06; schemas in `packages/shared/src/schemas/commands/orders.ts`)
+- `OpenTable` `{ tableId, covers, captainId?, orderId? }`: `orderId` is the client-made id for offline opens.
+  Blocked or occupied table → `INVALID_STATE`. Result `{ orderId }` and the new snapshot at version 1.
+- `AddItems` lines: `{ id, itemId, variantId?, qty, addons: [{ addonId, qty }], note?, course }`. Name
+  ("Item (Variant)"), unit price (area price list first) and tax rate are snapshotted. An item with variants
+  needs `variantId`; every linked addon group's min/max must hold (`VALIDATION`); unavailable item →
+  `INVALID_STATE`. Addon qty is the addon's own count on the line.
+- `UpdateHeldItem` / `RemoveHeldItem` work only on `held` items (`INVALID_STATE` once fired). Removing a held
+  item deletes its row; the audit row keeps the full line.
+- `FireKOT` takes exactly one of `{ itemIds }`, `{ course }`, `{ all: true }`. Result `{ kots: [{ id, kotNo,
+  stationId, orderItemIds }] }`, KOTs ordered by station name.
+- `AddItems`/`FireKOT` on a `billed` order return it to `open` and mark its printed bill `superseded`.
+
 ### SplitBill payloads
 ```json
 { "mode": "equal", "parts": 3 }
