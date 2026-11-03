@@ -223,13 +223,25 @@ export class OnlineConnector {
     }
   }
 
-  /** Menu, prices, availability and settings, when they changed (by hash); and whether the outlet is taking orders. */
+  /**
+   * Menu, prices, availability and settings, when they changed (by hash); and whether the outlet is taking orders.
+   * Never rejects: callers fire it and forget (ticks, settings changes), and an unhandled rejection would stop the whole
+   * server. A failure (the hub down) is kept in lastError and tried again on the next tick.
+   */
   publish(force = false): Promise<void> {
     if (!this.running) return Promise.resolve();
-    this.publishing ??= this.publishOnce(force).finally(() => {
-      this.publishing = null;
-    });
+    this.publishing ??= this.publishOnce(force)
+      .catch((e: unknown) => this.failed('publishing to the order hub failed', e))
+      .finally(() => {
+        this.publishing = null;
+      });
     return this.publishing;
+  }
+
+  private failed(what: string, e: unknown): void {
+    const message = e instanceof Error ? (e.name === 'TimeoutError' ? 'the hub did not answer in time' : e.message) : String(e);
+    if (this.lastError !== message) this.o.log?.warn(what, message);
+    this.lastError = message;
   }
 
   private async publishOnce(force: boolean): Promise<void> {
@@ -269,9 +281,11 @@ export class OnlineConnector {
         this.flushAgain = false;
         await this.flushOnce();
       } while (this.flushAgain && this.running);
-    })().finally(() => {
-      this.flushing = null;
-    });
+    })()
+      .catch((e: unknown) => this.failed('sending to the order hub failed', e)) // never rejects (see publish)
+      .finally(() => {
+        this.flushing = null;
+      });
     return this.flushing;
   }
 

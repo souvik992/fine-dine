@@ -1,6 +1,7 @@
 // Entry point for the outlet server (the single SQLite writer). See apps/server/README.md.
 // Started by `npm start` / `npm run dev:server`, or on shop PCs by the "DinePOS Server" shortcut
 // (bundled node.exe + server.mjs), which shows this process in its own console window.
+import { appendFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { listBackups, stageRestore } from './backup/backups.js';
@@ -44,6 +45,27 @@ async function main(): Promise<void> {
     }
   };
   let server = await startServer(config, { banner: true, requestRestart: () => void restart() });
+
+  // A stray failure in a background task (a call to the order hub, a printer) must never stop the outlet: it is
+  // logged and the server carries on. A real crash is written to the log at once and kept on screen.
+  process.on('unhandledRejection', (reason) => {
+    server.app.log.error({ err: reason }, 'unhandled failure in a background task; the server carries on');
+  });
+  process.on('uncaughtException', (err) => {
+    if (server.logFile) {
+      try {
+        appendFileSync(server.logFile, `${JSON.stringify({ level: 60, time: Date.now(), msg: 'server crashed', err: { message: err.message, stack: err.stack } })}\n`);
+      } catch {
+        // the log cannot be written: the console still shows it
+      }
+    }
+    console.error('\n  The DinePOS server stopped because of an error:', err);
+    void server
+      .close()
+      .catch(() => undefined)
+      .then(holdWindowOpen)
+      .finally(() => process.exit(1));
+  });
 
   let stopping = false;
   const stop = (signal: string) => {

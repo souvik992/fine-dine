@@ -209,9 +209,11 @@ export class SyncAgent {
 
   /** Looks for a renewed key on the hub and installs it when it is newer; the result is shown in Settings. */
   checkLicence(): Promise<void> {
-    this.checking ??= this.fetchLicence().finally(() => {
-      this.checking = null;
-    });
+    this.checking ??= this.fetchLicence()
+      .catch((e: unknown) => this.o.log?.warn('licence check failed', String(e))) // never rejects: callers fire and forget
+      .finally(() => {
+        this.checking = null;
+      });
     return this.checking;
   }
 

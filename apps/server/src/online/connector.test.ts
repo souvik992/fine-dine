@@ -9,6 +9,8 @@ import type { Db } from '../db/connection.js';
 import { DEV_OWNER, devSeedCommands, devSetupCommand, seedId } from '../seed/dev-seed.js';
 import { createTestDb } from '../testing/test-db.js';
 import { parseConnectLink } from '../routes/online.js';
+import { EventBus } from '../core/events.js';
+import { OnlineConnector } from './connector.js';
 import { priceOnlineOrder } from './menu.js';
 
 // P4-06: the connector against a small fake hub that speaks contract v1 (pair, menu, status, SSE events, actions).
@@ -153,6 +155,18 @@ describe('online connector', () => {
     const orders = (await app.inject({ method: 'GET', url: '/v1/online/orders' })).json<{ orders: Array<{ state: string; billNo: string }> }>().orders;
     expect(orders[0]).toMatchObject({ state: 'ACCEPTED' });
     await until(() => app.online.status().pendingActions === 0);
+  });
+
+  it('the hub down never stops the server: publishing and sending fail quietly, are kept in lastError and retried', async () => {
+    await app.online.stop();
+    db.prepare("UPDATE online_link SET hub_url = 'http://127.0.0.1:9', device_key = 'k', store_slug = 'spice', store_name = 'Spice' WHERE id = 1").run();
+    const down = new OnlineConnector({ db, now: () => new Date(), bus: new EventBus(), tickMs: 20, retryMs: [20], fetch: () => Promise.reject(new TypeError('fetch failed')), execute: () => { throw new Error('not reached'); } });
+    down.start();
+    await new Promise((r) => setTimeout(r, 200)); // ~10 ticks of fire-and-forget publish + flush; an unhandled rejection fails this run
+    await expect(down.publish(true)).resolves.toBeUndefined();
+    await expect(down.flush()).resolves.toBeUndefined();
+    expect(down.status()).toMatchObject({ paired: true, lastError: 'fetch failed' });
+    await down.stop();
   });
 
   it('a price that changed is left for staff (noted), never accepted automatically', async () => {
