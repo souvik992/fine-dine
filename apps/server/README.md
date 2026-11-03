@@ -110,3 +110,8 @@ shortcut needs no environment variables).
 ## Dev
 `npm run dev -w @dinepos/server` → `tsx watch src/index.ts` with `apps/server/data/dev.db`, fake printers.
 `npm run build -w @dinepos/server && npm run start -w @dinepos/server` runs the compiled server.
+
+## Backups (P2-08)
+`src/backup/`: `backups.ts` (make, check, list, prune, copy, stage and apply a restore) and `scheduler.ts` (every 15 min,
+day end, on request). Files live in `<DATA_DIR>/backups`. If the server cannot start, run it with `--list-backups`, then
+`--restore <file>`: the restore is applied at that start and the old database is kept in `pre-restore-<time>/`.

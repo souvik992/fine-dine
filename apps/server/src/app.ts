@@ -18,6 +18,8 @@ import { queryRoutes } from './routes/queries.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { stockRoutes } from './routes/stock.js';
 import { cashierRoutes } from './routes/cashier.js';
+import { backupRoutes } from './routes/backups.js';
+import type { BackupScheduler } from './backup/scheduler.js';
 import { isAllowedOrigin, streamRoutes } from './routes/stream.js';
 
 export interface AppDeps {
@@ -36,6 +38,8 @@ export interface AppDeps {
   /** Browser origins allowed for CORS and the stream. */
   allowedOrigins?: readonly string[];
   hub?: HubOptions;
+  /** Backups and restore (P2-08); absent in tests that do not need them. */
+  backups?: { scheduler: BackupScheduler; dataDir: string; requestRestart: () => void };
 }
 
 // Secrets never reach the log (docs/07-security-licensing.md).
@@ -102,7 +106,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
     done();
   });
 
-  healthRoutes(app, { db, timeZone, now, startedAt });
+  healthRoutes(app, { db, timeZone, now, startedAt, backupStatus: deps.backups ? () => deps.backups!.scheduler.status() : undefined });
   queryRoutes(app, { db, timeZone, now, printerStatus: deps.printQueue ? (id) => deps.printQueue!.status(id) : undefined });
   commandRoutes(
     app,
@@ -121,6 +125,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
   sessionRoutes(app, { db, now, timeZone });
   stockRoutes(app, { db, now });
   cashierRoutes(app, { db, now });
+  if (deps.backups) backupRoutes(app, { db, now, timeZone, dataDir: deps.backups.dataDir, backups: deps.backups.scheduler, requestRestart: deps.backups.requestRestart });
   streamRoutes(app, hub, allowedOrigins);
   return Object.assign(app, { realtime: hub });
 }

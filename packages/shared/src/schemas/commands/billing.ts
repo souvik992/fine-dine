@@ -116,6 +116,13 @@ export const configSchemas = {
   'bill.display': billDisplaySchema,
   'bill.logo': billLogoSchema.nullable(),
   'kot.default_station_id': ulidSchema.nullable(),
+  /** P2-08: a second folder for backup copies (USB drive, another disk), an absolute path; null = none. */
+  'backup.copyDir': z
+    .string()
+    .trim()
+    .max(260)
+    .regex(/^([A-Za-z]:[\\/]|\\\\|\/)/, 'use a full folder path, like E:\\ or D:\\Backups')
+    .nullable(),
 } as const;
 
 export type ConfigKey = keyof typeof configSchemas;

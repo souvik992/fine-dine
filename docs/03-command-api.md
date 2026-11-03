@@ -194,6 +194,11 @@ marked `*** SAMPLE - NOT A BILL ***` at the top and bottom; it takes no bill num
   business date, VOID included, net payments per mode); `GET /v1/cash?date=` → `{ date, movements }`.
 - The Z-report lists VOID bills by number with their amount and reason (not in sales), and pay-ins / pay-outs.
 
+### Backups (P2-08; routes, not commands: backups are files and a restore replaces the database)
+`GET /v1/admin/backups` (admin) → `{ status, backups: [{ file, kind, at, bytes }] }`; `POST /v1/admin/backups` (admin)
+→ `{ backup }` (made and checked); `POST /v1/admin/restore` `{ file }` (users.manage + Owner PIN) → `{ restoring,
+safetyBackup, restarting: true }`, then the server restarts on the backup. Rules in `docs/07` "Backups".
+
 ## Stock commands (P2-10/P2-11; schemas in `packages/shared/src/schemas/commands/stock.ts` and `menu-csv.ts`)
 Quantities are integer thousandths of the material's unit (`qtyMilli`), costs integer paise per whole unit.
 | Type | Payload | Right | Effect |

@@ -63,5 +63,21 @@ active person must be able to manage staff; changing a PIN, role or active flag 
 - Restore: Settings › Backup › Restore (owner PIN) → stops server, swaps file, restarts.
 - Optional encrypted cloud upload (Phase 4).
 
+Built in P2-08 (`apps/server/src/backup/`, approach from TiffinPOS):
+- `BackupScheduler`: an `auto` backup every 15 minutes (and at start when the newest is older), a `dayend` backup on
+  `day.changed`, `manual` on request. Online backup (`db.backup()`), written as `.tmp`, opened read-only and
+  `quick_check`ed (and its schema version ≤ this build) before it is renamed into place; a failure is logged and shown.
+- Retention: `auto` — all from the last 2 hours, the newest per hour for 7 days, the newest per day for 30 days;
+  `dayend` 90, `manual` 30, `restore` (safety copies) 10.
+- Copy folder (`backup.copyDir`, Settings › Backups): every backup is copied there (USB drive, second disk), checked
+  again on the drive and pruned the same way; a missing drive is reported, never fatal.
+- Restore (Settings › Backups, session with `users.manage` + an Owner's PIN in `X-Manager-Pin`): a `restore` safety
+  backup is made, the chosen backup is checked and staged (`restore-pending.json`), the server stops and starts again
+  in the same process, and before opening the database moves it (with its WAL) into `pre-restore-<stamp>/` (never
+  deleted) and copies the backup in. On any failure the previous database is put back. Work after the backup is
+  not replayed (no journal yet): at most 15 minutes. Audited (`backup.restore_staged`, `backup.manual`).
+- Command line, when the server cannot start: `server.mjs --list-backups`, `server.mjs --restore <file>`.
+- `/v1/health` includes `backup { lastAt, ageMin, ok, error }`; terminals show "Backup late" when over an hour.
+
 ## Logging
 Rotating JSON logs in `logs/` (pino). Never log PINs, tokens or full customer phone numbers.

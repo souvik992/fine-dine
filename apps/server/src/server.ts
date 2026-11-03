@@ -12,6 +12,9 @@ import { closeDatabase, openDatabase, type Db } from './db/connection.js';
 import { acquireDataDirLock, type DataDirLock } from './db/lock.js';
 import { migrate, type MigrationResult } from './db/migrate.js';
 import { PrintQueue, type PrintQueueOptions } from './print/print-queue.js';
+import { applyPendingRestore } from './backup/backups.js';
+import { BackupScheduler } from './backup/scheduler.js';
+import { getConfig } from './core/outlet-config.js';
 import { SERVER_VERSION } from './version.js';
 
 export interface RunningServer {
@@ -27,6 +30,9 @@ export interface RunningServer {
   url: string;
   /** Where JSON logs go when config.logToFile is on. */
   logFile: string | null;
+  backups: BackupScheduler;
+  /** Set when this start applied a staged restore. */
+  restored: { restored: string; aside: string } | null;
   close(): Promise<void>;
 }
 
@@ -38,6 +44,10 @@ export interface StartOptions {
   printBackoffMs?: number[];
   /** Print the start-up banner (addresses, data folder) to the console: the server window. */
   banner?: boolean;
+  /** Called when a restore was staged: the caller stops this server and starts it again (index.ts). */
+  requestRestart?: () => void;
+  /** Backup interval; tests use a long one. */
+  backupIntervalMs?: number;
 }
 
 /** Startup order: data dir → lock → open DB → migrate → open business day → listen → resume print queue. */
@@ -49,6 +59,8 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
   let db: Db | undefined;
   try {
     const dbPath = path.join(config.dataDir, config.dbFile);
+    // A restore staged in Settings › Backups replaces the database before it is opened (P2-08).
+    const restored = applyPendingRestore(config.dataDir, config.dbFile, now());
     db = openDatabase(dbPath);
     const migrations = migrate(db, undefined, now);
     const businessDate = ensureBusinessDay(db, config.timeZone, now);
@@ -75,6 +87,16 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
       },
       log: (level, msg, data) => logSink.log?.(level, msg, data),
     });
+    const openedDb = db;
+    const backups = new BackupScheduler({
+      db,
+      dataDir: config.dataDir,
+      now,
+      bus,
+      copyDir: () => getConfig(openedDb)['backup.copyDir'],
+      intervalMs: opts.backupIntervalMs,
+      log: (level, msg, data) => logSink.log?.(level, msg, data),
+    });
     const app = buildApp({
       db,
       timeZone: config.timeZone,
@@ -85,10 +107,13 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
       printWaker: printQueue,
       printQueue,
       allowedOrigins: config.allowedOrigins,
+      backups: { scheduler: backups, dataDir: config.dataDir, requestRestart: opts.requestRestart ?? (() => undefined) },
     });
     logSink.log = (level, msg, data) => app.log[level](data ?? {}, msg);
     const url = await app.listen({ host: config.host, port: config.port });
     printQueue.start();
+    backups.start();
+    if (restored) app.log.warn(restored, 'restored a backup; the previous database was kept aside');
     if (opts.banner) {
       const port = Number(new URL(url).port) || config.port;
       process.stdout.write(formatBanner({ version: SERVER_VERSION, host: config.host, port, dataDir: config.dataDir, businessDate, logFile, lan: lanAddresses() }));
@@ -105,13 +130,14 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
         try {
           await app.close();
           await printQueue.stop();
+          await backups.stop();
         } finally {
           closeDatabase(openDb);
           lock.release();
         }
       })());
 
-    return { app, db, config, dbPath, migrations, businessDate, bus, printQueue, url, logFile, close };
+    return { app, db, config, dbPath, migrations, businessDate, bus, printQueue, url, logFile, backups, restored, close };
   } catch (err) {
     cleanup(db, lock);
     throw err;

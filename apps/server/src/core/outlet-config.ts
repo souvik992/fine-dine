@@ -19,6 +19,7 @@ export const CONFIG_DEFAULTS: OutletConfig = {
   'bill.display': DEFAULT_BILL_DISPLAY,
   'bill.logo': null,
   'kot.default_station_id': null,
+  'backup.copyDir': null,
 };
 
 const KEYS = Object.keys(configSchemas) as ConfigKey[];

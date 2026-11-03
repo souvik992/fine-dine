@@ -93,6 +93,9 @@ Sections are shown by right; every save is a command, so it is audited and other
 - **Kitchen & printers** (admin): printers (network IP/port, Windows USB name, or preview-only; paper width;
   KOT/bill role; copies; cutter; backup printer) with live status and **Test print** (`PrintTestPage`);
   stations with their printers.
+- **Backups** (admin, P2-08): last backup and its health, "Back up now", the copy folder, the list of backups
+  (time, kind, size) and, for staff managers, **Restore** (type RESTORE + Owner PIN; the app reconnects when the server
+  is back). The top bar shows "Backup late" when there was no backup for an hour.
 - **Staff & roles** (users.manage): people (name, role, new PIN, active) and roles (discount limit, each right
   allowed / allowed with manager PIN / not allowed).
 - **This terminal** (everyone): server address and connection test.

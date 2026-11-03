@@ -62,8 +62,12 @@ export class ApiClient {
   }
 
   /** POST/DELETE outside the command envelope (sign-in, sign-out). */
-  send<T>(method: 'POST' | 'DELETE', path: string, body?: unknown): Promise<T> {
-    return this.request<T>(path, { method, ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }) });
+  send<T>(method: 'POST' | 'DELETE', path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
+    return this.request<T>(path, {
+      method,
+      headers: { ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...headers },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
   }
 
   /**

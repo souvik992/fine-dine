@@ -640,6 +640,27 @@ describe('desktop app', () => {
     await page.getByRole('button', { name: 'Floor', exact: true }).click();
   });
 
+  it('Backups: back up now, then restore that backup with the Owner PIN; the server restarts and the app comes back', async () => {
+    const page = await openSettings('Backups');
+    await page.getByRole('button', { name: 'Back up now' }).click();
+    await page.getByText(/Backup made and checked/).waitFor();
+    const before = await get<{ tables: Array<{ label: string; state: string }> }>('/v1/floor');
+
+    await page.getByRole('table', { name: 'Backups' }).getByRole('button', { name: /^Restore the backup/ }).first().click();
+    const dlg = page.getByRole('dialog', { name: 'Restore a backup' });
+    await dlg.getByLabel('Type RESTORE to confirm').fill('restore');
+    await dlg.getByLabel('Owner PIN').fill('1234');
+    await dlg.getByRole('button', { name: 'Restore' }).click();
+    await dlg.getByText(/Restoring… the server is restarting|Restored/).waitFor();
+    await page.waitForEvent('load', { timeout: 30_000 }); // the app starts again on the restored data
+    await page.locator('[data-table="T1"]').or(page.getByText('Who is signing in?')).first().waitFor({ timeout: 20_000 });
+
+    const after = await get<{ tables: Array<{ label: string; state: string }> }>('/v1/floor');
+    expect(after.tables.map((t) => [t.label, t.state])).toEqual(before.tables.map((t) => [t.label, t.state]));
+    const list = await get<{ backups: Array<{ kind: string }> }>('/v1/admin/backups');
+    expect(list.backups.some((b) => b.kind === 'restore')).toBe(true); // a safety backup was taken first
+  });
+
   it('Lock returns every window of the terminal to the sign-in screen', async () => {
     const [page, other] = app.windows();
     await page!.getByRole('button', { name: 'Lock' }).click();
