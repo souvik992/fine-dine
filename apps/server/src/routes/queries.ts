@@ -1,10 +1,12 @@
 import { ulidSchema, type CaptainSection, type CaptainSections } from '@dinepos/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { lanAddresses } from '../banner.js';
 import { PosError } from '../core/errors.js';
 import { getConfig } from '../core/outlet-config.js';
 import type { Db } from '../db/connection.js';
 import { getFloor } from '../queries/floor.js';
+import { getKdsBoard } from '../queries/kds.js';
 import { getMenu } from '../queries/menu.js';
 import { getOrderSnapshot } from '../queries/order-snapshot.js';
 import { getPrinters } from '../queries/printers.js';
@@ -54,6 +56,21 @@ export function queryRoutes(app: FastifyInstance, deps: QueryDeps): void {
       .all() as CaptainSections['people'];
     const body: CaptainSections = { sections: [...byUser.values()], people };
     void reply.header('cache-control', 'no-store').send(body);
+    return reply;
+  });
+
+  // P4-02: the addresses phones and kitchen screens can open (this PC's LAN IPs, on the port this request came in on).
+  app.get('/v1/network', (req, reply) => {
+    const port = req.socket.localPort ?? 7420;
+    void reply.header('cache-control', 'no-store').send({ urls: lanAddresses().map((ip) => `http://${ip}:${port}`) });
+    return reply;
+  });
+
+  // P4-02: a kitchen screen's tickets.
+  app.get<{ Querystring: { stationId?: string } }>('/v1/kds/tickets', (req, reply) => {
+    const stationId = req.query.stationId ?? '';
+    if (!ulidSchema.safeParse(stationId).success) throw new PosError('VALIDATION', 'Choose a kitchen station (stationId).');
+    void reply.header('cache-control', 'no-store').send(getKdsBoard(deps.db, stationId, deps.now(), deps.timeZone));
     return reply;
   });
 

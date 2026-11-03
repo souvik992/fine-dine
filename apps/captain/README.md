@@ -34,6 +34,8 @@ server. Refused replays go to `src/screens/AttentionSheet.tsx`. Details and limi
   in the installer: `resources/server/web/captain`, copied by the server bundle script). `npm run dev -w @dinepos/captain`
   serves it on :5174 with the API proxied to :7420.
 - Uses `@dinepos/client` (the same API client and live stream as the desktop terminal), same origin as the server.
+- Pairing, PIN sign-in and the stream come from `@dinepos/web-shell` (shared with the kitchen display since P4-02);
+  `src/app-context.tsx` only holds the phone's settings (10-minute idle lock, topics).
 - `src/app-context.tsx` (device token, sign-in, stream), `src/screens/` (Pair, Login, Tables), `public/sw.js`
   (app shell cache; the offline outbox is P3-03).
 - End-to-end test: `apps/desktop/e2e/captain.e2e.test.ts` (a phone-sized window pairs, signs in, seats a table and sees

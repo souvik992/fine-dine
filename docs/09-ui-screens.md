@@ -158,3 +158,9 @@ The button shows how many materials are low or need a count. Tabs:
 ## KDS PWA
 - Station selector on first run. Ticket columns, age colours, bump on tap, all-day counts sidebar.
 - Large type, dark background by default (kitchen glare).
+- Built in P4-02 (`apps/kds`, `http://<master>:7420/kds`): **Pair this kitchen screen** → **Which station is this
+  screen for?** → the board (no sign-in after pairing): header (station, clock, to cook / ready, offline badge,
+  Station), **New** tickets as cards (table, KOT no., guests, captain, age m:ss turning amber then red with
+  "Waiting"/"Late" written too, lines by course with add-ons and notes, CHANGED/CANCELLED bands, a big **Ready**
+  button), **Ready** (Served, and Back to New), **All day** counts; "Undo" after Served. Settings › Kitchen &
+  printers on a terminal shows the address to open and the amber/red minutes.

@@ -10,6 +10,7 @@ export default defineConfig({
       '@dinepos/shared': src('shared'),
       '@dinepos/printing': src('printing'),
       '@dinepos/client': src('client'),
+      '@dinepos/web-shell': src('web-shell'),
     },
   },
   test: {

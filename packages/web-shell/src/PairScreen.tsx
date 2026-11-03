@@ -1,7 +1,7 @@
 import { ApiError } from '@dinepos/client';
 import { Smartphone } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useApp } from '../app-context.js';
+import { useShell } from './shell-context.js';
 
 interface Ticket {
   requestId: string;
@@ -9,9 +9,12 @@ interface Ticket {
   code: string;
 }
 
-/** Pair this phone (P2-02): a name, then a 6-digit code that a manager approves in Settings › Devices on a terminal. */
-export function PairScreen() {
-  const { api, setDeviceToken } = useApp();
+/**
+ * Pair this device (P2-02): a name, then a 6-digit code that a manager approves in Settings › Devices on a terminal.
+ * `device` is how the screen talks about itself ("phone", "kitchen screen").
+ */
+export function PairScreen({ kind, device = 'phone', placeholder = "Ravi's phone", reason = 'Only paired phones can take orders.' }: { kind: 'captain' | 'kds'; device?: string; placeholder?: string; reason?: string }) {
+  const { api, setDeviceToken } = useShell();
   const [name, setName] = useState('');
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -21,9 +24,9 @@ export function PairScreen() {
     setError(null);
     setExpired(false);
     try {
-      setTicket(await api.send<Ticket>('POST', '/v1/pairing-requests', { name: name.trim(), kind: 'captain' }));
+      setTicket(await api.send<Ticket>('POST', '/v1/pairing-requests', { name: name.trim(), kind }));
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Cannot reach the outlet server. Is this phone on the shop Wi-Fi?');
+      setError(e instanceof ApiError ? e.message : `Cannot reach the outlet server. Is this ${device} on the shop Wi-Fi?`);
     }
   };
 
@@ -50,8 +53,8 @@ export function PairScreen() {
   return (
     <main className="flex min-h-full flex-col justify-center px-5 py-8">
       <Smartphone className="mx-auto h-12 w-12 text-primary" />
-      <h1 className="mt-3 text-center font-display text-3xl font-semibold">Pair this phone</h1>
-      <p className="mt-2 text-center text-muted-foreground">Only paired phones can take orders.</p>
+      <h1 className="mt-3 text-center font-display text-3xl font-semibold">Pair this {device}</h1>
+      <p className="mt-2 text-center text-muted-foreground">{reason}</p>
       {!ticket || expired ? (
         <form
           className="mt-8"
@@ -61,8 +64,8 @@ export function PairScreen() {
           }}
         >
           <label className="block font-semibold">
-            Name for this phone
-            <input autoFocus className="input mt-2" maxLength={40} placeholder="Ravi's phone" value={name} onChange={(e) => setName(e.target.value)} aria-label="Phone name" />
+            Name for this {device}
+            <input autoFocus className="input mt-2" maxLength={40} placeholder={placeholder} value={name} onChange={(e) => setName(e.target.value)} aria-label={`${device[0]!.toUpperCase()}${device.slice(1)} name`} />
           </label>
           {expired ? <p className="mt-3 font-semibold text-danger">That code expired. Ask for a new one.</p> : null}
           {error ? (

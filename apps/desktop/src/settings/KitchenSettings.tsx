@@ -1,6 +1,6 @@
-import { newId } from '@dinepos/shared';
+import { newId, type OutletConfig } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
-import { ChefHat, Plus, Printer } from 'lucide-react';
+import { ChefHat, MonitorPlay, Plus, Printer } from 'lucide-react';
 import { useState } from 'react';
 import { useApp } from '../app-context.js';
 import { Modal } from '../components/Modal.js';
@@ -91,6 +91,8 @@ export function KitchenSettings() {
           </li>
         ))}
       </ul>
+
+      <KitchenScreens />
 
       {station ? <StationDialog station={station === 'new' ? null : station} printers={printers} onClose={() => setStation(null)} /> : null}
       {printer ? <PrinterDialog printer={printer === 'new' ? null : printer} printers={printers} onClose={() => setPrinter(null)} /> : null}
@@ -241,5 +243,65 @@ function PrinterDialog({ printer, printers, onClose }: { printer: PrinterRow | n
         <DialogButtons busy={busy} onCancel={onClose} disabled={!valid} />
       </form>
     </Modal>
+  );
+}
+
+/** Kitchen screens (P4-02): where to open them, and when a ticket turns amber and red. */
+function KitchenScreens() {
+  const { api, serverUrl } = useApp();
+  const config = useQuery({ queryKey: ['config'], queryFn: () => api.get<OutletConfig>('/v1/config') });
+  // The master PC talks to itself on 127.0.0.1; a tablet needs one of its network addresses.
+  const network = useQuery({ queryKey: ['network'], queryFn: () => api.get<{ urls: string[] }>('/v1/network') });
+  const { save, busy, error, setError } = useSave();
+  const [amber, setAmber] = useState<string | null>(null);
+  const [red, setRed] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  if (!config.data) return null;
+  const a = amber ?? String(config.data['kds.amberMin']);
+  const r = red ?? String(config.data['kds.redMin']);
+  const bases = network.data?.urls.length ? network.data.urls : [serverUrl.replace(/\/$/, '')];
+  const valid = /^\d+$/.test(a) && /^\d+$/.test(r) && Number(a) >= 1 && Number(r) > Number(a) && Number(r) <= 240;
+  return (
+    <div className="mt-10">
+      <SectionHeader title="Kitchen screens" subtitle="A screen (tablet, TV or PC browser) at a station shows its tickets; cooks tap Ready, then Served." />
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="flex items-center gap-2 text-sm">
+          <MonitorPlay className="h-4 w-4 shrink-0 text-primary" />
+          <span>
+            On the screen, open{' '}
+            {bases.map((b, i) => (
+              <span key={b}>
+                {i ? ' or ' : ''}
+                <span className="font-mono font-semibold" data-testid="kds-url">
+                  {b}/kds
+                </span>
+              </span>
+            ))}{' '}
+            (on the shop network), pair it in Settings › Devices and choose the station. No sign-in is needed on the screen.
+          </span>
+        </p>
+        <form
+          className="mt-4 flex flex-wrap items-end gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!valid) return setError('Red must be after amber (1 to 240 minutes).');
+            setSaved(false);
+            void save('SetConfig', { values: { 'kds.amberMin': Number(a), 'kds.redMin': Number(r) } }).then((ok) => setSaved(ok));
+          }}
+        >
+          <Field label="Amber after (minutes)">
+            <input className="input w-32" inputMode="numeric" value={a} onChange={(e) => setAmber(e.target.value)} aria-label="Amber after (minutes)" />
+          </Field>
+          <Field label="Red after (minutes)">
+            <input className="input w-32" inputMode="numeric" value={r} onChange={(e) => setRed(e.target.value)} aria-label="Red after (minutes)" />
+          </Field>
+          <button type="submit" className="btn btn-primary" disabled={busy || !valid}>
+            Save
+          </button>
+          {saved ? <span className="text-sm font-semibold text-ok">Saved</span> : null}
+        </form>
+        <ErrorText error={error} />
+      </div>
+    </div>
   );
 }

@@ -11,5 +11,5 @@
     "emitDeclarationOnly": true
   },
   "include": ["src"],
-  "references": [{ "path": "../../packages/shared" }, { "path": "../../packages/client" }]
+  "references": [{ "path": "../../packages/shared" }, { "path": "../../packages/client" }, { "path": "../../packages/web-shell" }]
 }

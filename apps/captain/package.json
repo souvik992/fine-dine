@@ -12,6 +12,7 @@
   "dependencies": {
     "@dinepos/client": "0.1.0",
     "@dinepos/shared": "0.1.0",
+    "@dinepos/web-shell": "0.1.0",
     "@tanstack/react-query": "^5.105.1",
     "lucide-react": "^1.66.0",
     "react": "^19.3.1",

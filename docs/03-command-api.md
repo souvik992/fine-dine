@@ -72,7 +72,7 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 | `Settle` | billId, tenders[{mode, amountPaise, ref?}] | bill.settle | | payment rows; when all parts paid → settled, table FREE | |
 | `VoidBill` | billId, reason | bill.void | yes | reversal, order → void | yes |
 | `ReprintKOT` / `ReprintBill` | kotId / billId | reprint | cfg | print job with DUPLICATE | yes |
-| `MarkKotReady` / `MarkKotServed` | kotId | kds.bump | | timestamps | |
+| `MarkKotReady` / `MarkKotServed` / `RecallKot` | kotId | kds.bump | | KOT timestamps only (no order version), `kot.status` | |
 | `SetItemAvailability` | itemId, available | menu.stock | | menu.changed | |
 | `OpenDrawer` | reason | drawer.open | cfg | ESC/POS drawer kick | yes |
 | `PayIn` / `PayOut` | amountPaise, reason | cash.move | yes | cash register lines | |
@@ -132,7 +132,9 @@ table close with the last part (result `unpaidParts`).
 | `/v1/orders/:id` | `OrderSnapshot` (items with addons, KOTs, bills with paid amount, version, running totals); 404 unknown, 400 not a ULID |
 | `/v1/orders?state=open` | open orders |
 | `/v1/menu?areaId=&since=<version>` | `MenuSnapshot` (active items; the area's price list overrides base/variant prices; with `areaId` also the area's tax `pricingMode`, P3-03) or `{ menuVersion, unchanged: true }` when `since` is current |
-| `/v1/reports/:name?from=&to=` | P4-03 (`apps/server/src/reports/catalog.ts`, right `reports.view`): a `ReportTable` (columns, rows, totals, summary; money in paise) over business dates, default today, at most a year. `GET /v1/reports` lists them: daily, items, categories, areas, tables, gst, payments, cash, discounts, voids, kot-changes, captains (P3-05: per captain of the order — tables served, guests, net sales, per cover, average bill, dishes sent, average stay, changes after the KOT; settled orders only, orders without a captain last) |
+| `/v1/kds/tickets?stationId=` | P4-02: `KdsBoard` — station, `amberMin`/`redMin`, today's unserved tickets of the station as printed (docs/06 KDS) |
+| `/v1/network` | P4-02: `{ urls }` — `http://<lan-ip>:<port>` addresses phones and kitchen screens can open |
+| `/v1/reports/:name?from=&to=` | P4-03 (`apps/server/src/reports/catalog.ts`, right `reports.view`): a `ReportTable` (columns, rows, totals, summary; money in paise) over business dates, default today, at most a year. `GET /v1/reports` lists them: daily, items, categories, areas, tables, gst, payments, cash, discounts, voids, kot-changes, kitchen (P4-02: kitchen speed per station), captains (P3-05: per captain of the order — tables served, guests, net sales, per cover, average bill, dishes sent, average stay, changes after the KOT; settled orders only, orders without a captain last) |
 | `/v1/audit?from=&to=&leakage=1&card=&before=&limit=` | P4-01 (`reports.view`): `{ entries: [{ seq, at, label, ref, amountPaise, reason, leakage, by, approvedBy, device }], next }`, newest first; `card` narrows to one leakage card; dates are the outlet's calendar days |
 | `/v1/leakage?from=&to=` | P4-01 (`reports.view`): `{ cards: [{ key, label, hint, count, amountPaise, actions }], unbilled: { orders, items, amountPaise } }` |
 | `/v1/config` | outlet and billing settings with defaults applied (nothing secret) |

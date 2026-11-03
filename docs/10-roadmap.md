@@ -104,7 +104,7 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
 ## Phase 4 â€” Controls, KDS, reports, cloud
 
 - [x] **P4-01 Audit viewer + leakage dashboard**
-- [ ] **P4-02 KDS PWA + bump + kitchen-speed report**
+- [x] **P4-02 KDS PWA + bump + kitchen-speed report**
 - [x] **P4-03 Reports v1**: day-end, item-wise, category-wise, GST summary, payment modes, discounts,
   cancelled/void, KOT modifications, area-wise, table turnover, cash register.
 - [ ] **P4-04 Reservations + waitlist (blocks tables)**

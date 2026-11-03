@@ -1,6 +1,6 @@
 import type { Right } from '@dinepos/shared';
 import { approveWithPin } from '../auth/approval.js';
-import type { Actor } from './context.js';
+import type { Actor, DeviceKind } from './context.js';
 import type { Db } from '../db/connection.js';
 import { PosError } from './errors.js';
 
@@ -19,6 +19,12 @@ export interface RightsPolicy {
   check(input: RightsCheck): { approvedBy?: string | null } | void;
 }
 
+/**
+ * What a device may do with nobody signed in (P4-02). A paired kitchen screen bumps tickets — nothing else. The master
+ * PC can too, so a screen opened on the master itself works. Audited with the device, no user.
+ */
+export const DEVICE_RIGHTS: Record<DeviceKind, readonly Right[]> = { kds: ['kds.bump'], master: ['kds.bump'], terminal: [], captain: [] };
+
 /** Grants every right. Tests and tools only; the server uses `roleRights`. */
 export const allowAllRights: RightsPolicy = {
   check: () => undefined,
@@ -30,7 +36,10 @@ export const allowAllRights: RightsPolicy = {
  */
 export const roleRights: RightsPolicy = {
   check({ db, actor, right }) {
-    if (!actor.userId) throw new PosError('UNAUTHENTICATED', 'Please sign in.');
+    if (!actor.userId) {
+      if (actor.deviceKind && DEVICE_RIGHTS[actor.deviceKind].includes(right)) return undefined;
+      throw new PosError('UNAUTHENTICATED', 'Please sign in.');
+    }
     const row = db
       .prepare(
         `SELECT p.needs_pin FROM app_user u JOIN role_permission p ON p.role_id = u.role_id

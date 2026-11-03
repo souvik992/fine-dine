@@ -2,8 +2,13 @@ import type { Right } from '@dinepos/shared';
 import type { Db } from '../db/connection.js';
 
 /** Who sent the command. Device and user come from auth (P2-01/P2-02); `approvedBy` from a manager PIN. */
+/** P4-02: what kind of device sent the request; `master` = the master PC itself (loopback). */
+export type DeviceKind = 'terminal' | 'captain' | 'kds' | 'master';
+
 export interface Actor {
   deviceId: string | null;
+  /** Lets a kitchen screen act without a staff session (DEVICE_RIGHTS). */
+  deviceKind?: DeviceKind | null;
   userId: string | null;
   approvedBy?: string | null;
   /** X-Manager-Pin of this request. Checked by approval only; never logged or stored. */

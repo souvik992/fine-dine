@@ -10,7 +10,7 @@ export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
   base: '/captain/',
   plugins: [react(), tailwindcss()],
-  resolve: { alias: { '@dinepos/shared': src('shared'), '@dinepos/client': src('client') } },
+  resolve: { alias: { '@dinepos/shared': src('shared'), '@dinepos/client': src('client'), '@dinepos/web-shell': src('web-shell') } },
   server: { port: 5174, strictPort: true, host: true, proxy: { '/v1': { target: 'http://127.0.0.1:7420', ws: true } } },
   build: { outDir: 'dist', emptyOutDir: true, target: 'es2022', sourcemap: true },
 });

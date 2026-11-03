@@ -98,3 +98,9 @@ Built in P2-08 (`apps/server/src/backup/`, approach from TiffinPOS):
 
 ## Logging
 Rotating JSON logs in `logs/` (pino). Never log PINs, tokens or full customer phone numbers.
+
+## Device rights (P4-02)
+A paired kitchen screen works with nobody signed in (docs/06 "no login after pairing"): with no staff session, a
+`kds` device — and the master PC itself — may run commands needing `kds.bump` and nothing else
+(`DEVICE_RIGHTS` in `apps/server/src/core/rights.ts`). Those commands only change KOT timestamps; the audit row
+records the device and no user. Terminals and phones always need a staff sign-in.

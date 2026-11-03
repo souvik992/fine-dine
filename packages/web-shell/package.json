@@ -1,0 +1,31 @@
+{
+  "name": "@dinepos/web-shell",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The shared shell of the DinePOS web apps (captain, kitchen display): device pairing, PIN sign-in, the API client and the live stream, as React components.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@dinepos/client": "0.1.0",
+    "@dinepos/shared": "0.1.0"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.105.1",
+    "lucide-react": "^1.66.0",
+    "react": "^19.3.1"
+  }
+}

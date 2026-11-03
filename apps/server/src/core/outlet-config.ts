@@ -19,6 +19,8 @@ export const CONFIG_DEFAULTS: OutletConfig = {
   'bill.display': DEFAULT_BILL_DISPLAY,
   'bill.logo': null,
   'kot.default_station_id': null,
+  'kds.amberMin': 10,
+  'kds.redMin': 20,
   'backup.copyDir': null,
 };
 

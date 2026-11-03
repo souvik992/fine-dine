@@ -116,6 +116,9 @@ export const configSchemas = {
   'bill.display': billDisplaySchema,
   'bill.logo': billLogoSchema.nullable(),
   'kot.default_station_id': ulidSchema.nullable(),
+  /** P4-02: a kitchen ticket turns amber, then red, after this many minutes without being bumped. */
+  'kds.amberMin': z.number().int().min(1).max(120),
+  'kds.redMin': z.number().int().min(2).max(240),
   /** P2-08: a second folder for backup copies (USB drive, another disk), an absolute path; null = none. */
   'backup.copyDir': z
     .string()

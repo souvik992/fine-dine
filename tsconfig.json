@@ -11,6 +11,9 @@
       "path": "packages/client"
     },
     {
+      "path": "packages/web-shell"
+    },
+    {
       "path": "apps/server"
     },
     {
@@ -18,6 +21,9 @@
     },
     {
       "path": "apps/captain"
+    },
+    {
+      "path": "apps/kds"
     },
     {
       "path": "apps/desktop/electron"

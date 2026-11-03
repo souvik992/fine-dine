@@ -95,3 +95,22 @@ assert on the text preview, not raw bytes.
   items with notes, course.
 - Bump → `MarkKotReady`. Second bump (or captain) → `MarkKotServed`.
 - Side panel: all-day counts per item across open tickets.
+
+Built in P4-02 (`apps/kds`, served at `/kds`; shell shared with the captain app in `packages/web-shell`):
+- Pair the screen (kind `kds`) and choose the station (`?station=<id>` in the address wins, else the saved choice;
+  stations marked for a screen first). No sign-in after pairing: a paired kitchen screen (and the master PC itself)
+  has the `kds.bump` right on its own and nothing else (`DEVICE_RIGHTS`); its bumps are audited with the device.
+- `GET /v1/kds/tickets?stationId=` (`apps/server/src/queries/kds.ts`): the station's KOTs of the business day not
+  yet served, oldest first, exactly as printed (`kot_document`) plus `firedAt`/`readyAt`; tickets of settled or
+  void orders drop off. Change slips (CHANGED / CANCELLED, with the KOT they change and the reason) and move
+  notices show too; a change slip sits on its original ticket while that is on the screen, and one bump acts on
+  both. The screen listens to the `kds` topic and refetches (the whole board after a reconnect); a short chime on a
+  new ticket.
+- Columns New → Ready, plus All day (still to cook; a change slip's `-1` takes one off). Age as m:ss on the
+  server's clock, amber/red at `kds.amberMin` / `kds.redMin` (10 / 20 by default; Settings › Kitchen & printers).
+- `MarkKotReady` (first bump), `MarkKotServed` (second bump; sets ready too if it was skipped), `RecallKot` (undo a
+  bump: back to New; "Undo" after Served). Right `kds.bump`; they change only the KOT's timestamps, never the order's
+  version, so the kitchen never conflicts with a captain or a terminal. Audited `kot.ready` / `kot.served` /
+  `kot.recall`; `kot.status` on `station:<id>`, `order:<id>` and `kds`.
+- Report **Kitchen speed** (Reports › Kitchen): per station, tickets bumped, average and slowest KOT → ready, how
+  many took longer than the amber time, on-time share, tickets never bumped.

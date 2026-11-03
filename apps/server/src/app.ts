@@ -6,6 +6,7 @@ import { sessionAuth, type Authenticator } from './auth/authenticate.js';
 import { commandRegistry } from './commands/registry.js';
 import { DEFAULT_ALLOWED_ORIGINS } from './config.js';
 import type { CommandRegistry } from './core/command-handler.js';
+import type { DeviceKind } from './core/context.js';
 import { PosError } from './core/errors.js';
 import { EventBus, noopPrintWaker, type PrintWaker } from './core/events.js';
 import { roleRights, type RightsPolicy } from './core/rights.js';
@@ -49,6 +50,8 @@ export interface AppDeps {
   devices?: 'required' | 'off';
   /** Built captain app folder (P3-01); defaults to the repo build or the bundle's web/captain. */
   captainDir?: string;
+  /** Built kitchen display app folder (P4-02); defaults like captainDir. */
+  kdsDir?: string;
   trustLoopback?: boolean;
   /** Backups and restore (P2-08); absent in tests that do not need them. */
   backups?: { scheduler: BackupScheduler; dataDir: string; requestRestart: () => void };
@@ -83,19 +86,23 @@ export function buildApp(deps: AppDeps): DinePosApp {
   // Every request names its device (P2-02): a paired device's token, or the master PC itself (loopback).
   const trustLoopback = deps.trustLoopback ?? true;
   app.decorateRequest('deviceId', null);
+  app.decorateRequest('deviceKind', null);
   if (deps.devices !== 'off') {
     app.addHook('onRequest', (req, _reply, done) => {
       const url = req.url.split('?')[0]!;
       // Public: health, pairing itself, CORS preflight; the stream checks its hello instead.
       if (req.method === 'OPTIONS' || url === '/v1/health' || url === '/v1/stream' || url.startsWith('/v1/pairing-requests')) return done();
-      if (url === '/captain' || url.startsWith('/captain/')) return done(); // the app's files; its API calls carry a token
+      // The apps' files; their API calls carry a token.
+      if (url === '/captain' || url.startsWith('/captain/') || url === '/kds' || url.startsWith('/kds/')) return done();
       if (trustLoopback && isLoopback(req.ip)) {
         req.deviceId = MASTER_DEVICE_ID;
+        req.deviceKind = 'master';
         return done();
       }
       const device = resolveDevice(db, deviceTokenOf(req.headers.authorization));
       if (!device) return done(deviceUnpaired());
       req.deviceId = device.id;
+      req.deviceKind = device.kind;
       touchDevice(db, device.id, now());
       done();
     });
@@ -168,6 +175,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
   deviceRoutes(app, { db, now });
   reportRoutes(app, { db, now, timeZone });
   webAppRoutes(app, 'captain', deps.captainDir ?? defaultWebDir('captain'));
+  webAppRoutes(app, 'kds', deps.kdsDir ?? defaultWebDir('kds'));
   if (deps.backups) backupRoutes(app, { db, now, timeZone, dataDir: deps.backups.dataDir, backups: deps.backups.scheduler, requestRestart: deps.backups.requestRestart });
   streamRoutes(app, hub, allowedOrigins);
   return Object.assign(app, { realtime: hub });
@@ -181,5 +189,7 @@ declare module 'fastify' {
   interface FastifyRequest {
     /** Set by the device check (P2-02); null when devices are off. */
     deviceId: string | null;
+    /** The paired device's kind, or `master` for the master PC itself (P4-02: device rights). */
+    deviceKind: DeviceKind | null;
   }
 }

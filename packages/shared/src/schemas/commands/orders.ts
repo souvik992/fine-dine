@@ -81,6 +81,8 @@ const returnToStock = z.boolean().default(false);
 export const modifyFiredItemSchema = z.object({ orderItemId: ulidSchema, newQty: qty, reason, returnToStock }).strict();
 export const cancelFiredItemSchema = z.object({ orderItemId: ulidSchema, reason, returnToStock }).strict();
 export const reprintKotSchema = z.object({ kotId: ulidSchema }).strict();
+/** P4-02 kitchen display: bump a ticket to ready, to served, or back (recall). */
+export const kotStatusSchema = z.object({ kotId: ulidSchema }).strict();
 export const reprintBillSchema = z.object({ billId: ulidSchema }).strict();
 
 // ---- tables (P2-03): the order moves, never its KOT history ----

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../../../packages/web-shell/src";
 
 /* Same design tokens as the desktop terminal (docs/09), sized for phones: large touch targets, one-handed use. */
 :root {

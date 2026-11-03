@@ -7,6 +7,8 @@ import { cancelFiredItem } from './cancel-fired-item.js';
 import { dayEnd } from './day-end.js';
 import { fireKot } from './fire-kot.js';
 import { importMenu } from './import-menu.js';
+import { markKotReady } from './mark-kot-ready.js';
+import { markKotServed } from './mark-kot-served.js';
 import { mergeTables } from './merge-tables.js';
 import { modifyFiredItem } from './modify-fired-item.js';
 import { moveTable } from './move-table.js';
@@ -19,6 +21,7 @@ import { printBill } from './print-bill.js';
 import { printSampleBill } from './print-sample-bill.js';
 import { printTestPage } from './print-test-page.js';
 import { recordPurchase } from './record-purchase.js';
+import { recallKot } from './recall-kot.js';
 import { reprintBill } from './reprint-bill.js';
 import { requestBill } from './request-bill.js';
 import { reprintKot } from './reprint-kot.js';
@@ -88,6 +91,10 @@ const handlers = [
   cancelFiredItem,
   reprintKot,
   reprintBill,
+  // kitchen display (P4-02)
+  markKotReady,
+  markKotServed,
+  recallKot,
   // tables (P2-03)
   moveTable,
   mergeTables,

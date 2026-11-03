@@ -127,3 +127,42 @@ describe('device pairing', () => {
     expect(await closed).toBe(CLOSE.UNPAIRED);
   });
 });
+
+// P4-02: a kitchen screen works on its pairing alone (docs/06 "no login after pairing"), with one right only.
+describe('device rights (kitchen screens)', () => {
+  function pairKind(kind: 'kds' | 'captain'): { token: string; id: string } {
+    const token = randomBytes(32).toString('base64url');
+    const id = newId();
+    db.prepare('INSERT INTO device (id, name, kind, token_hash, paired_at) VALUES (?, ?, ?, ?, ?)').run(id, `${kind} screen`, kind, deviceTokenHash(token), now().toISOString());
+    return { token, id };
+  }
+  async function firedKot(): Promise<string> {
+    const headers = { ...dev(ownerDevice), 'x-user-session': owner };
+    const opened = await send('OpenTable', { tableId: seedId('table:main:1'), covers: 2 }, headers);
+    if (!opened.body.ok) throw new Error(JSON.stringify(opened.body));
+    const orderId = opened.body.result!.orderId as string;
+    const cmd = async (type: string, payload: unknown, expectedVersion: number) =>
+      (await app.inject({ method: 'POST', url: '/v1/commands', headers, payload: { commandId: newId(), type, payload, orderId, expectedVersion, createdAt: now().toISOString() } })).json<{ result: { kots?: Array<{ id: string }> } }>();
+    await cmd('AddItems', { items: [{ id: newId(), itemId: seedId('item:DM'), qty: 1 }] }, 1);
+    return (await cmd('FireKOT', { all: true }, 2)).result.kots![0]!.id;
+  }
+
+  it('a paired kitchen screen bumps without anyone signed in; audited with the device and no user', async () => {
+    const kotId = await firedKot();
+    const kds = pairKind('kds');
+    const res = await send('MarkKotReady', { kotId }, dev(kds.token));
+    expect(res.body.ok).toBe(true);
+    const audit = db.prepare("SELECT device_id, user_id FROM audit_event WHERE action = 'kot.ready'").get() as { device_id: string; user_id: string | null };
+    expect(audit).toEqual({ device_id: kds.id, user_id: null });
+    expect((await app.inject({ method: 'GET', url: `/v1/kds/tickets?stationId=${seedId('station:kitchen')}`, headers: dev(kds.token) })).statusCode).toBe(200);
+  });
+
+  it('…and nothing else; a phone or terminal still needs a sign-in to bump', async () => {
+    const kotId = await firedKot();
+    const kds = pairKind('kds');
+    expect((await send('OpenTable', { tableId: seedId('table:main:2'), covers: 2 }, dev(kds.token))).body.error?.code).toBe('UNAUTHENTICATED');
+    expect((await send('MarkKotReady', { kotId }, dev(pairKind('captain').token))).body.error?.code).toBe('UNAUTHENTICATED');
+    expect((await send('MarkKotReady', { kotId }, dev(ownerDevice))).body.error?.code).toBe('UNAUTHENTICATED');
+  });
+});
+

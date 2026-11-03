@@ -1,13 +1,16 @@
 import { createHash } from 'node:crypto';
-import { UNPAIRED_DEVICE_ID } from '@dinepos/shared';
+import { UNPAIRED_DEVICE_ID, type Right } from '@dinepos/shared';
 import type { FastifyRequest } from 'fastify';
 import type { Actor } from '../core/context.js';
 import type { Db } from '../db/connection.js';
+import { DEVICE_RIGHTS } from '../core/rights.js';
 import { resolveSession, staffCount } from './sessions.js';
 
 export interface AuthOptions {
   /** First-run setup: allowed without a session while no staff exist. */
   allowWhenNoStaff?: boolean;
+  /** The right the command needs: a device may act alone only when it is one of its DEVICE_RIGHTS (P4-02). */
+  right?: Right;
 }
 
 /** Turns request headers into an Actor, or throws UNAUTHENTICATED. Device tokens (P2-02) add to this later. */
@@ -29,6 +32,9 @@ export function sessionAuth(db: Db, now: () => Date = () => new Date()): Authent
       const token = header(req, 'x-user-session');
       const deviceId = req.deviceId ?? UNPAIRED_DEVICE_ID; // set by the device check (P2-02)
       if (!token && opts.allowWhenNoStaff && staffCount(db) === 0) return { deviceId, userId: null };
+      // A kitchen screen works on its pairing alone (docs/06 KDS: "no login after pairing"); the rights policy
+      // gives such a device only DEVICE_RIGHTS.
+      if (!token && req.deviceKind && opts.right && DEVICE_RIGHTS[req.deviceKind].includes(opts.right)) return { deviceId, userId: null, deviceKind: req.deviceKind };
       const session = resolveSession(db, token, now());
       return {
         deviceId,

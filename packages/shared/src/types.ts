@@ -400,3 +400,43 @@ export interface CashMovementView {
   userName: string | null;
   at: string;
 }
+
+// ---------- kitchen display (P4-02, docs/06 "KDS") ----------
+
+export interface KdsTicketLine {
+  /** On a change slip, the quantity taken off as a negative number. */
+  qty: number;
+  nowQty?: number | null;
+  name: string;
+  course: number;
+  addons: Array<{ name: string; qty: number }>;
+  note?: string | null;
+}
+
+/** A KOT as the kitchen screen shows it: the ticket as printed, plus its timings. */
+export interface KdsTicket {
+  id: string;
+  kotNo: number;
+  kind: 'new' | 'modify' | 'cancel' | 'move_notice';
+  orderId: string;
+  orderType: 'dine_in' | 'takeaway' | 'delivery' | 'online';
+  tableLabel?: string | null;
+  areaName?: string | null;
+  covers?: number | null;
+  captainName?: string | null;
+  firedAt: string;
+  readyAt?: string;
+  lines: KdsTicketLine[];
+  forKotNo?: number | null;
+  reason?: string | null;
+  notice?: string | null;
+}
+
+/** `GET /v1/kds/tickets?stationId=`: today's tickets of one station not yet served, oldest first. */
+export interface KdsBoard {
+  serverTime: string;
+  station: { id: string; name: string };
+  amberMin: number;
+  redMin: number;
+  tickets: KdsTicket[];
+}

@@ -2,6 +2,7 @@
 // bills of the business dates asked for. Void bills never count as sales; they are listed in their own report.
 import { isoInZone, roundHalfUp, type ReportColumn, type ReportInfo, type ReportRow, type ReportTable } from '@dinepos/shared';
 import { PosError } from '../core/errors.js';
+import { getConfig } from '../core/outlet-config.js';
 import type { Db } from '../db/connection.js';
 
 interface Ctx {
@@ -460,7 +461,69 @@ const captains: Def = {
   },
 };
 
-const DEFS: Def[] = [daily, items, categories, areas, tables, gst, payments, cash, discounts, voids, kotChanges, captains];
+// ---------------------------------------------------------------- kitchen
+
+/** "7 min 05 s". */
+const duration = (seconds: number | null) => (seconds === null ? '' : `${Math.floor(seconds / 60)} min ${String(Math.round(seconds) % 60).padStart(2, '0')} s`);
+
+const kitchen: Def = {
+  key: 'kitchen',
+  title: 'Kitchen speed',
+  group: 'Kitchen',
+  description:
+    'Per station, from the kitchen screen bumps (P4-02): tickets, average and slowest time from KOT to ready, how many took longer than the amber time, and tickets never bumped.',
+  build(c) {
+    const amberMin = getConfig(c.db)['kds.amberMin'];
+    const raw = all(
+      c,
+      `SELECT s.name AS station,
+              sum(CASE WHEN k.ready_at IS NOT NULL THEN 1 ELSE 0 END) AS tickets,
+              avg(CASE WHEN k.ready_at IS NOT NULL THEN (julianday(k.ready_at) - julianday(k.fired_at)) * 86400 END) AS avgSec,
+              max(CASE WHEN k.ready_at IS NOT NULL THEN (julianday(k.ready_at) - julianday(k.fired_at)) * 86400 END) AS maxSec,
+              sum(CASE WHEN k.ready_at IS NOT NULL AND (julianday(k.ready_at) - julianday(k.fired_at)) * 1440 > @amber THEN 1 ELSE 0 END) AS late,
+              sum(CASE WHEN k.ready_at IS NULL THEN 1 ELSE 0 END) AS notBumped
+       FROM kot k JOIN station s ON s.id = k.station_id
+       WHERE k.business_date BETWEEN @from AND @to AND k.kind = 'new'
+       GROUP BY s.id ORDER BY s.name COLLATE NOCASE`,
+      { ...params(c), amber: amberMin },
+    );
+    const rows = raw.map((r): ReportRow => ({
+      station: r.station ?? '',
+      tickets: n(r.tickets),
+      avg: duration(r.avgSec === null ? null : n(r.avgSec)),
+      slowest: duration(r.maxSec === null ? null : n(r.maxSec)),
+      late: n(r.late),
+      onTime: n(r.tickets) ? `${Math.round(((n(r.tickets) - n(r.late)) * 100) / n(r.tickets))}%` : '',
+      notBumped: n(r.notBumped),
+    }));
+    const columns = [
+      col('station', 'Station'),
+      col('tickets', 'Tickets bumped', 'int'),
+      col('avg', 'Average to ready'),
+      col('slowest', 'Slowest'),
+      col('late', `Over ${amberMin} min`, 'int'),
+      col('onTime', 'On time'),
+      col('notBumped', 'Never bumped', 'int'),
+    ];
+    const totals = totalsOf(columns, rows);
+    const bumped = n(totals.tickets);
+    const totalSec = raw.reduce((s, r) => s + n(r.avgSec) * n(r.tickets), 0);
+    totals.avg = bumped ? duration(totalSec / bumped) : '';
+    totals.onTime = bumped ? `${Math.round(((bumped - n(totals.late)) * 100) / bumped)}%` : '';
+    return {
+      columns,
+      rows,
+      totals,
+      summary: [
+        { label: 'Average to ready', value: String(totals.avg || '—'), type: 'text' },
+        { label: 'On time', value: String(totals.onTime || '—'), type: 'text' },
+        { label: `Over ${amberMin} min`, value: n(totals.late), type: 'int' },
+      ],
+    };
+  },
+};
+
+const DEFS: Def[] = [daily, items, categories, areas, tables, gst, payments, cash, discounts, voids, kotChanges, captains, kitchen];
 
 export const REPORTS: ReportInfo[] = DEFS.map(({ key, title, group, description }) => ({ key, title, group, description }));
 

@@ -3,11 +3,11 @@ import type { LoginResult, LoginUser, SetupState } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Delete } from 'lucide-react';
 import { useState } from 'react';
-import { useApp } from '../app-context.js';
+import { useShell } from './shell-context.js';
 
-/** Who is taking orders: a name, then the PIN on a big pad (docs/07). */
-export function LoginScreen() {
-  const { api, signIn } = useApp();
+/** Who is signing in: a name, then the PIN on a big pad (docs/07). `question` e.g. "Who is taking orders?". */
+export function LoginScreen({ question }: { question: string }) {
+  const { api, signIn } = useShell();
   const setup = useQuery({ queryKey: ['setup'], queryFn: () => api.get<SetupState>('/v1/setup-state') });
   const [user, setUser] = useState<LoginUser | null>(null);
   const [pin, setPin] = useState('');
@@ -36,7 +36,7 @@ export function LoginScreen() {
     return (
       <main className="px-4 py-6">
         <h1 className="text-center font-display text-2xl font-semibold">{setup.data.outletName}</h1>
-        <p className="mb-5 text-center text-muted-foreground">Who is taking orders?</p>
+        <p className="mb-5 text-center text-muted-foreground">{question}</p>
         <div className="grid grid-cols-2 gap-3">
           {setup.data.users.map((u) => (
             <button key={u.id} className="btn h-20 flex-col gap-0" onClick={() => setUser(u)} aria-label={u.name}>

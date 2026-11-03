@@ -1,0 +1,61 @@
+@import "tailwindcss";
+@source "../../../packages/web-shell/src";
+
+/* Kitchen screen (docs/09 KDS): dark by default against kitchen glare, large type, readable from a step away. */
+:root {
+  --radius: 12px;
+  --background: oklch(19% .012 50);
+  --foreground: oklch(95% .01 80);
+  --card: oklch(25% .014 50);
+  --primary: oklch(72% .16 55);
+  --primary-foreground: oklch(18% .02 50);
+  --secondary: oklch(31% .016 50);
+  --muted-foreground: oklch(72% .02 60);
+  --border: oklch(37% .018 50);
+  --ring: oklch(72% .16 55);
+  --danger: oklch(62% .21 27);
+  --ok: oklch(70% .15 150);
+  --warn: oklch(78% .16 80);
+}
+
+@theme inline {
+  --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-display: Georgia, "Times New Roman", serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  html, body, #root { height: 100%; }
+  html { font-size: 17px; }
+  body { margin: 0; background: var(--background); color: var(--foreground); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
+  button, input { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  button:disabled { opacity: .5; }
+  :focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+}
+
+@layer components {
+  .btn { @apply inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-base font-semibold active:bg-secondary; }
+  .btn-primary { @apply border-transparent bg-primary text-primary-foreground; }
+  .input { @apply h-12 w-full rounded-lg border border-border bg-card px-3 text-base outline-none focus:border-ring; }
+  .tab { @apply h-10 shrink-0 rounded-full px-4 text-sm font-semibold text-muted-foreground; }
+  .tab[aria-selected="true"] { @apply bg-foreground text-background; }
+  /* Ticket age (docs/06): colour is never the only signal; the age is always written on the ticket too. */
+  .ticket { @apply flex flex-col overflow-hidden rounded-xl border-2 bg-card; border-color: var(--border); }
+  .ticket[data-level="amber"] { border-color: var(--warn); }
+  .ticket[data-level="amber"] .ticket-head { background: color-mix(in oklch, var(--warn) 30%, var(--card)); }
+  .ticket[data-level="red"] { border-color: var(--danger); }
+  .ticket[data-level="red"] .ticket-head { background: color-mix(in oklch, var(--danger) 35%, var(--card)); }
+}
