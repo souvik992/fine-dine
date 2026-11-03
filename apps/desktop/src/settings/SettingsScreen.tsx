@@ -1,5 +1,5 @@
 import type { Right } from '@dinepos/shared';
-import { ArrowLeft, ChefHat, DatabaseBackup, KeyRound, LayoutGrid, MapPinned, MonitorSmartphone, ShoppingBag, ReceiptText, Store, Users, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, ChefHat, CloudUpload, DatabaseBackup, KeyRound, LayoutGrid, MapPinned, MonitorSmartphone, ShoppingBag, ReceiptText, Store, Users, UtensilsCrossed } from 'lucide-react';
 import { useState, type ComponentType } from 'react';
 import { useApp } from '../app-context.js';
 import { UserBadge } from '../components/UserBadge.js';
@@ -11,12 +11,13 @@ import { KitchenSettings } from './KitchenSettings.js';
 import { MenuSettings } from './MenuSettings.js';
 import { OutletSettings } from './OutletSettings.js';
 import { CaptainSections } from './CaptainSections.js';
+import { CloudSyncSettings } from './CloudSyncSettings.js';
 import { LicenceSettings } from './LicenceSettings.js';
 import { OnlineSettings } from './OnlineSettings.js';
 import { StaffSettings } from './StaffSettings.js';
 import { TerminalSettings } from './TerminalSettings.js';
 
-type SectionKey = 'outlet' | 'bill' | 'backups' | 'devices' | 'floor' | 'menu' | 'kitchen' | 'staff' | 'sections' | 'licence' | 'online' | 'terminal';
+type SectionKey = 'outlet' | 'bill' | 'backups' | 'devices' | 'floor' | 'menu' | 'kitchen' | 'staff' | 'sections' | 'licence' | 'online' | 'sync' | 'terminal';
 
 const SECTIONS: Array<{ key: SectionKey; label: string; hint: string; icon: ComponentType<{ className?: string }>; right: Right | null }> = [
   { key: 'outlet', label: 'Outlet & bills', hint: 'Name, GSTIN, bill number, round-off, UPI', icon: Store, right: 'admin' },
@@ -29,6 +30,7 @@ const SECTIONS: Array<{ key: SectionKey; label: string; hint: string; icon: Comp
   { key: 'staff', label: 'Staff & roles', hint: 'People, PINs, rights and discount limits', icon: Users, right: 'users.manage' },
   { key: 'sections', label: 'Captain sections', hint: 'Who looks after which areas and tables', icon: MapPinned, right: 'staff.sections' },
   { key: 'online', label: 'Online orders', hint: 'Order hub, delivery, charges, hours', icon: ShoppingBag, right: 'admin' },
+  { key: 'sync', label: 'Cloud sync', hint: 'Sales sent to the hub; licence renewals', icon: CloudUpload, right: 'admin' },
   { key: 'licence', label: 'Licence', hint: 'Key, end date, seats; this PC’s hardware id', icon: KeyRound, right: 'admin' },
   { key: 'terminal', label: 'This terminal', hint: 'Outlet server address', icon: MonitorSmartphone, right: null },
 ];
@@ -80,6 +82,7 @@ export function SettingsScreen({ onBack, initial }: { onBack: () => void; initia
           {current.key === 'sections' ? <CaptainSections /> : null}
           {current.key === 'licence' ? <LicenceSettings /> : null}
           {current.key === 'online' ? <OnlineSettings /> : null}
+          {current.key === 'sync' ? <CloudSyncSettings /> : null}
           {current.key === 'terminal' ? <TerminalSettings onSaved={onBack} /> : null}
         </main>
       </div>

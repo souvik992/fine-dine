@@ -124,6 +124,7 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
     printQueue.start();
     backups.start();
     app.online.start(); // P4-06: idle unless online orders are on and the outlet is paired with a hub
+    app.sync.start(); // P4-05: sends the outbox to the same hub; idle unless paired
     if (restored) app.log.warn(restored, 'restored a backup; the previous database was kept aside');
     if (!businessDate) app.log.warn({ licence: licence.status(db, now()).state }, 'no business day open: the licence does not allow a new one');
     if (opts.banner) {

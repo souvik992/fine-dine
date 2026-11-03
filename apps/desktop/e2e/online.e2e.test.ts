@@ -15,6 +15,8 @@ const here = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const repo = path.resolve(here, '..', '..');
 const HUB_DIR = process.env.HUB_DIR ?? 'C:\\Users\\PL\\Documents\\pos-backend\\hub';
 const hubThere = existsSync(path.join(HUB_DIR, 'src', 'main.ts')) && Number(process.versions.node.split('.')[0]) >= 24;
+/** P4-05: hubs with the DinePOS sync endpoints (pos-backend branch dinepos-sync and later). */
+const hubSyncs = existsSync(path.join(HUB_DIR, 'src', 'sync.ts'));
 const PORT = 7491;
 const HUB_PORT = 4977;
 const SERVER = `http://127.0.0.1:${PORT}`;
@@ -171,5 +173,20 @@ describe.skipIf(!hubThere)('online orders through the real order hub', () => {
     });
     const status = await get<{ pendingActions: number }>('/v1/online');
     expect(status.pendingActions).toBe(0);
+  });
+
+  it.skipIf(!hubSyncs)('cloud sync: the bill reaches the hub owner’s sales view; nothing is left waiting', async () => {
+    const day = await until(async () => {
+      const r = await fetch(`${HUB}/v1/admin/stores/spice/sales`, { headers: { 'x-admin-key': ADMIN_KEY } });
+      const j = (await r.json()) as { days?: Array<{ businessDate: string; closed: boolean; bills: number; netSalesPaise: number }> };
+      return j.days?.[0] && j.days[0].bills >= 1 ? j.days[0] : null;
+    });
+    expect(day.closed).toBe(false);
+    expect(day.netSalesPaise).toBeGreaterThan(0);
+    const sync = await until(async () => {
+      const s = await get<{ state: string; pending: number; paired: boolean }>('/v1/sync');
+      return s.pending === 0 && s.state === 'idle' ? s : null;
+    });
+    expect(sync.paired).toBe(true);
   });
 });

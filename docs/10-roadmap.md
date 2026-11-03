@@ -108,5 +108,5 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
 - [x] **P4-03 Reports v1**: day-end, item-wise, category-wise, GST summary, payment modes, discounts,
   cancelled/void, KOT modifications, area-wise, table turnover, cash register.
 - [x] **P4-04 Reservations + waitlist (blocks tables)**
-- [ ] **P4-05 Cloud sync agent (outbox up, menu/licence down)**
+- [x] **P4-05 Cloud sync agent (outbox up, menu/licence down)**
 - [x] **P4-06 Online orders relay (own website first)**

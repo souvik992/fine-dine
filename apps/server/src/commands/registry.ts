@@ -21,6 +21,9 @@ import { dayEnd } from './day-end.js';
 import { fireKot } from './fire-kot.js';
 import { importMenu } from './import-menu.js';
 import { installLicence } from './install-licence.js';
+import { recordSyncAck } from './record-sync-ack.js';
+import { renewLicence } from './renew-licence.js';
+import { resetSyncStream } from './reset-sync-stream.js';
 import { leaveWaitlist } from './leave-waitlist.js';
 import { markKotReady } from './mark-kot-ready.js';
 import { markKotServed } from './mark-kot-served.js';
@@ -138,6 +141,10 @@ const handlers = [
   recordHubAction,
   recordOnlinePublish,
   noteOnlineOrder,
+  // cloud sync (P4-05): reset by the admin; the rest internal to the sync agent
+  resetSyncStream,
+  recordSyncAck,
+  renewLicence,
   // billing + day
   printBill,
   splitBill,

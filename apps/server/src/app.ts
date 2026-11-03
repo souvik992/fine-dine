@@ -1,6 +1,8 @@
 import { newId } from '@dinepos/shared';
 import { OnlineConnector, SYSTEM_ACTOR, type Execute } from './online/connector.js';
 import { onlineRoutes } from './routes/online.js';
+import { syncRoutes } from './routes/sync.js';
+import { SyncAgent } from './sync/sync-agent.js';
 import { executeCommand, type ExecuteDeps } from './core/execute-command.js';
 import fastifyCors from '@fastify/cors';
 import fastifyWebsocket from '@fastify/websocket';
@@ -63,7 +65,7 @@ export interface AppDeps {
   backups?: { scheduler: BackupScheduler; dataDir: string; requestRestart: () => void };
   /** P2-09: the licence check (default: not enforced, as in tests). */
   licence?: LicenceGate;
-  /** P4-06: how the connector reaches the order hub (tests pass a fake). */
+  /** P4-06 / P4-05: how the connector and the sync agent reach the order hub (tests pass a fake). */
   onlineFetch?: typeof fetch;
 }
 
@@ -74,7 +76,7 @@ export const LOG_REDACT = [
   'req.headers["x-manager-pin"]',
 ];
 
-export type DinePosApp = FastifyInstance & { realtime: RealtimeHub; online: OnlineConnector };
+export type DinePosApp = FastifyInstance & { realtime: RealtimeHub; online: OnlineConnector; sync: SyncAgent };
 
 /** Builds the HTTP app without listening, so tests can use `app.inject()`. */
 export function buildApp(deps: AppDeps): DinePosApp {
@@ -184,10 +186,14 @@ export function buildApp(deps: AppDeps): DinePosApp {
   const execute: Execute = (type, payload, actor = SYSTEM_ACTOR) =>
     executeCommand(executeDeps, { commandId: newId(), type, payload, createdAt: now().toISOString() }, actor);
   const online = new OnlineConnector({ db, now, execute, bus, ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}), log: { info: (m, d) => app.log.info(d ?? {}, m), warn: (m, d) => app.log.warn(d ?? {}, m) } });
+  // P4-05: the outbox sent up to the same hub, licence renewals fetched down. Started by the server; idle unless paired.
+  const sync = new SyncAgent({ db, now, execute, bus, ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}), log: { info: (m, d) => app.log.info(d ?? {}, m), warn: (m, d) => app.log.warn(d ?? {}, m) } });
   app.addHook('onClose', async () => {
     await online.stop();
+    await sync.stop();
   });
   onlineRoutes(app, { db, now, connector: online, execute, ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}) });
+  syncRoutes(app, { db, now, agent: sync });
   sessionRoutes(app, { db, now, timeZone });
   stockRoutes(app, { db, now });
   cashierRoutes(app, { db, now });
@@ -197,7 +203,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
   webAppRoutes(app, 'kds', deps.kdsDir ?? defaultWebDir('kds'));
   if (deps.backups) backupRoutes(app, { db, now, timeZone, dataDir: deps.backups.dataDir, backups: deps.backups.scheduler, requestRestart: deps.backups.requestRestart });
   streamRoutes(app, hub, allowedOrigins);
-  return Object.assign(app, { realtime: hub, online });
+  return Object.assign(app, { realtime: hub, online, sync });
 }
 
 function errorBody(code: string, message: string, details?: unknown) {

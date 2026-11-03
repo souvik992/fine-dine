@@ -65,7 +65,7 @@ export const voidBill = defineCommand({
       reason: p.reason,
       leakage: true,
     });
-    ctx.outbox('bill.voided', { billId: bill.id, orderId: o.id, billNo: stored?.bill_no_text ?? null, totalPaise: bill.total_paise, reason: p.reason });
+    ctx.outbox('bill.voided', { billId: bill.id, orderId: o.id, billNo: stored?.bill_no_text ?? null, totalPaise: bill.total_paise, reason: p.reason, businessDate: ctx.businessDate });
     emitTableState(ctx, o.table_id);
     return { result: { billId: bill.id, billNo: stored?.bill_no_text ?? null, refundPaise: payments.reduce((s, x) => s + x.amount_paise, 0), orderState: nextState } };
   },

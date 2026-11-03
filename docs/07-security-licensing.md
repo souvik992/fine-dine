@@ -88,6 +88,8 @@ Built in P2-09 (product owner's decisions 2026-11-03: **no key → billing canno
   server start, not after Day end (which still closes the day and prints the Z-report). A day already open is
   never stopped. Commands then fail `DAY_CLOSED` with the licence message (`details.reason = 'licence'`).
   Installing a valid key (`InstallLicence`, right `admin`; the key is not written to the audit log) opens the day.
+- Renewals (P4-05): a key the vendor puts on the hub is fetched hourly and installed by `RenewLicence` when it is
+  genuine, for this PC and ends later than the installed key (never shortens a licence; audited `licence.renew`).
 - The clock: the server remembers the latest time it has seen (`licence.last_seen_at`); setting the PC clock back
   does not extend a licence.
 - Seats at `PairDevice`: terminals count the master PC; revoked devices free their seat; over the limit →

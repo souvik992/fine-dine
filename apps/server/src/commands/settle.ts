@@ -66,7 +66,7 @@ export function settleBill(ctx: CommandContext, o: OrderRow, billId: string, ten
     reason: complimentary ? tenders.find((t) => t.mode === 'complimentary')!.ref : null,
     leakage: complimentary,
   });
-  ctx.outbox('bill.settled', { billId: bill.id, orderId: o.id, totalPaise: total, tenders: tenders.map((t) => ({ mode: t.mode, amountPaise: t.amountPaise })), changePaise: change });
+  ctx.outbox('bill.settled', { billId: bill.id, orderId: o.id, totalPaise: total, tenders: tenders.map((t) => ({ mode: t.mode, amountPaise: t.amountPaise })), changePaise: change, businessDate: ctx.businessDate });
   emitTableState(ctx, o.table_id);
   return { billId: bill.id, paidPaise: paid, changePaise: change, unpaidParts };
 }

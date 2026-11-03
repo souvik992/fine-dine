@@ -82,12 +82,29 @@ Built in P3-03 (captain app; the desktop terminals still need the server, see be
 - Dead hardware: restore latest backup on another PC, run "Promote to master" (manager PIN); clients
   re-discover via mDNS or new IP. Never run two masters.
 
-## Cloud sync (Phase 4)
-- Up: sync agent drains `outbox` by `seq` → `POST {cloud}/sync/batches` `{outletId, fromSeq, events[]}`,
-  signed with the licence key. Cloud acks highest seq; agent marks `sent_at`.
-- Down: long-poll/WS from cloud for menu documents (versioned), licence renewals, online orders.
-  Applied on the master as normal commands (audited).
-- Cloud is never required for billing.
+## Cloud sync (P4-05)
+The "cloud" is the order hub (pos-backend `hub/`, `src/sync.ts`); the outlet uses the **same pairing** as online
+orders (Settings › Online orders), so one connection link sets up both. The agent is `apps/server/src/sync/sync-agent.ts`.
+- **Up.** The outbox (`day.closed`, `bill.printed`, `bill.settled`, `bill.voided`; bill payloads carry `businessDate`)
+  is sent in `seq` order: `POST {hub}/v1/pos/sync/batches` `{streamId, fromSeq, events[{seq, kind, payload, createdAt}]}`,
+  at most 200 rows / ~1 MB per batch, authenticated with the hub device key (Bearer). The licence key is public, so it
+  is not used to authenticate. The hub answers `{ackSeq}` (the highest seq it holds); `RecordSyncAck` marks those rows
+  `sent_at`. Sent on start, ~1 s after any committed command, every 30 s, and on Settings › Cloud sync › Sync now.
+- **Streams.** Each outlet database has its own `sync_state.stream_id` (migration 0013); the hub keeps (store, stream,
+  seq). Resending is harmless (same seq, same content). Hub answers:
+  `SYNC_GAP {ackSeq}` (the hub lost records, e.g. restored) → `RecordSyncAck` with `rewind` and send again (≤ 3 per run);
+  `SYNC_CONFLICT` (different content under a seq it holds: this database was restored or copied) → the agent stops and
+  Settings shows **Start a new sync stream** (`ResetSyncStream`, admin): unsent rows go up under the new stream; nothing
+  is deleted on either side. The hub's sales view counts each bill id and each business day once.
+- **Down: licence renewals.** The vendor pastes a renewed key on the hub's store page; the agent fetches
+  `GET /v1/pos/licence` hourly (and on Sync now) and runs `RenewLicence`, which installs it only if it is genuine, for
+  this PC and ends later. The result is shown in Settings › Cloud sync.
+- **Down: menu documents — not done, on purpose.** The menu is owned and edited on the outlet (DinePOS publishes it to
+  the hub for online orders, P4-06); the hub has no menu editor, so there is nothing to bring down. Revisit with a
+  multi-outlet head-office menu. Online orders come down over the P4-06 event stream.
+- **Status:** `GET /v1/sync` (state idle / sending / offline / stuck / not-paired, rows waiting, last sent, last error,
+  licence check); `POST /v1/sync/run` (admin).
+- The hub is never required for billing: while it cannot be reached the outbox only grows (`idx_outbox_unsent`).
 
 ## Online orders through the order hub (P4-06)
 The hub (`pos-backend/hub`, contract v1 in `pos-backend/contract`) owns online orders and their states; DinePOS owns the

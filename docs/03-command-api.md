@@ -73,6 +73,7 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 | `CancelOnlineOrder` | onlineOrderId, reason | bill.void | per role | voids the bill; outbox `state` CANCELLED | |
 | `UnlinkOnlineHub` | — | admin | | forgets the hub link (refused while orders are open) | |
 | `InstallLicence` | key | admin | | licence row; opens a business day when none is open (P2-09) | |
+| `ResetSyncStream` | — | admin | | new `sync_state.stream_id` after the hub reports a conflict (P4-05); nothing deleted | |
 | `CreateReservation` / `UpdateReservation` | guestName, phone?, partySize, startsAt, durationMin, tableIds[], note? | reservation.manage | | booking rows, `reservations.changed` | |
 | `CloseReservation` | reservationId, outcome: cancelled \| no_show | reservation.manage | | status | |
 | `SeatReservation` | reservationId, tableId?, covers? | order.create | | new order (as OpenTable), booking seated | |
@@ -285,6 +286,12 @@ type OrderSnapshot = {
   totals: { subtotalPaise: number; taxPaise: number; totalPaise: number };
 };
 ```
+
+### Cloud sync (P4-05; schemas in `packages/shared/src/sync.ts`)
+- **Internal commands**: `RecordSyncAck {streamId, ackSeq, rewind?}` marks outbox rows up to `ackSeq` sent (with `rewind`,
+  later rows unsent again; audited as `sync.rewind`; an ack for an old stream is ignored). `RenewLicence {key}`
+  installs a key fetched from the hub like `InstallLicence` (audited `licence.renew`), only if it is for this PC and
+  ends later than the installed key.
 
 ### Online orders (P4-06; schemas in `packages/shared/src/online.ts`)
 - **Internal commands** (`internal: true`): `ApplyHubEvent`, `RecordHubAction`, `RecordOnlinePublish`, `SaveOnlineLink`,

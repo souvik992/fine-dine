@@ -170,7 +170,7 @@ export const printBill = defineCommand({
       reason: overLimit ? 'discount above role limit (manager PIN)' : null,
       leakage: overLimit,
     });
-    ctx.outbox('bill.printed', { billId, orderId: o.id, billNo: billNoText, totalPaise: breakup.total });
+    ctx.outbox('bill.printed', { billId, orderId: o.id, billNo: billNoText, totalPaise: breakup.total, businessDate: ctx.businessDate });
     emitTableState(ctx, o.table_id);
     return {
       result: {
