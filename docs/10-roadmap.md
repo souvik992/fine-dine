@@ -95,7 +95,7 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
 
 ## Phase 3 â€” Captain app
 
-- [ ] **P3-01 Captain PWA shell served at /captain** (pairing, PIN login, tables list)
+- [x] **P3-01 Captain PWA shell served at /captain** (pairing, PIN login, tables list)
 - [ ] **P3-02 Order taking + course-wise firing**
 - [ ] **P3-03 Offline outbox + replay + "Needs attention" list** (`05-sync-offline.md`)
 - [ ] **P3-04 Captain assignment to areas/tables + Request bill notification**

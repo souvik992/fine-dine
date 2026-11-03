@@ -5,9 +5,11 @@ import { newId, type CommandResponse, type LoginResult, type SetupState } from '
 import { DEV_OWNER, devSeedCommands, devSetupCommand } from './dev-seed.js';
 
 const server = (process.env.DINEPOS_URL ?? 'http://127.0.0.1:7420').replace(/\/$/, '');
+/** From another PC (or a server that does not trust loopback): a paired device token (P2-02). */
+const device: Record<string, string> = process.env.DINEPOS_DEVICE_TOKEN ? { authorization: `Device ${process.env.DINEPOS_DEVICE_TOKEN}` } : {};
 
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${server}${path}`, init);
+  const res = await fetch(`${server}${path}`, { ...init, headers: { ...(init?.headers as Record<string, string> | undefined), ...device } });
   const body = (await res.json()) as T & { ok?: boolean; error?: { code: string; message: string } };
   if (!res.ok) throw new Error(`${path}: ${body.error?.code ?? res.status} ${body.error?.message ?? ''}`);
   return body;
@@ -44,7 +46,7 @@ async function main(): Promise<void> {
     if (body.result.created === true) created++;
     else if (body.result.created === false) updated++;
   }
-  await fetch(`${server}/v1/session`, { method: 'DELETE', headers: { 'x-user-session': session.token } });
+  await fetch(`${server}/v1/session`, { method: 'DELETE', headers: { 'x-user-session': session.token, ...device } });
   console.warn(`Seed done against ${server}: ${created} created, ${updated} already present (updated in place).`);
   console.warn('Demo sign-in PINs (development only): owner 1234, manager 2345, cashier 1111, captain 3333.');
 }

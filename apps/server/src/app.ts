@@ -20,6 +20,7 @@ import { stockRoutes } from './routes/stock.js';
 import { cashierRoutes } from './routes/cashier.js';
 import { deviceRoutes } from './routes/devices.js';
 import { reportRoutes } from './routes/reports.js';
+import { defaultWebDir, webAppRoutes } from './routes/web-apps.js';
 import { deviceTokenOf, deviceUnpaired, isLoopback, MASTER_DEVICE_ID, resolveDevice, touchDevice } from './auth/devices.js';
 import { backupRoutes } from './routes/backups.js';
 import type { BackupScheduler } from './backup/scheduler.js';
@@ -46,6 +47,8 @@ export interface AppDeps {
    * that predate pairing. The master PC (loopback) is trusted unless `trustLoopback` is false (tests).
    */
   devices?: 'required' | 'off';
+  /** Built captain app folder (P3-01); defaults to the repo build or the bundle's web/captain. */
+  captainDir?: string;
   trustLoopback?: boolean;
   /** Backups and restore (P2-08); absent in tests that do not need them. */
   backups?: { scheduler: BackupScheduler; dataDir: string; requestRestart: () => void };
@@ -85,6 +88,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
       const url = req.url.split('?')[0]!;
       // Public: health, pairing itself, CORS preflight; the stream checks its hello instead.
       if (req.method === 'OPTIONS' || url === '/v1/health' || url === '/v1/stream' || url.startsWith('/v1/pairing-requests')) return done();
+      if (url === '/captain' || url.startsWith('/captain/')) return done(); // the app's files; its API calls carry a token
       if (trustLoopback && isLoopback(req.ip)) {
         req.deviceId = MASTER_DEVICE_ID;
         return done();
@@ -163,6 +167,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
   cashierRoutes(app, { db, now });
   deviceRoutes(app, { db, now });
   reportRoutes(app, { db, now, timeZone });
+  webAppRoutes(app, 'captain', deps.captainDir ?? defaultWebDir('captain'));
   if (deps.backups) backupRoutes(app, { db, now, timeZone, dataDir: deps.backups.dataDir, backups: deps.backups.scheduler, requestRestart: deps.backups.requestRestart });
   streamRoutes(app, hub, allowedOrigins);
   return Object.assign(app, { realtime: hub });

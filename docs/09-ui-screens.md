@@ -131,6 +131,11 @@ The button shows how many materials are low or need a count. Tabs:
 - Order screen: category chips, item list with + buttons, held basket at bottom with course tags.
 - Actions: Fire all / Fire course N, Request bill (notifies desk), Add note, Covers.
 - Offline banner and pending-command counter.
+- Built in P3-01 (`apps/captain`, served by the outlet server at `http://<master>:7420/captain`): **Pair this phone**
+  (name + 6-digit code; not shown on the master PC itself) → **Who is taking orders?** (name tiles, big PIN pad) →
+  **Tables** (area tabs, live states, covers, time at the table, amount; offline banner; Lock). A free table opens
+  a **Seat** sheet (guests stepper); an occupied one shows its order read-only until order taking (P3-02). Installable
+  (web app manifest); a service worker keeps the app shell through Wi-Fi blips.
 
 ## KDS PWA
 - Station selector on first run. Ticket columns, age colours, bump on tap, all-day counts sidebar.

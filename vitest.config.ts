@@ -9,6 +9,7 @@ export default defineConfig({
     alias: {
       '@dinepos/shared': src('shared'),
       '@dinepos/printing': src('printing'),
+      '@dinepos/client': src('client'),
     },
   },
   test: {

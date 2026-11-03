@@ -20,3 +20,13 @@ IndexedDB outbox (`idb` library). Allowed offline: OpenTable, AddItems, Update/R
 ## Notes
 - Service worker caches the app shell and the last menu snapshot.
 - Large touch targets (min 48 px), works one-handed, works in Hindi/Bengali (i18n JSON files).
+
+## Built (P3-01)
+- `npm run build -w @dinepos/captain` → `dist/`, served by the server at `/captain` (`apps/server/src/routes/web-apps.ts`;
+  in the installer: `resources/server/web/captain`, copied by the server bundle script). `npm run dev -w @dinepos/captain`
+  serves it on :5174 with the API proxied to :7420.
+- Uses `@dinepos/client` (the same API client and live stream as the desktop terminal), same origin as the server.
+- `src/app-context.tsx` (device token, sign-in, stream), `src/screens/` (Pair, Login, Tables), `public/sw.js`
+  (app shell cache; the offline outbox is P3-03).
+- End-to-end test: `apps/desktop/e2e/captain.e2e.test.ts` (a phone-sized window pairs, signs in, seats a table and sees
+  a KOT appear live).

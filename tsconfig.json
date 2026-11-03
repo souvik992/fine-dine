@@ -8,10 +8,16 @@
       "path": "packages/printing"
     },
     {
+      "path": "packages/client"
+    },
+    {
       "path": "apps/server"
     },
     {
       "path": "apps/desktop"
+    },
+    {
+      "path": "apps/captain"
     },
     {
       "path": "apps/desktop/electron"

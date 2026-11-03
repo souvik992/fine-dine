@@ -1,0 +1,25 @@
+{
+  "name": "@dinepos/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser clients for the DinePOS outlet server (commands with retries and manager PIN, live stream).",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@dinepos/shared": "0.1.0"
+  }
+}

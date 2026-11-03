@@ -3,10 +3,12 @@
 //   dist-bundle/
 //     server.mjs                         all server + workspace code (esbuild)
 //     migrations/NNNN_*.sql              read at startup next to server.mjs
+//     web/captain/                       the captain phone app, served at /captain (P3-01)
 //     node_modules/better-sqlite3/       native SQLite binding (Node-API prebuild, any Node >= 18)
 //     package.json                       { "type": "module" }
 //
 // The installer adds node.exe (pinned Node runtime) and the service wrapper beside these.
+import { execSync } from 'node:child_process';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -41,6 +43,10 @@ await build({
 });
 
 cpSync(`${root}src/db/migrations`, `${out}migrations`, { recursive: true, filter: (p) => !p.endsWith('.ts') });
+
+// The captain phone app (static files, served by the server at /captain).
+execSync('npm run build -w @dinepos/captain', { cwd: repo, stdio: 'inherit' });
+cpSync(`${repo}apps/captain/dist`, `${out}web/captain`, { recursive: true, filter: (p) => !p.endsWith('.map') });
 
 // better-sqlite3: only what runs (no sources, no build tooling), Windows x64 prebuild.
 const sqlite = `${repo}node_modules/better-sqlite3/`;

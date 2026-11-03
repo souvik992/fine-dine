@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+/* Same design tokens as the desktop terminal (docs/09), sized for phones: large touch targets, one-handed use. */
+:root {
+  --radius: 12px;
+  --background: oklch(96.5% .008 80);
+  --foreground: oklch(26% .03 50);
+  --card: oklch(99.8% .003 80);
+  --primary: oklch(62% .19 42);
+  --primary-foreground: oklch(99% .01 80);
+  --secondary: oklch(94.5% .015 75);
+  --muted-foreground: oklch(52% .03 55);
+  --border: oklch(90% .015 70);
+  --ring: oklch(62% .19 42);
+  --danger: oklch(55% .22 27);
+  --ok: oklch(58% .14 150);
+  --warn: oklch(72% .16 75);
+  --seated: oklch(91% .05 245);
+  --seated-ink: oklch(42% .12 250);
+  --kot: oklch(90% .09 75);
+  --kot-ink: oklch(45% .12 60);
+  --bill: oklch(90% .06 185);
+  --bill-ink: oklch(40% .08 190);
+  --reserved-ink: oklch(48% .16 300);
+  --blocked: oklch(92% .005 80);
+}
+
+@theme inline {
+  --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-display: Georgia, "Times New Roman", serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  html, body, #root { height: 100%; }
+  html { font-size: 16px; }
+  body { margin: 0; background: var(--background); color: var(--foreground); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
+  button, input, [role="tab"] { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  button:disabled { opacity: .55; }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+}
+
+@layer components {
+  .btn { @apply inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-base font-semibold active:bg-secondary; }
+  .btn-primary { @apply border-transparent bg-primary text-primary-foreground; }
+  .input { @apply h-12 w-full rounded-lg border border-border bg-card px-3 text-base outline-none focus:border-ring; }
+  .tab { @apply h-10 shrink-0 rounded-full px-4 text-sm font-semibold text-muted-foreground; }
+  .tab[aria-selected="true"] { @apply bg-foreground text-background; }
+  .tile { @apply flex min-h-24 flex-col justify-between rounded-xl border-2 p-3 text-left active:opacity-80; }
+  .tile-free { @apply border-border bg-card; }
+  .tile-seated { background: var(--seated); border-color: transparent; color: var(--seated-ink); }
+  .tile-kot { background: var(--kot); border-color: transparent; color: var(--kot-ink); }
+  .tile-bill { background: var(--bill); border-color: transparent; color: var(--bill-ink); }
+  .tile-reserved { @apply bg-card border-dashed; border-color: var(--reserved-ink); color: var(--reserved-ink); }
+  .tile-blocked { background: var(--blocked); border-color: transparent; @apply text-muted-foreground; }
+}
