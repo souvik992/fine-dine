@@ -74,6 +74,30 @@ active person must be able to manage staff; changing a PIN, role or active flag 
 - Seats enforced at device pairing.
 - Keygen CLI lives outside this repo (keep the private key off customer machines).
 
+Built in P2-09 (product owner's decisions 2026-11-03: **no key → billing cannot start**; keygen in a separate folder):
+- Key = `base64url(payload JSON).base64url(Ed25519 signature)`; payload `{ v: 1, licensee, hardwareId, issuedAt,
+  expiresAt, seats { terminals, captains, kds }, features }` (`apps/server/src/licence/licence.ts`). The app embeds the
+  public key only (`apps/server/src/licence/public-key.ts`).
+- Keygen: `C:\Users\PL\Documents\dinepos-keygen` (outside the repo; `keygen.mjs init | public | issue | verify`, see
+  its README). Its `keys/` holds the private key: back it up offline; never run `init` again.
+- Hardware id: SHA-256 of Windows MachineGuid + system-drive volume serial, 20 hex digits as `AB12-CD34-EF56-7890-1A2B`
+  (`hardware.ts`), shown in Settings › Licence to send to the vendor.
+- States: `none` (no key), `invalid` (forged, or another PC's), `ok`, `expiring` (≤ 15 days left), `grace` (≤ 7 days
+  after the end), `expired`. Without a valid key — none, invalid, expired — **no new business date opens**: not at
+  server start, not after Day end (which still closes the day and prints the Z-report). A day already open is
+  never stopped. Commands then fail `DAY_CLOSED` with the licence message (`details.reason = 'licence'`).
+  Installing a valid key (`InstallLicence`, right `admin`; the key is not written to the audit log) opens the day.
+- The clock: the server remembers the latest time it has seen (`licence.last_seen_at`); setting the PC clock back
+  does not extend a licence.
+- Seats at `PairDevice`: terminals count the master PC; revoked devices free their seat; over the limit →
+  `INVALID_STATE` (`details.reason = 'seats'`).
+- Enforced by the installed server (the bundle) always, with the embedded key; environment variables cannot change
+  that. A run from source does not enforce ("Development run") unless `DINEPOS_LICENCE_PUBLIC_KEY` (a test key) is
+  set, with optional `DINEPOS_HARDWARE_ID` — the desktop end-to-end suite runs that way.
+- `/v1/health` carries `licence { state, canOpenDay, message, daysLeft }` (terminals show a warning on every screen,
+  the sign-in screen included); `GET /v1/licence` the details, hardware id and seats in use.
+- Not tamper-proof (a determined person can patch a local program); it keeps honest outlets honest.
+
 ## Backups
 - SQLite online backup API (`db.backup()` in better-sqlite3) every 15 min to `backups/`; retain 7 days
   hourly + 30 days daily; optional second drive/USB path.

@@ -126,7 +126,9 @@ export const dayEnd = defineCommand({
       ctx.actor.userId,
       ctx.nowIso,
     );
-    const next = openNextBusinessDay(db, ctx.timeZone, ctx.now, `day end of ${ctx.businessDate}`);
+    // P2-09: the next date opens only when the licence allows it (closing today is never blocked).
+    const licence = ctx.licence.status(db, ctx.now);
+    const next = licence.canOpenDay ? openNextBusinessDay(db, ctx.timeZone, ctx.now, `day end of ${ctx.businessDate}`) : null;
 
     const printer = billPrinter(db, cfg);
     if (printer) {
@@ -147,6 +149,6 @@ export const dayEnd = defineCommand({
     });
     ctx.emit('system', 'day.changed', { businessDate: next, closedDate: ctx.businessDate });
     ctx.outbox('day.closed', { businessDate: ctx.businessDate, zReport: z });
-    return { result: { closedDate: ctx.businessDate, nextDate: next, zReport: z, printerId: printer?.id ?? null } };
+    return { result: { closedDate: ctx.businessDate, nextDate: next, zReport: z, printerId: printer?.id ?? null, ...(next ? {} : { licence: licence.message }) } };
   },
 });

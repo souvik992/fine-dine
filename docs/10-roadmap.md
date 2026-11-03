@@ -83,7 +83,7 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria �
 - [x] **P2-06 VoidBill + PayIn/PayOut + OpenDrawer** — Accept: void keeps bill number; reports show VOID.
 - [x] **P2-07 Second terminal over LAN + conflict UX** — Accept: two terminals editing T7 never lose an item; conflict banner appears for Move vs PrintBill race.
 - [x] **P2-08 Backups + restore** — Accept: restore from a 15-min backup reproduces open orders.
-- [ ] **P2-09 Licence verification + seats** — Accept: expired key → warning, grace, then DayEnd/new date blocked; seat limit at pairing.
+- [x] **P2-09 Licence verification + seats** — Accept: expired key → warning, grace, then DayEnd/new date blocked; seat limit at pairing.
 - [x] **P2-10 Stock: materials, purchases, recipes, wastage, usage** (added 2026-11-02 at the product owner's request, from
   TiffinPOS; `02-domain-model.md` "Stock", ADR-0003) — Accept: ledger = cached balance; FireKOT uses variant/item/add-on
   recipes; purchase void reverses stock and cost; usage report opening + in − out = closing; stock.manage enforced.

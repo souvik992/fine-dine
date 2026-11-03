@@ -60,3 +60,7 @@ export const setCaptainSectionSchema = z
   })
   .strict()
   .refine((p) => new Set(p.areaIds).size === p.areaIds.length && new Set(p.tableIds).size === p.tableIds.length, { message: 'an area or table appears twice' });
+
+/** P2-09: a licence key from the vendor, pasted in Settings › Licence. */
+export const installLicenceSchema = z.object({ key: z.string().trim().min(40).max(4000) }).strict();
+

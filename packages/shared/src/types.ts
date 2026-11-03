@@ -499,3 +499,26 @@ export interface Waitlist {
   serverTime: string;
   entries: WaitlistEntry[];
 }
+
+// ---------- licence (P2-09, docs/07) ----------
+
+export type LicenceState = 'dev' | 'none' | 'invalid' | 'ok' | 'expiring' | 'grace' | 'expired';
+
+/** `GET /v1/licence`. `/v1/health` carries `state`, `canOpenDay`, `message` and `daysLeft` only. */
+export interface LicenceInfo {
+  state: LicenceState;
+  /** May a new business date open (a day already open is never stopped). */
+  canOpenDay: boolean;
+  message: string;
+  /** False in development runs. */
+  enforced: boolean;
+  /** This PC's id, to send to the vendor for a key. */
+  hardwareId: string;
+  licensee?: string;
+  expiresAt?: string;
+  daysLeft?: number;
+  graceEndsAt?: string;
+  seats?: { terminals: number; captains: number; kds: number };
+  used: { terminals: number; captains: number; kds: number };
+}
+

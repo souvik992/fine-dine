@@ -36,6 +36,8 @@ describe('GET /v1/health', () => {
       timeZone: 'Asia/Kolkata',
       serverTime: '2026-11-02T12:00:00.000+05:30',
       uptimeSec: 60,
+      // P2-09: the licence in brief (not enforced in a development run or a test).
+      licence: { state: 'dev', canOpenDay: true, message: 'Development run: the licence is not enforced.' },
     });
   });
 

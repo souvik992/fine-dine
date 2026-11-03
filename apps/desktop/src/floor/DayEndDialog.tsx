@@ -23,7 +23,7 @@ export function DayEndDialog({ floor, onClose }: { floor: FloorSnapshot; onClose
   const [cash, setCash] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ z: ZSummary; nextDate: string } | null>(null);
+  const [done, setDone] = useState<{ z: ZSummary; nextDate: string | null; licence?: string } | null>(null);
   const openTables = floor.tables.filter((t) => t.orderId);
   const counted = rupeesToPaise(cash);
 
@@ -32,8 +32,8 @@ export function DayEndDialog({ floor, onClose }: { floor: FloorSnapshot; onClose
     setBusy(true);
     setError(null);
     try {
-      const res = await api.command<{ zReport: ZSummary; nextDate: string }>('DayEnd', { cashCountedPaise: counted });
-      setDone({ z: res.result.zReport, nextDate: res.result.nextDate });
+      const res = await api.command<{ zReport: ZSummary; nextDate: string | null; licence?: string }>('DayEnd', { cashCountedPaise: counted });
+      setDone({ z: res.result.zReport, nextDate: res.result.nextDate, ...(res.result.licence ? { licence: res.result.licence } : {}) });
       await qc.invalidateQueries();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not close the day.');
@@ -61,7 +61,10 @@ export function DayEndDialog({ floor, onClose }: { floor: FloorSnapshot; onClose
           {row('Cash counted', formatINR(done.z.cashCountedPaise))}
           {row(diff === 0 ? 'Cash matches' : diff > 0 ? 'Cash over' : 'Cash short', formatINR(Math.abs(diff)), diff !== 0)}
         </dl>
-        <p className="mt-3 text-sm text-muted-foreground">The Z-report was sent to the bill printer. New business date: {done.nextDate}.</p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          The Z-report was sent to the bill printer.{' '}
+          {done.nextDate ? `New business date: ${done.nextDate}.` : <span className="font-semibold text-danger">No new business date was opened. {done.licence}</span>}
+        </p>
         <button data-autofocus className="btn btn-primary mt-4 w-full" onClick={onClose}>
           Done
         </button>

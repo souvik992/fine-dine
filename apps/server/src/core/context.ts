@@ -1,3 +1,4 @@
+import type { LicenceGate } from '../licence/gate.js';
 import type { Right } from '@dinepos/shared';
 import type { Db } from '../db/connection.js';
 
@@ -70,6 +71,8 @@ export interface CommandContext {
   /** Server time for this command (one value per command). */
   readonly now: Date;
   readonly nowIso: string;
+  /** P2-09: may a new business date open; seats; verifying a key. */
+  readonly licence: LicenceGate;
   audit(entry: AuditEntry): void;
   emit(topics: string | string[], event: string, data: unknown): void;
   print(job: Omit<PendingPrintJob, 'id'> & { id?: string }): string;

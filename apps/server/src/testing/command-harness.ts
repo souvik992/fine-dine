@@ -1,3 +1,4 @@
+import type { LicenceGate } from '../licence/gate.js';
 import { newId, type CommandSuccess } from '@dinepos/shared';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { commandRegistry } from '../commands/registry.js';
@@ -17,12 +18,20 @@ export interface Harness {
   run(type: string, payload: unknown, opts?: { commandId?: string; rights?: RightsPolicy; actor?: Actor; orderId?: string; expectedVersion?: number }): CommandSuccess;
   fail(type: string, payload: unknown, code: string, opts?: Parameters<Harness['run']>[2]): PosError;
   count(table: string, where?: string): number;
+  /** P2-09: run the following commands with this licence check (default: not enforced). */
+  useLicence(gate: LicenceGate | undefined): void;
+  /** Change the clock for the following commands (default: TEST_NOW). */
+  setNow(now: (() => Date) | undefined): void;
 }
 
 /** Fresh migrated DB with an open business day, per test. Use inside a describe block. */
 export function useHarness(): Harness {
   let db!: Db;
+  let licence: LicenceGate | undefined;
+  let clock: (() => Date) | undefined;
   beforeEach(() => {
+    licence = undefined;
+    clock = undefined;
     db = createTestDb();
     ensureBusinessDay(db, 'Asia/Kolkata', TEST_NOW);
   });
@@ -35,7 +44,8 @@ export function useHarness(): Harness {
     bus: new EventBus(),
     printWaker: noopPrintWaker,
     timeZone: 'Asia/Kolkata',
-    now: TEST_NOW,
+    now: clock ?? TEST_NOW,
+    licence,
   });
 
   const h: Harness = {
@@ -61,6 +71,12 @@ export function useHarness(): Harness {
         return err as PosError;
       }
       throw new Error(`expected ${type} to fail with ${code}`);
+    },
+    useLicence(gate) {
+      licence = gate;
+    },
+    setNow(now) {
+      clock = now;
     },
     count(table, where = '1 = 1') {
       return db.prepare(`SELECT count(*) FROM ${table} WHERE ${where}`).pluck().get() as number;

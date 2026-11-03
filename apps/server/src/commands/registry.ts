@@ -10,6 +10,7 @@ import { createReservation } from './create-reservation.js';
 import { dayEnd } from './day-end.js';
 import { fireKot } from './fire-kot.js';
 import { importMenu } from './import-menu.js';
+import { installLicence } from './install-licence.js';
 import { leaveWaitlist } from './leave-waitlist.js';
 import { markKotReady } from './mark-kot-ready.js';
 import { markKotServed } from './mark-kot-served.js';
@@ -83,6 +84,7 @@ const handlers = [
   upsertRole,
   setCaptainSection,
   pairDevice,
+  installLicence,
   revokeDevice,
   // orders
   openTable,

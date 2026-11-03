@@ -17,7 +17,7 @@ export interface BannerInfo {
   host: string;
   port: number;
   dataDir: string;
-  businessDate: string;
+  businessDate: string | null;
   logFile: string | null;
   lan: string[];
 }
@@ -40,7 +40,7 @@ export function formatBanner(i: BannerInfo): string {
   } else {
     lines.push(`  Other devices:    off (listening on ${i.host} only)`);
   }
-  lines.push(`  Data folder:      ${i.dataDir}`, `  Business date:    ${i.businessDate}`);
+  lines.push(`  Data folder:      ${i.dataDir}`, `  Business date:    ${i.businessDate ?? 'none open (licence: see Settings › Licence)'}`);
   if (i.logFile) lines.push(`  Log file:         ${i.logFile}`);
   lines.push('', '  Keep this window open while the restaurant is working.', '  Close it (or press Ctrl+C) to stop the server safely.', '');
   return lines.join('\n');

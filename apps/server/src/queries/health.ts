@@ -16,6 +16,8 @@ export interface Health {
   uptimeSec: number;
   /** P2-08: newest backup and whether backups are healthy (one in the last hour, no error). */
   backup?: { lastAt: string | null; ageMin: number | null; ok: boolean; error: string | null };
+  /** P2-09: the licence in brief (details: GET /v1/licence). */
+  licence?: { state: string; canOpenDay: boolean; message: string; daysLeft?: number };
 }
 
 export interface HealthDeps {
@@ -24,9 +26,10 @@ export interface HealthDeps {
   now: () => Date;
   startedAt: Date;
   backupStatus?: () => BackupStatus;
+  licence?: () => { state: string; canOpenDay: boolean; message: string; daysLeft?: number };
 }
 
-export function getHealth({ db, timeZone, now, startedAt, backupStatus }: HealthDeps): Health {
+export function getHealth({ db, timeZone, now, startedAt, backupStatus, licence }: HealthDeps): Health {
   const at = now();
   const businessDate = currentBusinessDate(db);
   return {
@@ -39,9 +42,15 @@ export function getHealth({ db, timeZone, now, startedAt, backupStatus }: Health
     serverTime: isoInZone(at, timeZone),
     uptimeSec: Math.max(0, Math.floor((at.getTime() - startedAt.getTime()) / 1000)),
     ...(backupStatus ? { backup: backupHealth(backupStatus()) } : {}),
+    ...(licence ? { licence: brief(licence()) } : {}),
   };
 }
 
 function backupHealth(s: BackupStatus): NonNullable<Health['backup']> {
   return { lastAt: s.last?.at ?? null, ageMin: s.ageMin, ok: s.ageMin !== null && s.ageMin <= 60 && !s.lastError, error: s.lastError ?? s.copyError };
 }
+
+function brief(l: { state: string; canOpenDay: boolean; message: string; daysLeft?: number }): NonNullable<Health['licence']> {
+  return { state: l.state, canOpenDay: l.canOpenDay, message: l.message, ...(l.daysLeft !== undefined ? { daysLeft: l.daysLeft } : {}) };
+}
+

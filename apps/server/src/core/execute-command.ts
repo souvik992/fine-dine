@@ -1,3 +1,4 @@
+import { unenforcedGate, type LicenceGate } from '../licence/gate.js';
 import { createHash } from 'node:crypto';
 import { commandEnvelopeSchema, isoInZone, localDate, newId, type CommandEnvelope, type CommandSuccess } from '@dinepos/shared';
 import type { z } from 'zod';
@@ -22,6 +23,8 @@ export interface ExecuteDeps {
   now?: () => Date;
   /** Called for post-commit failures (they never fail the command). */
   onPostCommitError?: (err: unknown, stage: 'publish' | 'print') => void;
+  /** P2-09: the licence check (default: not enforced, as in development and tests). */
+  licence?: LicenceGate;
 }
 
 interface StoredCommand {
@@ -90,6 +93,9 @@ function runInTransaction(
   // 2. Business day.
   const openDate = currentBusinessDate(db);
   if (openDate === null && !handler.allowWhenDayClosed) {
+    // No day open because the licence does not allow a new one (P2-09): say so, and where to fix it.
+    const licence = (deps.licence ?? unenforcedGate()).status(db, now);
+    if (!licence.canOpenDay) throw new PosError('DAY_CLOSED', licence.message, { reason: 'licence', licence: licence.state });
     throw new PosError('DAY_CLOSED', 'The business day is closed. Open a new day before taking orders.');
   }
   const businessDate = openDate ?? localDate(now, deps.timeZone);
@@ -137,6 +143,7 @@ function runInTransaction(
     timeZone: deps.timeZone,
     now,
     nowIso,
+    licence: deps.licence ?? unenforcedGate(),
     audit: (e) => audits.push(e),
     emit: (topics, event, data) => events.push({ topics: Array.isArray(topics) ? topics : [topics], event, data }),
     print: (job) => {

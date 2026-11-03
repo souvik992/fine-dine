@@ -67,6 +67,7 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 | `SetCovers` / `AssignCaptain` | covers / captainId (null clears) | order.edit | | | |
 | `RequestBill` | — | order.edit | | bill_request row, `bill.requested` on `floor` | |
 | `SetCaptainSection` | userId, areaIds[], tableIds[] | staff.sections | | replaces the captain's section, `floor.changed` | |
+| `InstallLicence` | key | admin | | licence row; opens a business day when none is open (P2-09) | |
 | `CreateReservation` / `UpdateReservation` | guestName, phone?, partySize, startsAt, durationMin, tableIds[], note? | reservation.manage | | booking rows, `reservations.changed` | |
 | `CloseReservation` | reservationId, outcome: cancelled \| no_show | reservation.manage | | status | |
 | `SeatReservation` | reservationId, tableId?, covers? | order.create | | new order (as OpenTable), booking seated | |
@@ -145,6 +146,7 @@ table close with the last part (result `unpaidParts`).
 | `/v1/orders/:id` | `OrderSnapshot` (items with addons, KOTs, bills with paid amount, version, running totals); 404 unknown, 400 not a ULID |
 | `/v1/orders?state=open` | open orders |
 | `/v1/menu?areaId=&since=<version>` | `MenuSnapshot` (active items; the area's price list overrides base/variant prices; with `areaId` also the area's tax `pricingMode`, P3-03) or `{ menuVersion, unchanged: true }` when `since` is current |
+| `/v1/licence` | P2-09: `LicenceInfo` — state, message, licensee, end date, seats and seats in use, this PC's hardware id, enforced |
 | `/v1/reservations?date=` | P4-04: `ReservationDay` — one local date's bookings (default today), every status, with tables, `late` flags and the hold/grace minutes |
 | `/v1/waitlist` | P4-04: guests still waiting, first come first, with `waitedMin` and `quotedMin` |
 | `/v1/kds/tickets?stationId=` | P4-02: `KdsBoard` — station, `amberMin`/`redMin`, today's unserved tickets of the station as printed (docs/06 KDS) |

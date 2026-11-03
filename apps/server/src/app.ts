@@ -7,6 +7,7 @@ import { commandRegistry } from './commands/registry.js';
 import { DEFAULT_ALLOWED_ORIGINS } from './config.js';
 import type { CommandRegistry } from './core/command-handler.js';
 import type { DeviceKind } from './core/context.js';
+import { unenforcedGate, type LicenceGate } from './licence/gate.js';
 import { PosError } from './core/errors.js';
 import { EventBus, noopPrintWaker, type PrintWaker } from './core/events.js';
 import { roleRights, type RightsPolicy } from './core/rights.js';
@@ -15,6 +16,7 @@ import type { PrinterStatus } from './print/print-queue.js';
 import { RealtimeHub, type HubOptions } from './realtime/hub.js';
 import { commandRoutes } from './routes/commands.js';
 import { healthRoutes } from './routes/health.js';
+import { licenceRoutes } from './routes/licence.js';
 import { queryRoutes } from './routes/queries.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { stockRoutes } from './routes/stock.js';
@@ -55,6 +57,8 @@ export interface AppDeps {
   trustLoopback?: boolean;
   /** Backups and restore (P2-08); absent in tests that do not need them. */
   backups?: { scheduler: BackupScheduler; dataDir: string; requestRestart: () => void };
+  /** P2-09: the licence check (default: not enforced, as in tests). */
+  licence?: LicenceGate;
 }
 
 // Secrets never reach the log (docs/07-security-licensing.md).
@@ -153,7 +157,9 @@ export function buildApp(deps: AppDeps): DinePosApp {
     done();
   });
 
-  healthRoutes(app, { db, timeZone, now, startedAt, backupStatus: deps.backups ? () => deps.backups!.scheduler.status() : undefined });
+  const licenceGate = deps.licence ?? unenforcedGate();
+  healthRoutes(app, { db, timeZone, now, startedAt, backupStatus: deps.backups ? () => deps.backups!.scheduler.status() : undefined, licence: () => licenceGate.status(db, now()) });
+  licenceRoutes(app, { db, now, licence: licenceGate });
   queryRoutes(app, { db, timeZone, now, printerStatus: deps.printQueue ? (id) => deps.printQueue!.status(id) : undefined });
   commandRoutes(
     app,
@@ -165,6 +171,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
       rights: deps.rights ?? roleRights,
       bus,
       printWaker: deps.printWaker ?? noopPrintWaker,
+      licence: licenceGate,
       onPostCommitError: (err, stage) => app.log.error({ err, stage }, 'post-commit step failed'),
     },
     deps.auth ?? sessionAuth(db, now),

@@ -7,6 +7,7 @@ import { useApp } from './app-context.js';
 import { LoginScreen } from './auth/LoginScreen.js';
 import { PairScreen } from './auth/PairScreen.js';
 import { ManagerPinDialog } from './auth/ManagerPinDialog.js';
+import { LicenceBanner } from './components/LicenceBanner.js';
 import { SetupScreen } from './auth/SetupScreen.js';
 import { BillingScreen } from './billing/BillingScreen.js';
 import { BookingsScreen } from './bookings/BookingsScreen.js';
@@ -16,16 +17,16 @@ import { SettingsScreen } from './settings/SettingsScreen.js';
 import { ReportsScreen } from './reports/ReportsScreen.js';
 import { StockScreen } from './stock/StockScreen.js';
 
-type Screen = { kind: 'floor' } | { kind: 'settings' } | { kind: 'stock' } | { kind: 'reports' } | { kind: 'bookings' } | { kind: 'order'; orderId: string };
+type Screen = { kind: 'floor' } | { kind: 'settings'; section?: string } | { kind: 'stock' } | { kind: 'reports' } | { kind: 'bookings' } | { kind: 'order'; orderId: string };
 
 export function App() {
-  const { api, session, needsPairing } = useApp();
+  const { api, session, needsPairing, can } = useApp();
   const [screen, setScreen] = useState<Screen>({ kind: 'floor' });
   const toFloor = () => setScreen({ kind: 'floor' });
   // Public: first-run setup or the staff list. Refetched whenever nobody is signed in.
   const setup = useQuery({ queryKey: ['setup-state'], queryFn: () => api.get<SetupState>('/v1/setup-state'), enabled: !session, retry: 1 });
 
-  if (screen.kind === 'settings') return <SettingsScreen onBack={toFloor} />;
+  if (screen.kind === 'settings') return <SettingsScreen onBack={toFloor} initial={screen.section} />;
   if (needsPairing) return <PairScreen onSettings={() => setScreen({ kind: 'settings' })} />;
 
   if (!session) {
@@ -48,7 +49,12 @@ export function App() {
     }
     if (!setup.data) return <p className="mt-24 text-center text-muted-foreground">Connecting…</p>;
     if (setup.data.setupNeeded) return <SetupScreen onDone={toFloor} />;
-    return <LoginScreen state={setup.data} onSettings={() => setScreen({ kind: 'settings' })} />;
+    return (
+      <>
+        <LoginScreen state={setup.data} onSettings={() => setScreen({ kind: 'settings' })} />
+        <LicenceBanner />
+      </>
+    );
   }
 
   return (
@@ -65,6 +71,7 @@ export function App() {
         <FloorScreen onSettings={() => setScreen({ kind: 'settings' })} onStock={() => setScreen({ kind: 'stock' })} onReports={() => setScreen({ kind: 'reports' })} onBookings={() => setScreen({ kind: 'bookings' })} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} />
       )}
       <BillRequests onOpen={(orderId) => setScreen({ kind: 'order', orderId })} hiddenOrderId={screen.kind === 'order' ? screen.orderId : undefined} compact={screen.kind !== 'floor'} />
+      <LicenceBanner onOpen={can('admin') ? () => setScreen({ kind: 'settings', section: 'licence' }) : undefined} />
       <ManagerPinDialog />
     </>
   );

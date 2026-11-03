@@ -7,6 +7,8 @@ import { buildApp, LOG_REDACT } from './app.js';
 import { formatBanner, lanAddresses } from './banner.js';
 import type { ServerConfig } from './config.js';
 import { ensureBusinessDay } from './core/business-day.js';
+import { licenceGateFor } from './licence/from-env.js';
+import type { LicenceGate } from './licence/gate.js';
 import { EventBus } from './core/events.js';
 import { closeDatabase, openDatabase, type Db } from './db/connection.js';
 import { acquireDataDirLock, type DataDirLock } from './db/lock.js';
@@ -23,7 +25,8 @@ export interface RunningServer {
   config: ServerConfig;
   dbPath: string;
   migrations: MigrationResult;
-  businessDate: string;
+  /** Null when no day is open (P2-09: the licence does not allow a new one). */
+  businessDate: string | null;
   bus: EventBus;
   printQueue: PrintQueue;
   /** Base URL actually bound (port 0 resolves to a free port). */
@@ -48,6 +51,8 @@ export interface StartOptions {
   requestRestart?: () => void;
   /** Backup interval; tests use a long one. */
   backupIntervalMs?: number;
+  /** P2-09: the licence check (default: licenceGateFor(), enforced in the installed server). */
+  licence?: LicenceGate;
 }
 
 /** Startup order: data dir → lock → open DB → migrate → open business day → listen → resume print queue. */
@@ -63,7 +68,10 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
     const restored = applyPendingRestore(config.dataDir, config.dbFile, now());
     db = openDatabase(dbPath);
     const migrations = migrate(db, undefined, now);
-    const businessDate = ensureBusinessDay(db, config.timeZone, now);
+    // P2-09: a new business date opens only with a valid licence (a date already open carries on).
+    const licence = opts.licence ?? licenceGateFor();
+    const openedForLicence = db;
+    const businessDate = ensureBusinessDay(db, config.timeZone, now, () => licence.status(openedForLicence, now()).canOpenDay);
 
     const logFile = config.logToFile ? path.join(config.dataDir, 'logs', `server-${localDate(now(), config.timeZone)}.log`) : null;
     const logger = opts.logger ?? {
@@ -109,12 +117,14 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
       allowedOrigins: config.allowedOrigins,
       trustLoopback: config.trustLoopback ?? true,
       backups: { scheduler: backups, dataDir: config.dataDir, requestRestart: opts.requestRestart ?? (() => undefined) },
+      licence,
     });
     logSink.log = (level, msg, data) => app.log[level](data ?? {}, msg);
     const url = await app.listen({ host: config.host, port: config.port });
     printQueue.start();
     backups.start();
     if (restored) app.log.warn(restored, 'restored a backup; the previous database was kept aside');
+    if (!businessDate) app.log.warn({ licence: licence.status(db, now()).state }, 'no business day open: the licence does not allow a new one');
     if (opts.banner) {
       const port = Number(new URL(url).port) || config.port;
       process.stdout.write(formatBanner({ version: SERVER_VERSION, host: config.host, port, dataDir: config.dataDir, businessDate, logFile, lan: lanAddresses() }));

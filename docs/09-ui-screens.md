@@ -126,6 +126,13 @@ The button shows how many materials are low or need a count. Tabs:
 - **Usage report**: business-date range; opening, received, used, wasted, adjusted, closing per material, used
   and wasted value; Download CSV.
 
+## Licence (built in P2-09: Settings › Licence; `apps/desktop/src/settings/LicenceSettings.tsx`)
+- Status (Licensed / Ending soon / Ended: grace period / Ended / Not licensed / Key not valid here) with the message,
+  seats in use of allowed, this PC's hardware id with Copy, and a box to paste and install a key.
+- A warning card on every screen (the sign-in screen too) while the licence ends within 15 days, is in grace, has
+  ended, is missing or not valid here: amber while billing works, red when no new day can start; "Licence" opens
+  the settings for someone with the admin right. Day end says when no new business date was opened, and why.
+
 ## Bookings and waitlist (built in P4-04: `apps/desktop/src/bookings/`; Floor header "Bookings")
 - Header: Today / Tomorrow / a date, **New booking**. Left: bookings to come in time order (time, guest, party, tables,
   phone, length, note, who booked; **Late** after the grace time) with **Seat** (today; free tables, the booked one

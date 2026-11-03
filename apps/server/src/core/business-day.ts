@@ -34,9 +34,12 @@ export function openNextBusinessDay(db: Db, timeZone: string, at: Date, reason: 
   return date;
 }
 
-/** Makes sure exactly one business date is open; returns it. Runs at startup, before any client can connect. */
-export function ensureBusinessDay(db: Db, timeZone: string, now: () => Date = () => new Date()): string {
+/**
+ * Makes sure a business date is open; returns it. Runs at startup, before any client can connect. P2-09: a new date
+ * opens only when the licence allows it (`mayOpen`); a date already open is never closed by a licence. Null = none.
+ */
+export function ensureBusinessDay(db: Db, timeZone: string, now: () => Date = () => new Date(), mayOpen: () => boolean = () => true): string | null {
   return db
-    .transaction(() => currentBusinessDate(db) ?? openNextBusinessDay(db, timeZone, now(), 'server start: no open business date'))
+    .transaction(() => currentBusinessDate(db) ?? (mayOpen() ? openNextBusinessDay(db, timeZone, now(), 'server start: no open business date') : null))
     .immediate();
 }

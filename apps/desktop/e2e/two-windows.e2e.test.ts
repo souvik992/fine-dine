@@ -2,6 +2,7 @@
 // Drives the real Electron app (built renderer on app://dinepos) against a real outlet server process.
 // Run: npm run test:e2e -w @dinepos/desktop (builds first).
 import { spawn, type ChildProcess } from 'node:child_process';
+import { generateKeyPairSync, sign } from 'node:crypto';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -78,10 +79,35 @@ function ulid(): string {
 
 const tileState = (page: Page, label: string) => page.locator(`[data-table="${label}"]`).getAttribute('data-state');
 
+// P2-09: the server checks a licence as the installed one does — here against a test key pair, for a fixed PC id.
+const licenceKeys = generateKeyPairSync('ed25519');
+const HARDWARE_ID = 'E2E0-0000-0000-0000-0001';
+function testLicence(): string {
+  const payload = {
+    v: 1,
+    licensee: 'Spice Garden (E2E)',
+    hardwareId: HARDWARE_ID,
+    issuedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 365 * 86_400_000).toISOString(),
+    seats: { terminals: 3, captains: 4, kds: 2 },
+    features: [],
+  };
+  const body = Buffer.from(JSON.stringify(payload));
+  return `${body.toString('base64url')}.${sign(null, body, licenceKeys.privateKey).toString('base64url')}`;
+}
+let licenceBefore: { businessDate: string | null; licence?: { state: string; canOpenDay: boolean } } | null = null;
+
 describe('desktop app', () => {
   beforeAll(async () => {
     dataDir = mkdtempSync(path.join(tmpdir(), 'dinepos-e2e-'));
-    const serverEnv = cleanEnv({ DATA_DIR: dataDir, DINEPOS_PORT: String(PORT), DINEPOS_HOST: '127.0.0.1', LOG_LEVEL: 'warn' });
+    const serverEnv = cleanEnv({
+      DATA_DIR: dataDir,
+      DINEPOS_PORT: String(PORT),
+      DINEPOS_HOST: '127.0.0.1',
+      LOG_LEVEL: 'warn',
+      DINEPOS_LICENCE_PUBLIC_KEY: licenceKeys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64'),
+      DINEPOS_HARDWARE_ID: HARDWARE_ID,
+    });
     server = PACKAGED
       ? spawn(path.join(unpacked, 'resources', 'server', 'node.exe'), ['server.mjs'], {
           cwd: path.join(unpacked, 'resources', 'server'),
@@ -92,6 +118,11 @@ describe('desktop app', () => {
     await waitForHealth();
     await run(process.execPath, ['--import', 'tsx', 'apps/server/src/seed/cli.ts'], { DINEPOS_URL: SERVER });
     await signInForTest();
+    if (!PACKAGED) {
+      // No key yet: no business day opened. Then the manager installs one (a packaged run needs a real key instead).
+      licenceBefore = (await (await fetch(`${SERVER}/v1/health`)).json()) as typeof licenceBefore;
+      await command('InstallLicence', { key: testLicence() });
+    }
 
     const electron = createRequire(import.meta.url)('electron') as unknown as string;
     app = PACKAGED
@@ -117,6 +148,24 @@ describe('desktop app', () => {
     await page.keyboard.press('Enter');
     await page.waitForSelector('[data-table="T1"]', { timeout: 10_000 });
     expect(await page.getByTestId('signed-in-user').innerText()).toContain('Asha (Owner)');
+  });
+
+  it('Licence (P2-09): no business day until a key was installed; Settings › Licence shows it, this PC’s id and seats', async () => {
+    if (PACKAGED) return;
+    expect(licenceBefore).toMatchObject({ businessDate: null, licence: { state: 'none', canOpenDay: false } });
+    const page = await app.firstWindow();
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('button', { name: /^Licence/ }).click();
+    await page.getByTestId('licence-status').getByText('Licensed', { exact: true }).waitFor();
+    await page.getByTestId('licence-status').getByText(/Spice Garden \(E2E\)/).waitFor();
+    expect(await page.getByTestId('hardware-id').innerText()).toBe(HARDWARE_ID);
+    await page.getByRole('list', { name: 'Seats' }).getByText('1 of 3').waitFor(); // this PC is one terminal
+    // A key for another PC is refused with a reason.
+    await page.getByLabel('Licence key').fill(testLicence().replace(/^[^.]+/, Buffer.from(JSON.stringify({ v: 1, licensee: 'x', hardwareId: '0000-0000-0000-0000-0000', issuedAt: '', expiresAt: '2030-01-01T00:00:00Z', seats: { terminals: 1, captains: 0, kds: 0 }, features: [] })).toString('base64url')));
+    await page.getByRole('button', { name: 'Install key' }).click();
+    await page.getByText(/not genuine|another computer/).waitFor();
+    await page.getByRole('button', { name: 'Floor', exact: true }).click();
+    expect(await page.getByTestId('licence-banner').count()).toBe(0); // licensed: no warning
   });
 
   it('loads on app://dinepos, locked down, showing the seeded floor', async () => {
