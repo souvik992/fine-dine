@@ -153,6 +153,8 @@ export interface FloorTable {
   sectionCaptainIds?: string[];
   /** P3-04: a captain asked for the bill and it is not printed yet. */
   billRequest?: BillRequestInfo;
+  /** P4-04: the table's next booking today (it holds the table, state RESERVED, from `holdMin` before). */
+  booking?: TableBooking;
   /** When the current order was opened. */
   since?: string;
   elapsedMin?: number;
@@ -439,4 +441,61 @@ export interface KdsBoard {
   amberMin: number;
   redMin: number;
   tickets: KdsTicket[];
+}
+
+// ---------- bookings and waitlist (P4-04) ----------
+
+export interface TableBooking {
+  reservationId: string;
+  guestName: string;
+  partySize: number;
+  startsAt: string;
+  /** True while it holds the table (from `holdMin` before until `graceMin` after its time). */
+  holding: boolean;
+}
+
+export type ReservationStatus = 'booked' | 'seated' | 'cancelled' | 'no_show';
+
+export interface Reservation {
+  id: string;
+  guestName: string;
+  phone?: string;
+  partySize: number;
+  startsAt: string;
+  durationMin: number;
+  note?: string;
+  status: ReservationStatus;
+  tables: Array<{ id: string; label: string }>;
+  orderId?: string;
+  createdAt: string;
+  createdByName?: string;
+  /** Booked and past its time + grace: probably a no-show. */
+  late: boolean;
+}
+
+/** `GET /v1/reservations?date=YYYY-MM-DD` (outlet's local date). */
+export interface ReservationDay {
+  date: string;
+  serverTime: string;
+  holdMin: number;
+  graceMin: number;
+  reservations: Reservation[];
+}
+
+export interface WaitlistEntry {
+  id: string;
+  guestName: string;
+  phone?: string;
+  partySize: number;
+  quotedMin?: number;
+  note?: string;
+  joinedAt: string;
+  /** Minutes waited so far. */
+  waitedMin: number;
+}
+
+/** `GET /v1/waitlist`: guests still waiting, first come first. */
+export interface Waitlist {
+  serverTime: string;
+  entries: WaitlistEntry[];
 }

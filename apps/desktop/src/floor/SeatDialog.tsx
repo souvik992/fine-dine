@@ -1,21 +1,32 @@
 import type { FloorTable } from '@dinepos/shared';
 import { newId } from '@dinepos/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Minus, Plus } from 'lucide-react';
+import { CalendarClock, Minus, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { Modal } from '../components/Modal.js';
 
-/** Seat guests at a free table (OpenTable), then open the order. One commandId per dialog, so a double click cannot open twice. */
+export const bookingTime = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+/**
+ * Seat guests at a free table (OpenTable), then open the order. One commandId per dialog, so a double click cannot open
+ * twice. When a booking holds the table (P4-04): are these the booked guests (SeatReservation), or a walk-in seated
+ * anyway (OpenTable with ignoreReservation, audited with whose booking it was)?
+ */
 export function SeatDialog({ table, onClose, onSeated }: { table: FloorTable; onClose: () => void; onSeated: (orderId: string) => void }) {
   const { api } = useApp();
   const qc = useQueryClient();
-  const [covers, setCovers] = useState(Math.min(table.seats ?? 2, 2));
+  const held = table.booking?.holding ? table.booking : null;
+  const [who, setWho] = useState<'booking' | 'walkin'>(held ? 'booking' : 'walkin');
+  const [covers, setCovers] = useState(held ? held.partySize : Math.min(table.seats ?? 2, 2));
   const commandId = useRef(newId());
 
   const seat = useMutation({
-    mutationFn: () => api.command('OpenTable', { tableId: table.id, covers }, { commandId: commandId.current }),
+    mutationFn: () =>
+      held && who === 'booking'
+        ? api.command('SeatReservation', { reservationId: held.reservationId, tableId: table.id, covers }, { commandId: commandId.current })
+        : api.command('OpenTable', { tableId: table.id, covers, ...(held ? { ignoreReservation: true } : {}) }, { commandId: commandId.current }),
     onSuccess: async (res) => {
       await qc.invalidateQueries({ queryKey: ['floor'] });
       onClose();
@@ -33,6 +44,38 @@ export function SeatDialog({ table, onClose, onSeated }: { table: FloorTable; on
           seat.mutate();
         }}
       >
+        {held ? (
+          <fieldset className="mb-4 rounded-lg border-2 border-[var(--reserved-ink)] p-3" data-testid="held-for">
+            <legend className="flex items-center gap-1.5 px-1 text-sm font-semibold">
+              <CalendarClock className="h-4 w-4" /> Held for {held.guestName} ({held.partySize}) at {bookingTime(held.startsAt)}
+            </legend>
+            <label className="flex items-center gap-2 py-1">
+              <input
+                type="radio"
+                name="who"
+                checked={who === 'booking'}
+                onChange={() => {
+                  setWho('booking');
+                  setCovers(held.partySize);
+                  commandId.current = newId();
+                }}
+              />
+              These are {held.guestName}’s guests
+            </label>
+            <label className="flex items-center gap-2 py-1">
+              <input
+                type="radio"
+                name="who"
+                checked={who === 'walkin'}
+                onChange={() => {
+                  setWho('walkin');
+                  commandId.current = newId();
+                }}
+              />
+              A walk-in: seat anyway (the booking will need another table)
+            </label>
+          </fieldset>
+        ) : null}
         <label className="mb-2 block text-sm font-semibold" htmlFor="covers">
           Covers (guests)
         </label>
@@ -69,7 +112,7 @@ export function SeatDialog({ table, onClose, onSeated }: { table: FloorTable; on
             Cancel
           </button>
           <button type="submit" className="btn btn-primary" disabled={seat.isPending}>
-            {seat.isPending ? 'Seating…' : 'Seat guests'}
+            {seat.isPending ? 'Seating…' : held && who === 'booking' ? `Seat ${held.guestName}` : 'Seat guests'}
           </button>
         </div>
       </form>

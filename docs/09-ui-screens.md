@@ -126,6 +126,16 @@ The button shows how many materials are low or need a count. Tabs:
 - **Usage report**: business-date range; opening, received, used, wasted, adjusted, closing per material, used
   and wasted value; Download CSV.
 
+## Bookings and waitlist (built in P4-04: `apps/desktop/src/bookings/`; Floor header "Bookings")
+- Header: Today / Tomorrow / a date, **New booking**. Left: bookings to come in time order (time, guest, party, tables,
+  phone, length, note, who booked; **Late** after the grace time) with **Seat** (today; free tables, the booked one
+  marked), **Change**, **No-show** (when late) and **Cancel**; then the day's done bookings (seated → Open order).
+- Right: the waitlist, first come first, with minutes waited / minutes told (amber in the last 5, red after), **Seat**
+  (free tables; a table held for a booking asks "Seat anyway?") and **Left**; **Add** asks name, phone, guests, wait told.
+- Floor: a table held by a booking is RESERVED and its tile reads "14:00 · Sharma (4)"; later bookings show the same
+  line on a free tile. Seating a held table asks: "These are Sharma's guests" (seats the booking) or "A walk-in: seat
+  anyway". The header button shows bookings still to come and a badge with how many are waiting.
+
 ## Captain PWA (phone/tablet)
 - Login with PIN → My tables (assigned areas first) → table → order screen.
 - Order screen: category chips, item list with + buttons, held basket at bottom with course tags.

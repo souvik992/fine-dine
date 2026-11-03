@@ -1,4 +1,4 @@
-import { ulidSchema, type CaptainSection, type CaptainSections } from '@dinepos/shared';
+import { isIsoDate, localDate, ulidSchema, type CaptainSection, type CaptainSections } from '@dinepos/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { lanAddresses } from '../banner.js';
@@ -7,6 +7,7 @@ import { getConfig } from '../core/outlet-config.js';
 import type { Db } from '../db/connection.js';
 import { getFloor } from '../queries/floor.js';
 import { getKdsBoard } from '../queries/kds.js';
+import { getReservationDay, getWaitlist } from '../queries/reservations.js';
 import { getMenu } from '../queries/menu.js';
 import { getOrderSnapshot } from '../queries/order-snapshot.js';
 import { getPrinters } from '../queries/printers.js';
@@ -63,6 +64,18 @@ export function queryRoutes(app: FastifyInstance, deps: QueryDeps): void {
   app.get('/v1/network', (req, reply) => {
     const port = req.socket.localPort ?? 7420;
     void reply.header('cache-control', 'no-store').send({ urls: lanAddresses().map((ip) => `http://${ip}:${port}`) });
+    return reply;
+  });
+
+  // P4-04: one local date's bookings (default today) and the waitlist.
+  app.get<{ Querystring: { date?: string } }>('/v1/reservations', (req, reply) => {
+    const date = req.query.date ?? localDate(deps.now(), deps.timeZone);
+    if (!isIsoDate(date)) throw new PosError('VALIDATION', 'The date must be YYYY-MM-DD.');
+    void reply.header('cache-control', 'no-store').send(getReservationDay(deps.db, date, deps.now(), deps.timeZone));
+    return reply;
+  });
+  app.get('/v1/waitlist', (_req, reply) => {
+    void reply.header('cache-control', 'no-store').send(getWaitlist(deps.db, deps.now(), deps.timeZone));
     return reply;
   });
 

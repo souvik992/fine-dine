@@ -20,6 +20,7 @@ Endpoint: `GET /v1/stream` (WebSocket). Auth: first message `{ "type": "hello", 
 | `menu.changed` | `menu` | menuVersion, itemIds | all |
 | `stock.changed` | `stock` | stockItemIds (refetch `/v1/stock`) | desktop Stock screen |
 | `bill.requested` | `floor` | orderId, tableId, tableLabel, byName, at (a captain asked for the bill, P3-04) | desktop |
+| `reservations.changed` | `floor`, `reservations` | reservationId? / waitlistEntryId? (P4-04) | desktop |
 | `floor.changed` | `floor` | areaId?, tableId? (layout/config changed; refetch `/v1/floor`) | desktop, captain |
 | `printer.changed` | `printers` | printerId | desktop |
 | `online.order` | `online` | orderId, source | desktop (Phase 4) |

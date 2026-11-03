@@ -119,6 +119,10 @@ export const configSchemas = {
   /** P4-02: a kitchen ticket turns amber, then red, after this many minutes without being bumped. */
   'kds.amberMin': z.number().int().min(1).max(120),
   'kds.redMin': z.number().int().min(2).max(240),
+  /** P4-04: a booking holds its tables from this many minutes before its time… */
+  'reservation.holdMin': z.number().int().min(0).max(240),
+  /** …until this many minutes after it (a no-show then stops blocking the table). */
+  'reservation.graceMin': z.number().int().min(0).max(120),
   /** P2-08: a second folder for backup copies (USB drive, another disk), an absolute path; null = none. */
   'backup.copyDir': z
     .string()

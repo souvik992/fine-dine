@@ -15,6 +15,8 @@ export const openTableSchema = z
     captainId: ulidSchema.nullable().default(null),
     /** Client-made id (offline OpenTable, docs/05); the server makes one when omitted. */
     orderId: ulidSchema.optional(),
+    /** P4-04: seat a walk-in on a table held for a booking anyway (the person was told whose booking it is). */
+    ignoreReservation: z.boolean().default(false),
   })
   .strict();
 

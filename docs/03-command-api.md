@@ -67,6 +67,11 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 | `SetCovers` / `AssignCaptain` | covers / captainId (null clears) | order.edit | | | |
 | `RequestBill` | — | order.edit | | bill_request row, `bill.requested` on `floor` | |
 | `SetCaptainSection` | userId, areaIds[], tableIds[] | staff.sections | | replaces the captain's section, `floor.changed` | |
+| `CreateReservation` / `UpdateReservation` | guestName, phone?, partySize, startsAt, durationMin, tableIds[], note? | reservation.manage | | booking rows, `reservations.changed` | |
+| `CloseReservation` | reservationId, outcome: cancelled \| no_show | reservation.manage | | status | |
+| `SeatReservation` | reservationId, tableId?, covers? | order.create | | new order (as OpenTable), booking seated | |
+| `AddToWaitlist` / `LeaveWaitlist` | guestName, phone?, partySize, quotedMin? / entryId, outcome: left \| cancelled | reservation.manage | | waitlist row | |
+| `SeatFromWaitlist` | entryId, tableId, covers?, ignoreReservation? | order.create | | new order, entry seated | |
 | `PrintBill` | discount?{kind: pct\|amount, value, reason}, serviceCharge?{enabled, rateBp}, customer?{name, phone, gstin} | bill.print | if discount > role limit | bill row(s), billNo assigned, table → BILL_PRINTED | |
 | `SplitBill` | mode: equal\|items\|proportion, parts | bill.split | | replaces unsettled bill rows | |
 | `Settle` | billId, tenders[{mode, amountPaise, ref?}] | bill.settle | | payment rows; when all parts paid → settled, table FREE | |
@@ -99,6 +104,14 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
   and tables). The floor carries `captainName`, `sectionCaptainIds` and `billRequest { at, byName }`; the order
   snapshot carries `billRequest`. `GET /v1/captain-sections` → `{ sections[], people[] }` (people = active staff whose
   role has `order.create`).
+- Bookings (P4-04): a booking holds its tables from `reservation.holdMin` (30) minutes before its time until
+  `reservation.graceMin` (15) after it; the floor shows such a free table `RESERVED` with `booking { guestName,
+  partySize, startsAt, holding }` (later bookings of the day show on the tile without holding). `OpenTable` (and
+  `SeatFromWaitlist`) on a held table → `INVALID_STATE` "Table T1 is held for Sharma (4) at 14:00." (`details.reason =
+  'reserved'`) unless `ignoreReservation: true`; the `order.open` audit row then records `overBookingId` and the guest.
+  Two `booked` bookings never share a table at overlapping times (`INVALID_STATE` naming the other booking). A start
+  more than 10 minutes in the past → `VALIDATION`. `SeatReservation` ignores the booking's own hold and opens the order
+  with the party size as covers. Closed and seated bookings stay (audit `reservation.*`, `waitlist.*`).
 - `SetCovers { covers: 1–99 }` (P3-02) only while the order is `open`: the printed bill shows the guests, so a
   `billed` order refuses with `INVALID_STATE`. Audited as `order.covers` with before/after; same covers is a no-op.
 
@@ -132,6 +145,8 @@ table close with the last part (result `unpaidParts`).
 | `/v1/orders/:id` | `OrderSnapshot` (items with addons, KOTs, bills with paid amount, version, running totals); 404 unknown, 400 not a ULID |
 | `/v1/orders?state=open` | open orders |
 | `/v1/menu?areaId=&since=<version>` | `MenuSnapshot` (active items; the area's price list overrides base/variant prices; with `areaId` also the area's tax `pricingMode`, P3-03) or `{ menuVersion, unchanged: true }` when `since` is current |
+| `/v1/reservations?date=` | P4-04: `ReservationDay` — one local date's bookings (default today), every status, with tables, `late` flags and the hold/grace minutes |
+| `/v1/waitlist` | P4-04: guests still waiting, first come first, with `waitedMin` and `quotedMin` |
 | `/v1/kds/tickets?stationId=` | P4-02: `KdsBoard` — station, `amberMin`/`redMin`, today's unserved tickets of the station as printed (docs/06 KDS) |
 | `/v1/network` | P4-02: `{ urls }` — `http://<lan-ip>:<port>` addresses phones and kitchen screens can open |
 | `/v1/reports/:name?from=&to=` | P4-03 (`apps/server/src/reports/catalog.ts`, right `reports.view`): a `ReportTable` (columns, rows, totals, summary; money in paise) over business dates, default today, at most a year. `GET /v1/reports` lists them: daily, items, categories, areas, tables, gst, payments, cash, discounts, voids, kot-changes, kitchen (P4-02: kitchen speed per station), captains (P3-05: per captain of the order — tables served, guests, net sales, per cover, average bill, dishes sent, average stay, changes after the KOT; settled orders only, orders without a captain last) |

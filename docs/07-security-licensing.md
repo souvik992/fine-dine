@@ -52,7 +52,8 @@ Roles: Owner, Manager, Cashier, Captain, Kitchen (defaults, editable). Rights ar
 
 Defaults (migration 0004; edit with `UpsertRole`): Owner everything; Manager everything except `users.manage`, 20%
 discount; Cashier billing and orders, 10%, with a manager PIN for `kot.modify`, `kot.cancel`, `reprint`, `bill.void`,
-`drawer.open`, `cash.move`, `staff.sections` (captains' sections; Owner and Manager, P3-04); Captain orders and firing, PIN for changes to fired items; Kitchen `kds.bump`,
+`drawer.open`, `cash.move`, `staff.sections` (captains' sections; Owner and Manager, P3-04), `reservation.manage` (bookings and the waitlist; Owner,
+Manager, Cashier and Captain, P4-04); Captain orders and firing, PIN for changes to fired items; Kitchen `kds.bump`,
 `menu.stock`. `reports.view` (migration 0008) goes to Owner and Manager. `stock.manage` (materials, purchases, wastage, counts, recipes, stock reads; migration 0005) goes to
 Owner and Manager. `menu.stock` is "mark items sold out" (Owner, Manager, Cashier, Kitchen). A PrintBill discount above the role limit needs a manager PIN and is a leakage flag. Safety rules: the
 Owner role always keeps `users.manage`; nobody can deactivate themselves or change their own role; at least one

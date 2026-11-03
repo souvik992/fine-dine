@@ -8,6 +8,7 @@ import { HealthDots } from '../components/HealthDots.js';
 import { UserBadge } from '../components/UserBadge.js';
 import { canvasSize, hasLayout, TILE_H, TILE_W } from '../settings/layout-model.js';
 import { findTable, moveFocus, STATE_META, stateCounts, tablesInArea, type Arrow } from './floor-model.js';
+import { BookingsButton } from '../bookings/BookingsButton.js';
 import { StockButton } from '../stock/StockButton.js';
 import { BillsDialog } from './BillsDialog.js';
 import { CashDialog } from './CashDialog.js';
@@ -31,7 +32,19 @@ function columnsOf(grid: HTMLElement | null): number {
   return Math.max(1, tiles.filter((t) => (t as HTMLElement).offsetTop === top).length);
 }
 
-export function FloorScreen({ onSettings, onStock, onReports, onOpenOrder }: { onSettings: () => void; onStock: () => void; onReports: () => void; onOpenOrder: (orderId: string) => void }) {
+export function FloorScreen({
+  onSettings,
+  onStock,
+  onReports,
+  onBookings,
+  onOpenOrder,
+}: {
+  onSettings: () => void;
+  onStock: () => void;
+  onReports: () => void;
+  onBookings: () => void;
+  onOpenOrder: (orderId: string) => void;
+}) {
   const { api, pinRequest, can } = useApp();
   const now = useClock();
   const floor = useQuery({
@@ -180,6 +193,7 @@ export function FloorScreen({ onSettings, onStock, onReports, onOpenOrder }: { o
         <time className="w-14 text-right text-sm font-semibold tabular-nums" dateTime={now.toISOString()}>
           {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })}
         </time>
+        {can('reservation.manage') || can('order.create') ? <BookingsButton onClick={onBookings} /> : null}
         {can('bill.settle') ? (
           <button className="btn h-10" onClick={() => setPanel('bills')} title="Today's bills: reprint or void">
             <ReceiptText className="h-4 w-4" /> Bills

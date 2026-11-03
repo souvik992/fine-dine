@@ -21,6 +21,8 @@ export const CONFIG_DEFAULTS: OutletConfig = {
   'kot.default_station_id': null,
   'kds.amberMin': 10,
   'kds.redMin': 20,
+  'reservation.holdMin': 30,
+  'reservation.graceMin': 15,
   'backup.copyDir': null,
 };
 

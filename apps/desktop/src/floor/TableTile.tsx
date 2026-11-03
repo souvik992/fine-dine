@@ -1,6 +1,7 @@
 import { initials } from '@dinepos/client';
 import { formatINR, type FloorTable } from '@dinepos/shared';
 import { Ban, CalendarClock, Circle, Flame, ReceiptText, Users } from 'lucide-react';
+import { bookingTime } from './SeatDialog.js';
 import { forwardRef, type ComponentType, type CSSProperties } from 'react';
 import { formatElapsed, elapsedMinutes, STATE_META, type StateMeta } from './floor-model.js';
 
@@ -28,7 +29,7 @@ export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile
   const Icon = ICONS[meta.icon];
   const elapsed = formatElapsed(elapsedMinutes(table.since, now));
   const amount = table.amountPaise ? formatINR(table.amountPaise) : '';
-  const label = [table.label, meta.label, table.covers ? `${table.covers} covers` : '', elapsed, amount, table.captainName ? `captain ${table.captainName}` : '', table.billRequest ? 'bill asked' : ''].filter(Boolean).join(', ');
+  const label = [table.label, meta.label, table.covers ? `${table.covers} covers` : '', elapsed, amount, table.captainName ? `captain ${table.captainName}` : '', table.billRequest ? 'bill asked' : '', table.booking ? `booked ${bookingTime(table.booking.startsAt)} for ${table.booking.guestName}` : ''].filter(Boolean).join(', ');
 
   return (
     <button
@@ -59,6 +60,11 @@ export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile
           <Icon className="h-4 w-4" aria-hidden />
           <span>{meta.label}</span>
         </div>
+        {table.booking && !table.orderId ? (
+          <div className="flex items-center gap-1 text-xs font-semibold" data-testid="booking">
+            <CalendarClock className="h-3.5 w-3.5" aria-hidden /> {bookingTime(table.booking.startsAt)} · {table.booking.guestName} ({table.booking.partySize})
+          </div>
+        ) : null}
         {table.billRequest ? (
           <div className="flex w-fit items-center gap-1 rounded bg-[var(--bill)] px-1.5 text-xs font-bold text-[var(--bill-ink)]" data-testid="bill-asked">
             <ReceiptText className="h-3.5 w-3.5" aria-hidden /> Bill asked

@@ -2,6 +2,7 @@ import { deriveTableState, isoInZone, type FloorSnapshot, type FloorTable } from
 import type { Db } from '../db/connection.js';
 import { sectionCaptains } from '../commands/captain-support.js';
 import { billRequestOf, getOrderSnapshot } from './order-snapshot.js';
+import { nextBookings } from './reservations.js';
 
 interface FloorRow {
   id: string;
@@ -42,6 +43,7 @@ export function getFloor(db: Db, now: Date, timeZone: string): FloorSnapshot {
     )
     .all() as FloorRow[];
 
+  const bookings = nextBookings(db, now, timeZone);
   const tables: FloorTable[] = rows.map((r) => {
     const order = r.order_id
       ? { hasFiredKot: r.has_kot === 1, lastKotAt: r.last_kot_at, billPrintedAt: r.bill_printed_at }
@@ -53,8 +55,11 @@ export function getFloor(db: Db, now: Date, timeZone: string): FloorSnapshot {
       seats: opt(r.seats),
       layoutX: opt(r.layout_x),
       layoutY: opt(r.layout_y),
-      state: deriveTableState({ status: r.status }, order),
+      // A booking holding a free table shows it RESERVED (P4-04).
+      state: deriveTableState({ status: r.status === 'active' && !order && bookings.get(r.id)?.holding ? 'reserved' : r.status }, order),
     };
+    const booking = bookings.get(r.id);
+    if (booking) table.booking = booking;
     const section = sectionCaptains(db, r.id);
     if (section.length) table.sectionCaptainIds = section;
     if (r.order_id) {

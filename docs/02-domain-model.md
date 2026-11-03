@@ -8,6 +8,8 @@
 | Order | id, businessDate, tableId?, type, covers, captainId, state, version, mergedInto, timestamps | Aggregate root |
 | CaptainSection | userId, areaId \| tableId | P3-04: who looks after which area/table (`captain_section`) |
 | BillRequest | orderId, requestedAt, requestedBy | P3-04: open "Request bill", cleared by PrintBill (`bill_request`) |
+| Reservation | id, guestName, phone?, partySize, startsAt (UTC), durationMin, tableIds[], note?, status(booked/seated/cancelled/no_show), orderId? | P4-04 (`reservation`, `reservation_table`); never deleted |
+| WaitlistEntry | id, guestName, phone?, partySize, quotedMin?, status(waiting/seated/left/cancelled), joinedAt, tableId?, orderId? | P4-04 (`waitlist_entry`) |
 | OrderItem | id, orderId, itemId, variantId, nameSnapshot, qty, unitPricePaise, taxRateBp, note, course, stationId, kotId, status | Snapshots at add time |
 | OrderItemAddon | orderItemId, addonId, nameSnapshot, qty, pricePaise | |
 | Kot | id, orderId, stationId, businessDate, kotNo, kind, firedAt, readyAt, servedAt, reprintCount | kind: new/modify/cancel/move_notice |
@@ -41,7 +43,7 @@ Stock: StockItem, StockMovement, Purchase + PurchaseLine, RecipeLine (see "Stock
 | Order of checks | Condition | State |
 | --- | --- | --- |
 | 1 | table.status = blocked | `BLOCKED` |
-| 2 | table.status = reserved and no open order | `RESERVED` |
+| 2 | table.status = reserved, or a booking holds it (P4-04: from `reservation.holdMin` before its time until `reservation.graceMin` after), and no open order | `RESERVED` |
 | 3 | no open order | `FREE` |
 | 4 | order has no fired KOT | `SEATED` |
 | 5 | billPrintedAt is null or lastKotAt > billPrintedAt | `KOT_RUNNING` |

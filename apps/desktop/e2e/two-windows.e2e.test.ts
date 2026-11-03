@@ -782,6 +782,64 @@ describe('desktop app', () => {
     await tile.getByTestId('bill-asked').waitFor({ state: 'detached' });
   });
 
+  it('Bookings (P4-04): a booking holds its table; seating from the tile seats the booked guests; a waitlist guest gets a table', async () => {
+    const [page] = app.windows();
+    await page!.getByRole('button', { name: 'Floor', exact: true }).click().catch(() => undefined);
+    const get = async <T,>(url: string) => (await (await fetch(`${SERVER}${url}`, { headers: { 'x-user-session': testToken } })).json()) as T;
+    const free = (await get<{ tables: Array<{ label: string; state: string; areaId: string }>; areas: Array<{ id: string; name: string }> }>('/v1/floor')).tables.filter((t) => t.state === 'FREE');
+    const [booked, forWaitlist] = [free[0]!, free[1]!];
+    const soon = new Date(Date.now() + 20 * 60_000); // inside the 30-minute hold
+    const hhmm = `${String(soon.getHours()).padStart(2, '0')}:${String(soon.getMinutes()).padStart(2, '0')}`;
+    const ymd = `${soon.getFullYear()}-${String(soon.getMonth() + 1).padStart(2, '0')}-${String(soon.getDate()).padStart(2, '0')}`;
+
+    await page!.getByRole('button', { name: /^Bookings/ }).click();
+    await page!.getByRole('button', { name: 'New booking' }).click();
+    const dlg = page!.getByRole('dialog', { name: 'New booking' });
+    await dlg.getByLabel('Guest name').fill('Sharma');
+    await dlg.getByLabel('Phone').fill('98300 12345');
+    await dlg.getByLabel('Guests').fill('4');
+    await dlg.getByLabel('Booking date').fill(ymd);
+    await dlg.getByLabel('Booking time').fill(hhmm);
+    await dlg.getByRole('checkbox', { name: booked.label, exact: true }).click();
+    await dlg.getByRole('button', { name: 'Book' }).click();
+    const row = page!.locator('[data-booking="Sharma"]');
+    await row.getByText(booked.label, { exact: true }).waitFor({ timeout: 5_000 });
+
+    // The waitlist: a walk-in party of 3, told 15 minutes.
+    await page!.getByRole('button', { name: 'Add', exact: true }).click();
+    const wdlg = page!.getByRole('dialog', { name: 'Add to the waitlist' });
+    await wdlg.getByLabel('Waiting guest name').fill('Gupta');
+    await wdlg.getByLabel('Waiting guests').fill('3');
+    await wdlg.getByRole('button', { name: 'Add' }).click();
+    const waiting = page!.locator('[data-waiting="Gupta"]');
+    await waiting.waitFor({ timeout: 5_000 });
+
+    // On the floor the booked table is held, with the booking on its tile.
+    await page!.getByRole('button', { name: 'Floor', exact: true }).click();
+    const tile = page!.locator(`[data-table="${booked.label}"]`);
+    await page!.locator(`[data-table="${booked.label}"][data-state="RESERVED"]`).waitFor({ timeout: 5_000 });
+    await tile.getByTestId('booking').getByText(`${hhmm} · Sharma (4)`).waitFor();
+    expect(await page!.getByRole('button', { name: /^Bookings/ }).getAttribute('title')).toContain('waitlist: 1');
+
+    // Seating the held table: these are Sharma's guests → the booking is seated, 4 covers.
+    await tile.click();
+    const seat = page!.getByRole('dialog', { name: `Seat table ${booked.label}` });
+    await seat.getByTestId('held-for').getByText(`Held for Sharma (4) at ${hhmm}`).waitFor();
+    await seat.getByRole('button', { name: 'Seat Sharma' }).click();
+    await page!.getByTestId('order-title').getByText(`Table ${booked.label}`).waitFor({ timeout: 5_000 });
+    const day = await get<{ reservations: Array<{ guestName: string; status: string; orderId?: string }> }>(`/v1/reservations?date=${ymd}`);
+    expect(day.reservations.find((r) => r.guestName === 'Sharma')).toMatchObject({ status: 'seated' });
+
+    // Gupta is seated from the waitlist at another free table.
+    await page!.getByRole('button', { name: 'Floor', exact: true }).click();
+    await page!.getByRole('button', { name: /^Bookings/ }).click();
+    await waiting.getByRole('button', { name: 'Seat' }).click();
+    await page!.getByRole('dialog', { name: 'Seat Gupta (3)' }).getByRole('listitem', { name: `Table ${forWaitlist.label}` }).click();
+    await page!.getByTestId('order-title').getByText(`Table ${forWaitlist.label}`).waitFor({ timeout: 5_000 });
+    expect((await get<{ entries: unknown[] }>('/v1/waitlist')).entries).toHaveLength(0);
+    await page!.getByRole('button', { name: 'Floor', exact: true }).click();
+  });
+
   it('Lock returns every window of the terminal to the sign-in screen', async () => {
     const [page, other] = app.windows();
     await page!.getByRole('button', { name: 'Lock' }).click();
