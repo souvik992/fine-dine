@@ -59,6 +59,11 @@ export const removeHeldItemSchema = z.object({ orderItemId: ulidSchema }).strict
 /** Guests at the table (P3-02). Only while the order is open: the printed bill shows them. */
 export const setCoversSchema = z.object({ covers: z.number().int().min(1).max(99) }).strict();
 
+/** P3-04: the captain looking after this order (null = nobody). */
+export const assignCaptainSchema = z.object({ captainId: ulidSchema.nullable() }).strict();
+/** P3-04: a captain asks the counter for this table's bill. */
+export const requestBillSchema = z.object({}).strict();
+
 /** Exactly one selector: specific held items, one course, or everything held. */
 export const fireKotSchema = z.union([
   z.object({ itemIds: z.array(ulidSchema).min(1).max(200) }).strict(),

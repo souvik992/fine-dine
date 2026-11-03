@@ -69,6 +69,24 @@ export interface BillSnapshot {
   paidPaise: number;
 }
 
+/** P3-04: "Request bill" from a captain, until the bill is printed. */
+export interface BillRequestInfo {
+  at: string;
+  byName?: string;
+}
+
+export interface CaptainSection {
+  userId: string;
+  areaIds: string[];
+  tableIds: string[];
+}
+
+/** P3-04: `GET /v1/captain-sections`: every section, and the active people whose role can seat tables. */
+export interface CaptainSections {
+  sections: CaptainSection[];
+  people: LoginUser[];
+}
+
 export interface OrderSnapshot {
   id: string;
   version: number;
@@ -81,6 +99,8 @@ export interface OrderSnapshot {
   openedAt: string;
   lastKotAt?: string;
   billPrintedAt?: string;
+  /** P3-04 */
+  billRequest?: BillRequestInfo;
   items: OrderItemSnapshot[];
   kots: KotSnapshot[];
   bills: BillSnapshot[];
@@ -127,6 +147,12 @@ export interface FloorTable {
   orderVersion?: number;
   covers?: number;
   captainId?: string;
+  /** P3-04: the order's captain, for initials on the tile. */
+  captainName?: string;
+  /** P3-04: captains whose section holds this table (directly or through its area). */
+  sectionCaptainIds?: string[];
+  /** P3-04: a captain asked for the bill and it is not printed yet. */
+  billRequest?: BillRequestInfo;
   /** When the current order was opened. */
   since?: string;
   elapsedMin?: number;

@@ -1,19 +1,20 @@
 import { formatINR, type FloorSnapshot, type FloorTable } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Clock, Lock, Minus, Plus, TriangleAlert, Users, WifiOff } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Clock, Lock, Minus, Plus, ReceiptText, TriangleAlert, Users, WifiOff } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../app-context.js';
 import { Sheet } from '../components/Sheet.js';
 import { floorWithPending, waitingByTable } from '../offline/pending-model.js';
 import { useSync } from '../offline/sync-context.js';
-import { elapsedText, STATE_CLASS, STATE_LABEL, stateCounts, tablesOf } from '../tables-model.js';
+import { elapsedText, initials, isMine, MINE, STATE_CLASS, STATE_LABEL, stateCounts, tablesFor } from '../tables-model.js';
 import { AttentionSheet } from './AttentionSheet.js';
 import { OrderScreen } from './OrderScreen.js';
 
 /**
  * My tables (docs/09 Captain): area tabs, live table states; a free table is seated, an occupied one opens its order.
  * Offline (P3-03): the last floor stays on screen, tables seated on this phone show as seated, and the header counts
- * what is waiting to be sent and what needs attention.
+ * what is waiting to be sent and what needs attention. P3-04: "My tables" (my section and the orders I look after)
+ * comes first and opens by default when there are any; tiles show the order's captain and "Bill asked".
  */
 export function TablesScreen() {
   const { session, signOut, stream, can } = useApp();
@@ -25,8 +26,14 @@ export function TablesScreen() {
   const [attentionOpen, setAttentionOpen] = useState(false);
   const data = useMemo(() => (floor.data ? floorWithPending(floor.data, sync.entries) : undefined), [floor.data, sync.entries]);
   const waiting = useMemo(() => waitingByTable(sync.entries), [sync.entries]);
+  const me = session?.user.id;
+  const mineCount = data ? data.tables.filter((t) => isMine(t, me)).length : 0;
+  // Chosen once, when the floor first arrives; after that the captain's choice stays.
+  useEffect(() => {
+    if (areaId === null && data) setAreaId(mineCount ? MINE : (data.areas[0]?.id ?? null));
+  }, [areaId, data, mineCount]);
   const area = areaId ?? data?.areas[0]?.id ?? null;
-  const tables = data ? tablesOf(data, area) : [];
+  const tables = data ? tablesFor(data, area, me) : [];
   const queued = sync.entries.filter((e) => e.status === 'queued').length;
   const attention = sync.entries.length - queued;
 
@@ -54,6 +61,11 @@ export function TablesScreen() {
           </button>
         </div>
         <nav role="tablist" aria-label="Areas" className="no-scrollbar -mx-1 mt-2 flex gap-1 overflow-x-auto px-1">
+          {mineCount || area === MINE ? (
+            <button role="tab" className="tab" aria-selected={area === MINE} onClick={() => setAreaId(MINE)}>
+              My tables ({mineCount})
+            </button>
+          ) : null}
           {data?.areas.map((a) => (
             <button key={a.id} role="tab" className="tab" aria-selected={a.id === area} onClick={() => setAreaId(a.id)}>
               {a.name}
@@ -104,7 +116,19 @@ export function TablesScreen() {
                       <span className="text-xs opacity-70">{t.seats} seats</span>
                     ) : null}
                   </span>
-                  <span className="text-sm font-semibold">{STATE_LABEL[t.state]}</span>
+                  <span className="flex items-center justify-between gap-1 text-sm font-semibold">
+                    {STATE_LABEL[t.state]}
+                    {t.captainName && t.captainId !== me ? (
+                      <span className="rounded-full bg-black/10 px-1.5 text-xs" title={t.captainName}>
+                        {initials(t.captainName)}
+                      </span>
+                    ) : null}
+                  </span>
+                  {t.billRequest ? (
+                    <span className="flex items-center gap-1 text-xs font-bold" data-testid="bill-asked">
+                      <ReceiptText className="h-3 w-3" /> Bill asked
+                    </span>
+                  ) : null}
                   {w ? (
                     <span className={`flex items-center gap-1 text-xs font-bold ${w.attention ? 'text-danger' : ''}`} data-testid="table-waiting">
                       {w.attention ? <TriangleAlert className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
@@ -121,7 +145,7 @@ export function TablesScreen() {
             );
           })}
         </ul>
-        {data && tables.length === 0 ? <p className="mt-10 text-center text-muted-foreground">No tables in this area.</p> : null}
+        {data && tables.length === 0 ? <p className="mt-10 text-center text-muted-foreground">{area === MINE ? 'No tables of yours right now.' : 'No tables in this area.'}</p> : null}
         {floor.error && !data ? <p className="mt-10 text-center text-muted-foreground">Cannot reach the outlet server, and no tables are saved on this phone yet.</p> : null}
       </main>
 

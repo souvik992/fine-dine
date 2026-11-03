@@ -64,7 +64,9 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 | `MoveTable` | toTableId | table.move | | order.tableId changes; `move_notice` KOT if any fired | if fired |
 | `MergeTables` | sourceOrderId | table.merge | | source → merged, items re-parented | if fired |
 | `TransferItems` | itemIds[], toOrderId | item.transfer | | items re-parented (KOT link kept) | yes |
-| `SetCovers` / `AssignCaptain` | covers / captainId | order.edit | | | |
+| `SetCovers` / `AssignCaptain` | covers / captainId (null clears) | order.edit | | | |
+| `RequestBill` | — | order.edit | | bill_request row, `bill.requested` on `floor` | |
+| `SetCaptainSection` | userId, areaIds[], tableIds[] | staff.sections | | replaces the captain's section, `floor.changed` | |
 | `PrintBill` | discount?{kind: pct\|amount, value, reason}, serviceCharge?{enabled, rateBp}, customer?{name, phone, gstin} | bill.print | if discount > role limit | bill row(s), billNo assigned, table → BILL_PRINTED | |
 | `SplitBill` | mode: equal\|items\|proportion, parts | bill.split | | replaces unsettled bill rows | |
 | `Settle` | billId, tenders[{mode, amountPaise, ref?}] | bill.settle | | payment rows; when all parts paid → settled, table FREE | |
@@ -90,6 +92,13 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 - `FireKOT` takes exactly one of `{ itemIds }`, `{ course }`, `{ all: true }`. Result `{ kots: [{ id, kotNo,
   stationId, orderItemIds }] }`, KOTs ordered by station name.
 - `AddItems`/`FireKOT` on a `billed` order return it to `open` and mark its printed bill `superseded`.
+- Captains (P3-04): `OpenTable` without `captainId` takes the captain whose section lists the table, else the only
+  captain whose section holds its area (none when two share it). `RequestBill` needs an `open` order with something
+  sent to the kitchen (`INVALID_STATE` otherwise, "The bill is already printed." once billed); asking again moves the
+  time on; `PrintBill` clears it. `SetCaptainSection` replaces the person's whole section (active staff, known areas
+  and tables). The floor carries `captainName`, `sectionCaptainIds` and `billRequest { at, byName }`; the order
+  snapshot carries `billRequest`. `GET /v1/captain-sections` → `{ sections[], people[] }` (people = active staff whose
+  role has `order.create`).
 - `SetCovers { covers: 1–99 }` (P3-02) only while the order is `open`: the printed bill shows the guests, so a
   `billed` order refuses with `INVALID_STATE`. Audited as `order.covers` with before/after; same covers is a no-op.
 

@@ -1,6 +1,6 @@
 import { formatINR, newId, type MenuItem, type MenuSnapshot, type OrderItemSnapshot, type OrderSnapshot, type OutletConfig } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRightLeft, Flame, Merge, MoveRight, Printer, Search, Split, TriangleAlert, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, Flame, Merge, MoveRight, Printer, ReceiptText, Search, Split, TriangleAlert, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
@@ -8,6 +8,7 @@ import { HealthDots } from '../components/HealthDots.js';
 import { UserBadge } from '../components/UserBadge.js';
 import { VegMark } from '../components/VegMark.js';
 import { elapsedMinutes, formatElapsed } from '../floor/floor-model.js';
+import { CaptainPicker } from './CaptainPicker.js';
 import { Cart } from './Cart.js';
 import { hasChoices, needsChoices, resolveQuickEntry, visibleItems } from './menu-model.js';
 import { FiredItemDialog } from './FiredItemDialog.js';
@@ -274,6 +275,12 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
         <span className="text-sm text-muted-foreground">
           {order.covers} covers{elapsed ? ` · ${elapsed}` : ''} · v{order.version}
         </span>
+        {order.state === 'open' || order.state === 'billed' ? <CaptainPicker order={order} disabled={!can('order.edit')} run={run} /> : null}
+        {order.billRequest && order.state === 'open' ? (
+          <span role="status" className="flex items-center gap-1 rounded-full bg-[var(--bill)] px-3 py-1 text-xs font-bold text-[var(--bill-ink)]" data-testid="bill-asked">
+            <ReceiptText className="h-3.5 w-3.5" /> Bill asked{order.billRequest.byName ? ` by ${order.billRequest.byName}` : ''}
+          </span>
+        ) : null}
         {changedElsewhere ? (
           <button role="status" onClick={dismissChange} className="rounded-full bg-[var(--kot)] px-3 py-1 text-xs font-bold text-[var(--kot-ink)]">
             Updated on another terminal

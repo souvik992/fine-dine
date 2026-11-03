@@ -102,6 +102,7 @@ export function orderView(orderId: string, base: OrderSnapshot | null | undefine
         }
       }
     } else if (e.type === 'SetCovers') view.covers = p.covers as number;
+    else if (e.type === 'RequestBill') view.billRequest = { at: e.queuedAt, byName: e.by.name };
   }
   // Each accepted change adds one to the version; a new order starts at 1.
   view.version = (base?.version ?? 1) + mine.filter((e) => e.type !== 'OpenTable').length;

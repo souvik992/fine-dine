@@ -72,3 +72,8 @@ export function stateCounts(tables: readonly FloorTable[]): Partial<Record<Table
   for (const t of tables) out[t.state] = (out[t.state] ?? 0) + 1;
   return out;
 }
+
+/** Tables whose captain asked for the bill (P3-04), oldest first. */
+export function billRequests(floor: FloorSnapshot | undefined): FloorTable[] {
+  return (floor?.tables ?? []).filter((t) => t.billRequest && t.orderId).sort((a, b) => a.billRequest!.at.localeCompare(b.billRequest!.at));
+}

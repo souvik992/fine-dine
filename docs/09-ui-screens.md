@@ -144,6 +144,13 @@ The button shows how many materials are low or need a count. Tabs:
   all**; the **basket** groups waiting lines by course (−/+/remove, move to another course), shows what was sent by
   KOT, and offers **Fire all** plus **Fire course N** when more than one course waits. Changes from other devices
   arrive live; a refused change says who changed the table.
+- Captains (P3-04): **My tables** (the captain's section and the orders they look after) is the first tab and opens by
+  default when there are any; tiles show another captain's initials and "Bill asked". Tables seated on the phone are
+  the captain's. The order screen's footer offers **Request bill** once something was sent and nothing waits ("Ask
+  again" after); it needs the server. On the terminals: captain initials and "Bill asked" on tiles, a **Table T5 asks
+  for the bill** card on every screen (oldest first; click opens the order) until the bill is printed, a **Captain**
+  picker in the order header (AssignCaptain), and **Settings › Captain sections** (whole areas or single tables;
+  right `staff.sections`, Owner and Manager by default).
 - Offline (P3-03): an Offline banner, "N changes waiting to send" on Tables and on the order, a clock on tables and
   lines that are only on the phone, "Queued — not in the kitchen yet" in the basket, and a red **N need(s) attention**
   bar opening **Needs attention** (Try again / Discard / Seat at another table). Guests are locked while offline.

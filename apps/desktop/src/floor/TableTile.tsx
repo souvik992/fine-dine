@@ -1,3 +1,4 @@
+import { initials } from '@dinepos/client';
 import { formatINR, type FloorTable } from '@dinepos/shared';
 import { Ban, CalendarClock, Circle, Flame, ReceiptText, Users } from 'lucide-react';
 import { forwardRef, type ComponentType, type CSSProperties } from 'react';
@@ -27,7 +28,7 @@ export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile
   const Icon = ICONS[meta.icon];
   const elapsed = formatElapsed(elapsedMinutes(table.since, now));
   const amount = table.amountPaise ? formatINR(table.amountPaise) : '';
-  const label = [table.label, meta.label, table.covers ? `${table.covers} covers` : '', elapsed, amount].filter(Boolean).join(', ');
+  const label = [table.label, meta.label, table.covers ? `${table.covers} covers` : '', elapsed, amount, table.captainName ? `captain ${table.captainName}` : '', table.billRequest ? 'bill asked' : ''].filter(Boolean).join(', ');
 
   return (
     <button
@@ -44,13 +45,25 @@ export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile
     >
       <div className="flex items-start justify-between gap-2">
         <span className="font-display text-2xl font-semibold leading-none">{table.label}</span>
-        {table.seats ? <span className="text-xs opacity-70">{table.seats} seats</span> : null}
+        <span className="flex items-center gap-1">
+          {table.captainName ? (
+            <span className="rounded-full bg-black/10 px-1.5 py-0.5 text-[11px] font-bold" title={`Captain: ${table.captainName}`} data-testid="captain-initials">
+              {initials(table.captainName)}
+            </span>
+          ) : null}
+          {table.seats && !table.captainName ? <span className="text-xs opacity-70">{table.seats} seats</span> : null}
+        </span>
       </div>
       <div className="mt-2 space-y-1 text-sm">
         <div className="flex items-center gap-1.5 font-semibold">
           <Icon className="h-4 w-4" aria-hidden />
           <span>{meta.label}</span>
         </div>
+        {table.billRequest ? (
+          <div className="flex w-fit items-center gap-1 rounded bg-[var(--bill)] px-1.5 text-xs font-bold text-[var(--bill-ink)]" data-testid="bill-asked">
+            <ReceiptText className="h-3.5 w-3.5" aria-hidden /> Bill asked
+          </div>
+        ) : null}
         {table.orderId ? (
           <div className="flex items-center justify-between gap-2 text-xs opacity-80">
             <span className="flex items-center gap-1">

@@ -1,6 +1,7 @@
 // type → handler. One handler per file in this folder; add each new command here (see /add-command).
 import { createRegistry, type CommandRegistry } from '../core/command-handler.js';
 import { addItems } from './add-items.js';
+import { assignCaptain } from './assign-captain.js';
 import { adjustStock } from './adjust-stock.js';
 import { cancelFiredItem } from './cancel-fired-item.js';
 import { dayEnd } from './day-end.js';
@@ -19,9 +20,11 @@ import { printSampleBill } from './print-sample-bill.js';
 import { printTestPage } from './print-test-page.js';
 import { recordPurchase } from './record-purchase.js';
 import { reprintBill } from './reprint-bill.js';
+import { requestBill } from './request-bill.js';
 import { reprintKot } from './reprint-kot.js';
 import { revokeDevice } from './revoke-device.js';
 import { removeHeldItem } from './remove-held-item.js';
+import { setCaptainSection } from './set-captain-section.js';
 import { setConfig } from './set-config.js';
 import { setCovers } from './set-covers.js';
 import { setItemAvailability } from './set-item-availability.js';
@@ -68,6 +71,7 @@ const handlers = [
   setupOutlet,
   upsertUser,
   upsertRole,
+  setCaptainSection,
   pairDevice,
   revokeDevice,
   // orders
@@ -76,6 +80,8 @@ const handlers = [
   updateHeldItem,
   removeHeldItem,
   setCovers,
+  assignCaptain,
+  requestBill,
   fireKot,
   // after the KOT (P2-04)
   modifyFiredItem,

@@ -116,6 +116,7 @@ export const printBill = defineCommand({
 
     if (p.customer) db.prepare('UPDATE "order" SET customer_name = ?, customer_phone = ? WHERE id = ?').run(p.customer.name, p.customer.phone, o.id);
     db.prepare(`UPDATE "order" SET state = 'billed', bill_printed_at = ? WHERE id = ?`).run(ctx.nowIso, o.id);
+    db.prepare('DELETE FROM bill_request WHERE order_id = ?').run(o.id); // the captain's request is answered (P3-04)
 
     const when = printedDateTime(ctx.now, ctx.timeZone);
     const doc: BillDocument = {

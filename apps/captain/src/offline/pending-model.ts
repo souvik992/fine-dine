@@ -11,7 +11,8 @@ export function floorWithPending(floor: FloorSnapshot, entries: readonly OutboxE
     tables: floor.tables.map((t): FloorTable => {
       const e = seated.get(t.id);
       if (!e || t.orderId) return t;
-      return { ...t, state: 'SEATED', orderId: e.orderId, covers: e.payload.covers as number, elapsedMin: 0 };
+      const captainId = e.payload.captainId as string | null | undefined;
+      return { ...t, state: 'SEATED', orderId: e.orderId, covers: e.payload.covers as number, elapsedMin: 0, ...(captainId ? { captainId, captainName: e.by.name } : {}) };
     }),
   };
 }

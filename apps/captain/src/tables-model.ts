@@ -1,6 +1,8 @@
 // Pure helpers for the captain's table list (tested).
 import type { FloorSnapshot, FloorTable, TableState } from '@dinepos/shared';
 
+export { initials } from '@dinepos/client';
+
 export const STATE_LABEL: Record<TableState, string> = {
   FREE: 'Free',
   SEATED: 'Seated',
@@ -27,6 +29,19 @@ export function byLabel(a: FloorTable, b: FloorTable): number {
 /** Tables of one area (all when null), in natural label order. */
 export function tablesOf(floor: FloorSnapshot, areaId: string | null): FloorTable[] {
   return floor.tables.filter((t) => areaId === null || t.areaId === areaId).sort(byLabel);
+}
+
+/** The "My tables" tab (P3-04). */
+export const MINE = 'mine';
+
+/** A table is mine when my section holds it, or I am the captain of the order on it. */
+export function isMine(t: FloorTable, userId: string | undefined): boolean {
+  return !!userId && (t.captainId === userId || (t.sectionCaptainIds?.includes(userId) ?? false));
+}
+
+/** The tables for a tab: an area, or MINE (across areas). */
+export function tablesFor(floor: FloorSnapshot, tab: string | null, userId: string | undefined): FloorTable[] {
+  return tab === MINE ? floor.tables.filter((t) => isMine(t, userId)).sort(byLabel) : tablesOf(floor, tab);
 }
 
 /** "12 min", "1 h 05". */

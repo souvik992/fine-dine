@@ -1,5 +1,6 @@
 import {
   calculateBill,
+  type BillRequestInfo,
   type BillSnapshot,
   type KotSnapshot,
   type OrderItemSnapshot,
@@ -171,9 +172,18 @@ export function getOrderSnapshot(db: Db, orderId: string): OrderSnapshot | undef
     openedAt: order.opened_at,
     lastKotAt: opt(order.last_kot_at),
     billPrintedAt: opt(order.bill_printed_at),
+    ...billRequestOf(db, order.id),
     items,
     kots,
     bills,
     totals: { subtotalPaise: calc.subtotal, taxPaise: calc.totalTax, totalPaise: calc.total },
   };
+}
+
+/** P3-04: an open "Request bill" for this order, with the captain's name. */
+export function billRequestOf(db: Db, orderId: string): { billRequest?: BillRequestInfo } {
+  const r = db
+    .prepare('SELECT r.requested_at, u.name FROM bill_request r LEFT JOIN app_user u ON u.id = r.requested_by WHERE r.order_id = ?')
+    .get(orderId) as { requested_at: string; name: string | null } | undefined;
+  return r ? { billRequest: { at: r.requested_at, ...(r.name ? { byName: r.name } : {}) } } : {};
 }

@@ -9,6 +9,7 @@ import { PairScreen } from './auth/PairScreen.js';
 import { ManagerPinDialog } from './auth/ManagerPinDialog.js';
 import { SetupScreen } from './auth/SetupScreen.js';
 import { BillingScreen } from './billing/BillingScreen.js';
+import { BillRequests } from './floor/BillRequests.js';
 import { FloorScreen } from './floor/FloorScreen.js';
 import { SettingsScreen } from './settings/SettingsScreen.js';
 import { ReportsScreen } from './reports/ReportsScreen.js';
@@ -60,6 +61,7 @@ export function App() {
       ) : (
         <FloorScreen onSettings={() => setScreen({ kind: 'settings' })} onStock={() => setScreen({ kind: 'stock' })} onReports={() => setScreen({ kind: 'reports' })} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} />
       )}
+      <BillRequests onOpen={(orderId) => setScreen({ kind: 'order', orderId })} hiddenOrderId={screen.kind === 'order' ? screen.orderId : undefined} compact={screen.kind !== 'floor'} />
       <ManagerPinDialog />
     </>
   );

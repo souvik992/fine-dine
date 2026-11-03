@@ -50,3 +50,13 @@ export const pairDeviceSchema = z
   .strict();
 /** Cuts a device off at once: its token stops working, its sign-ins end and its live connection closes. */
 export const revokeDeviceSchema = z.object({ deviceId: ulidSchema }).strict();
+
+/** P3-04: the areas and tables a captain looks after (replaces their section; empty lists = no section). */
+export const setCaptainSectionSchema = z
+  .object({
+    userId: ulidSchema,
+    areaIds: z.array(ulidSchema).max(50).default([]),
+    tableIds: z.array(ulidSchema).max(500).default([]),
+  })
+  .strict()
+  .refine((p) => new Set(p.areaIds).size === p.areaIds.length && new Set(p.tableIds).size === p.tableIds.length, { message: 'an area or table appears twice' });

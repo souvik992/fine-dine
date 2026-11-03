@@ -1,4 +1,4 @@
-import { ulidSchema } from '@dinepos/shared';
+import { ulidSchema, type CaptainSection, type CaptainSections } from '@dinepos/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { PosError } from '../core/errors.js';
@@ -32,6 +32,28 @@ export function queryRoutes(app: FastifyInstance, deps: QueryDeps): void {
     const order = getOrderSnapshot(deps.db, req.params.id);
     if (!order) throw new PosError('NOT_FOUND', 'Order not found.', { orderId: req.params.id });
     void reply.header('cache-control', 'no-store').send(order);
+    return reply;
+  });
+
+  // P3-04: every captain's section and who can have one (Settings › Captain sections; the floor carries them per table).
+  app.get('/v1/captain-sections', (_req, reply) => {
+    const rows = deps.db.prepare('SELECT user_id, area_id, table_id FROM captain_section ORDER BY user_id').all() as Array<{ user_id: string; area_id: string | null; table_id: string | null }>;
+    const byUser = new Map<string, CaptainSection>();
+    for (const r of rows) {
+      const s = byUser.get(r.user_id) ?? { userId: r.user_id, areaIds: [], tableIds: [] };
+      if (r.area_id) s.areaIds.push(r.area_id);
+      if (r.table_id) s.tableIds.push(r.table_id);
+      byUser.set(r.user_id, s);
+    }
+    const people = deps.db
+      .prepare(
+        `SELECT u.id, u.name, r.name AS roleName FROM app_user u JOIN role r ON r.id = u.role_id
+         WHERE u.active = 1 AND EXISTS (SELECT 1 FROM role_permission p WHERE p.role_id = u.role_id AND p.permission = 'order.create')
+         ORDER BY u.name COLLATE NOCASE`,
+      )
+      .all() as CaptainSections['people'];
+    const body: CaptainSections = { sections: [...byUser.values()], people };
+    void reply.header('cache-control', 'no-store').send(body);
     return reply;
   });
 

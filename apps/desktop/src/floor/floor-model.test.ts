@@ -1,6 +1,6 @@
 import type { FloorSnapshot, FloorTable } from '@dinepos/shared';
 import { describe, expect, it } from 'vitest';
-import { elapsedMinutes, findTable, formatElapsed, moveFocus, STATE_META, stateCounts, tablesInArea } from './floor-model.js';
+import { billRequests, elapsedMinutes, findTable, formatElapsed, moveFocus, STATE_META, stateCounts, tablesInArea } from './floor-model.js';
 
 const t = (label: string, areaId: string, state: FloorTable['state'] = 'FREE'): FloorTable => ({ id: label, label, areaId, state });
 const floor: FloorSnapshot = {
@@ -52,5 +52,12 @@ describe('floor model', () => {
       expect(meta.icon).toBeTruthy();
     }
     expect(stateCounts(floor.tables)).toEqual({ FREE: 2, SEATED: 1, KOT_RUNNING: 1 });
+  });
+
+  it('bill requests from captains: only tables with one, oldest first (P3-04)', () => {
+    const asked = (label: string, at: string): FloorTable => ({ ...t(label, 'main', 'KOT_RUNNING'), orderId: `o${label}`, billRequest: { at, byName: 'Ravi' } });
+    const f = { ...floor, tables: [asked('T9', '2026-11-02T08:05:00Z'), t('T1', 'main'), asked('T3', '2026-11-02T08:01:00Z')] };
+    expect(billRequests(f).map((x) => x.label)).toEqual(['T3', 'T9']);
+    expect(billRequests(undefined)).toEqual([]);
   });
 });

@@ -13,6 +13,11 @@ Read first: `docs/09-ui-screens.md` (Captain), `docs/05-sync-offline.md`, `docs/
 5. Request bill, covers, notes
 6. Needs attention (offline replays that conflicted)
 
+## Captains (P3-04)
+- "My tables" tab (`tablesFor(…, MINE, me)` in `src/tables-model.ts`): my section plus the orders I look after; picked
+  once when the floor first loads. OpenTable from the phone names the signed-in captain.
+- Request bill in the order footer (`RequestBill` through the outbox, online only); the banner shows when and who.
+
 ## Offline (P3-03)
 Every change goes through the outbox in `@dinepos/client` (`Outbox`, `orderView`), stored in IndexedDB
 (`src/offline/idb.ts`, no extra library). `src/offline/sync-context.tsx` decides each change on the latest view,

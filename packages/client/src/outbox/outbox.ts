@@ -6,7 +6,7 @@ import { MAX_REBASES } from '../order/order-session.js';
 import { MAX_LINE_QTY } from '../order/order-lines.js';
 
 /** Allowed in the outbox (docs/05: everything else needs the server and is disabled offline). */
-export type OutboxCommand = 'OpenTable' | 'AddItems' | 'UpdateHeldItem' | 'RemoveHeldItem' | 'FireKOT' | 'SetCovers';
+export type OutboxCommand = 'OpenTable' | 'AddItems' | 'UpdateHeldItem' | 'RemoveHeldItem' | 'FireKOT' | 'SetCovers' | 'RequestBill';
 
 export interface OutboxEntry {
   /** Order of creation; replay is strictly in this order. */

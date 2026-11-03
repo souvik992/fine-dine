@@ -296,8 +296,8 @@ describe('orderView', () => {
   it('server snapshot plus waiting changes; attention counted; no outbox = the snapshot as is', () => {
     const snap: OrderSnapshot = { id: 'o1', version: 4, state: 'open', type: 'dine_in', businessDate: 'd', covers: 2, openedAt: 'x', items: [{ id: 'A', itemId: 'DM', name: 'Dal Makhani', qty: 1, unitPricePaise: 28_000, taxRateBp: 500, addons: [], course: 1, status: 'held' }], kots: [], bills: [], totals: { subtotalPaise: 28_000, taxPaise: 1_400, totalPaise: 29_400 } };
     expect(orderView('o1', snap, [], menu)).toMatchObject({ version: 4, totals: snap.totals, waiting: 0 });
-    const v = orderView('o1', snap, [q(1, 'UpdateHeldItem', { orderItemId: 'A', qty: 3 }), q(2, 'SetCovers', { covers: 5 }, 'attention')], menu)!;
-    expect(v).toMatchObject({ version: 6, covers: 5, waiting: 2, attention: 1, items: [{ qty: 3, waiting: true }] });
+    const v = orderView('o1', snap, [q(1, 'UpdateHeldItem', { orderItemId: 'A', qty: 3 }), q(2, 'SetCovers', { covers: 5 }, 'attention'), q(3, 'RequestBill', {})], menu)!;
+    expect(v).toMatchObject({ version: 7, covers: 5, waiting: 3, attention: 1, items: [{ qty: 3, waiting: true }], billRequest: { at: 'now', byName: 'Ravi' } });
     expect(orderView('nope', undefined, [], menu)).toBeNull();
   });
 });

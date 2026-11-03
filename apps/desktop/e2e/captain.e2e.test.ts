@@ -274,4 +274,30 @@ describe('captain app on a phone', () => {
     expect(t8order.covers).toBe(2);
     expect(t8order.items.map((i) => [i.name, i.qty, i.status])).toEqual([['Masala Chai', 1, 'held']]);
   });
+
+  // P3-04: a manager gives Ravi the Terrace; his phone shows "My tables" (his section and the tables he seated), and
+  // he asks the counter for T3's bill.
+  it('My tables lists my section and my orders; Request bill reaches the counter', async () => {
+    const page = await phone.firstWindow();
+    const floor = await get<{ areas: Array<{ id: string; name: string }>; tables: Array<{ label: string; orderId?: string; captainId?: string }> }>('/v1/floor');
+    const users = (await get<{ users: Array<{ id: string; name: string }> }>('/v1/setup-state')).users;
+    const ravi = users.find((u) => u.name.startsWith('Ravi'))!;
+    expect(floor.tables.find((t) => t.label === 'T5')!.captainId).toBe(ravi.id); // seated from his phone
+    expect((await send('SetCaptainSection', { userId: ravi.id, areaIds: [floor.areas.find((a) => a.name === 'Terrace')!.id] })).ok).toBe(true);
+
+    await page.getByRole('dialog', { name: 'Needs attention' }).getByRole('button', { name: 'Close' }).click(); // left open by the offline test
+    await page.getByRole('tab', { name: /^My tables/ }).click({ timeout: 5_000 }); // appears live
+    const mine = await page.locator('[data-table]').evaluateAll((els) => els.map((e) => e.getAttribute('data-table')));
+    expect(mine).toEqual(expect.arrayContaining(['R1', 'R2', 'R3', 'R4', 'T5', 'T6', 'T8']));
+
+    await page.getByRole('tab', { name: 'Main Hall' }).click();
+    await page.locator('[data-table="T3"]').click();
+    await page.getByRole('button', { name: 'Request bill' }).click();
+    await page.getByTestId('bill-requested').getByText(/Bill asked at .* by Ravi \(Captain\)/).waitFor({ timeout: 5_000 });
+    await page.getByRole('button', { name: 'Ask again' }).waitFor();
+    const t3 = (await get<{ tables: Array<{ label: string; billRequest?: { byName?: string } }> }>('/v1/floor')).tables.find((t) => t.label === 'T3')!;
+    expect(t3.billRequest?.byName).toBe('Ravi (Captain)');
+    await page.getByRole('button', { name: 'Back to tables' }).click();
+    await page.locator('[data-table="T3"]').getByTestId('bill-asked').waitFor();
+  });
 });

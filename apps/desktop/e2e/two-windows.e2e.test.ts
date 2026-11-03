@@ -731,6 +731,57 @@ describe('desktop app', () => {
     expect(list.backups.some((b) => b.kind === 'restore')).toBe(true); // a safety backup was taken first
   });
 
+  it('Captains (P3-04): a section set in Settings › Staff; Request bill from a phone shows on the counter and opens the order', async () => {
+    const page = await openSettings('Captain sections');
+    const row = page.locator('[data-section="Ravi (Captain)"]');
+    await row.getByRole('button', { name: 'Set section' }).click();
+    const dlg = page.getByRole('dialog', { name: 'Ravi (Captain): section' });
+    await dlg.getByLabel('All of Terrace').check();
+    await dlg.getByRole('button', { name: 'Save' }).click();
+    await row.getByText('Terrace').waitFor();
+    await page.getByRole('button', { name: 'Floor', exact: true }).click();
+
+    // A terrace table opened at the counter goes to Ravi (his section); he fires from his phone and asks for the bill.
+    const get = async <T,>(url: string) => (await (await fetch(`${SERVER}${url}`, { headers: { 'x-user-session': testToken } })).json()) as T;
+    const users = (await get<{ users: Array<{ id: string; name: string }> }>('/v1/setup-state')).users;
+    const ravi = users.find((u) => u.name.startsWith('Ravi'))!;
+    const raviToken = ((await (await fetch(`${SERVER}/v1/sessions`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ userId: ravi.id, pin: '3333' }) })).json()) as { token: string }).token;
+    const send = async (token: string, type: string, payload: unknown, orderId?: string, expectedVersion?: number) =>
+      (await (
+        await fetch(`${SERVER}/v1/commands`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-user-session': token },
+          body: JSON.stringify({ commandId: ulid(), type, payload, createdAt: new Date().toISOString(), ...(orderId ? { orderId, expectedVersion } : {}) }),
+        })
+      ).json()) as { ok: boolean; order?: { id: string; version: number } };
+    const floor = await get<{ areas: Array<{ id: string; name: string }>; tables: Array<{ id: string; label: string; areaId: string; state: string }> }>('/v1/floor');
+    const terrace = floor.areas.find((a) => a.name === 'Terrace')!;
+    const table = floor.tables.find((t) => t.areaId === terrace.id && t.state === 'FREE')!;
+    const dal = (await get<{ items: Array<{ id: string; shortCode?: string }> }>('/v1/menu')).items.find((i) => i.shortCode === 'DM')!;
+    const opened = await send(testToken, 'OpenTable', { tableId: table.id, covers: 2 });
+    const added = await send(raviToken, 'AddItems', { items: [{ id: ulid(), itemId: dal.id, qty: 1 }] }, opened.order!.id, opened.order!.version);
+    const fired = await send(raviToken, 'FireKOT', { all: true }, opened.order!.id, added.order!.version);
+    expect((await send(raviToken, 'RequestBill', {}, opened.order!.id, fired.order!.version)).ok).toBe(true);
+
+    await page.getByRole('tab', { name: 'Terrace' }).click().catch(() => undefined);
+    const tile = page.locator(`[data-table="${table.label}"]`);
+    await tile.getByTestId('captain-initials').getByText('R').waitFor({ timeout: 5_000 });
+    await tile.getByTestId('bill-asked').waitFor();
+    const notice = page.locator(`[data-bill-request="${table.label}"]`);
+    await notice.getByText(`Table ${table.label} asks for the bill`).waitFor();
+    await notice.click();
+    await page.getByTestId('order-title').getByText(`Table ${table.label}`).waitFor();
+    await page.getByTestId('bill-asked').getByText('Bill asked by Ravi (Captain)').waitFor();
+    expect(await page.getByRole('combobox', { name: 'Captain' }).inputValue()).toBe(ravi.id);
+    expect(await notice.count()).toBe(0); // not shown over the order it is about
+
+    // Printing the bill answers the request: gone from every screen.
+    await send(testToken, 'PrintBill', {}, opened.order!.id, (await get<{ version: number }>(`/v1/orders/${opened.order!.id}`)).version);
+    await page.getByTestId('bill-asked').waitFor({ state: 'detached', timeout: 5_000 });
+    await page.getByRole('button', { name: 'Floor', exact: true }).click();
+    await tile.getByTestId('bill-asked').waitFor({ state: 'detached' });
+  });
+
   it('Lock returns every window of the terminal to the sign-in screen', async () => {
     const [page, other] = app.windows();
     await page!.getByRole('button', { name: 'Lock' }).click();

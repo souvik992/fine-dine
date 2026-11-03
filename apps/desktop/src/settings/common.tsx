@@ -62,7 +62,7 @@ export function useSave() {
     setError(null);
     try {
       await api.command(type, payload);
-      await Promise.all(['catalog', 'menu', 'floor', 'config', 'staff', 'roles', 'printers'].map((k) => qc.invalidateQueries({ queryKey: [k] })));
+      await Promise.all(['catalog', 'menu', 'floor', 'config', 'staff', 'roles', 'printers', 'captain-sections'].map((k) => qc.invalidateQueries({ queryKey: [k] })));
       return true;
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not save. Try again.');

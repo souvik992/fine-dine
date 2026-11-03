@@ -6,6 +6,8 @@
 | Area | id, name, priceListId, taxProfileId | Per-area pricing and tax |
 | DiningTable | id, areaId, label, seats, layoutX, layoutY, status(active/reserved/blocked), openOrderId | One open order max |
 | Order | id, businessDate, tableId?, type, covers, captainId, state, version, mergedInto, timestamps | Aggregate root |
+| CaptainSection | userId, areaId \| tableId | P3-04: who looks after which area/table (`captain_section`) |
+| BillRequest | orderId, requestedAt, requestedBy | P3-04: open "Request bill", cleared by PrintBill (`bill_request`) |
 | OrderItem | id, orderId, itemId, variantId, nameSnapshot, qty, unitPricePaise, taxRateBp, note, course, stationId, kotId, status | Snapshots at add time |
 | OrderItemAddon | orderItemId, addonId, nameSnapshot, qty, pricePaise | |
 | Kot | id, orderId, stationId, businessDate, kotNo, kind, firedAt, readyAt, servedAt, reprintCount | kind: new/modify/cancel/move_notice |

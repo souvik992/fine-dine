@@ -149,7 +149,9 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       entries,
       openTable: (table, covers) => {
         const orderId = newId();
-        queue(() => ({ type: 'OpenTable', orderId, table: { id: table.id, label: table.label, areaId: table.areaId }, label: seatLabel(table.label, covers), payload: { tableId: table.id, covers, orderId } }));
+        // The captain who seats the table looks after it (P3-04).
+        const captainId = sessionRef.current?.user.id ?? null;
+        queue(() => ({ type: 'OpenTable', orderId, table: { id: table.id, label: table.label, areaId: table.areaId }, label: seatLabel(table.label, covers), payload: { tableId: table.id, covers, orderId, captainId } }));
         return orderId;
       },
       change: (orderId, menu, decide) =>

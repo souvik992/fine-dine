@@ -1,7 +1,7 @@
 import { addOrMerge, changeBy, firedByKot, hasChoices, needsChoices, orderView, visibleItems, type OrderView, type ViewItem } from '@dinepos/client';
 import { formatINR, newId, type MenuItem, type MenuSnapshot } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, Clock, Minus, Plus, Search, Send, ShoppingBasket, Trash2, TriangleAlert, Users, WifiOff } from 'lucide-react';
+import { ChevronLeft, Clock, Minus, Plus, ReceiptText, Search, Send, ShoppingBasket, Trash2, TriangleAlert, Users, WifiOff } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useApp } from '../app-context.js';
 import { Sheet } from '../components/Sheet.js';
@@ -75,6 +75,14 @@ export function OrderScreen({ orderId, areaId, onBack, onAttention }: { orderId:
     if (order && ('all' in choice || heldByCourse(order.items).length <= 1)) setSheet(null);
   };
 
+  // Request bill (P3-04): once something was sent and nothing waits; needs the server (the counter must hear now).
+  const canAskBill = order?.state === 'open' && can('order.edit') && order.items.some((i) => i.status === 'fired' && !i.queuedFire);
+  const askBill = () => {
+    if (!sync.online) return sync.notify('error', 'Asking for the bill needs the outlet server. Try again when the phone is back on the Wi-Fi.');
+    change(() => ({ type: 'RequestBill', payload: {}, label: 'Ask for the bill' }));
+    sync.notify('ok', `The counter has been asked for Table ${order?.table?.label ?? ''}’s bill.`);
+  };
+
   const held = heldSummary(order?.items ?? []);
   const choices = canFire ? fireChoices(order?.items ?? []) : [];
   const label = order?.table?.label ?? '';
@@ -142,6 +150,12 @@ export function OrderScreen({ orderId, areaId, onBack, onAttention }: { orderId:
           <Clock className="h-4 w-4 shrink-0" /> {order.waiting} change{order.waiting === 1 ? '' : 's'} waiting to send
         </p>
       ) : null}
+      {order?.billRequest && order.state === 'open' ? (
+        <p role="status" className="flex items-center gap-2 bg-[var(--bill)] px-4 py-2 text-sm font-semibold" data-testid="bill-requested">
+          <ReceiptText className="h-4 w-4 shrink-0" /> Bill asked at {new Date(order.billRequest.at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+          {order.billRequest.byName ? ` by ${order.billRequest.byName}` : ''}. The counter has been told.
+        </p>
+      ) : null}
       {order && !editable ? (
         <p role="status" className="bg-secondary px-4 py-3 font-semibold">
           This order is {order.state === 'merged' ? 'merged into another table' : order.state}. It can no longer be changed here.
@@ -187,6 +201,10 @@ export function OrderScreen({ orderId, areaId, onBack, onAttention }: { orderId:
         {choices[0] ? (
           <button className="btn btn-primary" onClick={() => fire(choices[0]!.payload)}>
             <Send className="h-5 w-5" /> Fire all
+          </button>
+        ) : canAskBill ? (
+          <button className="btn btn-primary" onClick={askBill}>
+            <ReceiptText className="h-5 w-5" /> {order?.billRequest ? 'Ask again' : 'Request bill'}
           </button>
         ) : null}
       </footer>
