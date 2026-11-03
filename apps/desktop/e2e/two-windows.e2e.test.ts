@@ -698,6 +698,15 @@ describe('desktop app', () => {
 
     await page!.getByRole('navigation', { name: 'Reports' }).getByRole('button', { name: 'GST summary' }).click();
     await page!.getByRole('table', { name: 'GST summary' }).getByText('5%').waitFor();
+
+    // P4-01: the leakage dashboard counts today's void; its card lists who, when and why.
+    await page!.getByRole('navigation', { name: 'Reports' }).getByRole('button', { name: 'Leakage dashboard' }).click();
+    const voids = page!.getByRole('listitem', { name: /^Void bills: [1-9]/ });
+    await voids.waitFor();
+    await voids.click();
+    await page!.getByTestId('audit-table').getByText('Billed twice by mistake').waitFor();
+    await page!.getByRole('navigation', { name: 'Reports' }).getByRole('button', { name: 'Audit log' }).click();
+    await page!.getByTestId('audit-table').getByText('Bill voided').first().waitFor();
     await page!.getByRole('button', { name: 'Floor', exact: true }).click();
   });
 

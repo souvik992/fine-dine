@@ -71,6 +71,11 @@ quantity instead of adding a second line (lines already sent to the kitchen are 
 ### 5. Leakage dashboard (owner/manager)
 - Cards: cancelled after fire, modified after fire, reprints, moves/transfers, voids, unbilled KOTs — counts
   for today, click to list with who/when/why.
+- Built in P4-01 (`apps/desktop/src/reports/LeakageViews.tsx`, Reports › Owner's view): cards for cancelled after KOT,
+  reduced after KOT, void bills, discounts above limit, reprints, moves and transfers, complimentary, cash out and
+  drawer, day-end cash difference, plus "food made, never paid" (fired items on void orders); count and amount each;
+  a card opens its events (when, what, detail, amount, why, by and device, approved by). **Audit log**: everything,
+  newest first, "Flagged only", "Show older". Same dates as the reports.
 
 ### 6. Reports (built in P4-03: `apps/desktop/src/reports/`; Floor header "Reports" for `reports.view`)
 Reports grouped Sales / Tax & money / Controls on the left; Today, Yesterday, Last 7 days, This month or dates

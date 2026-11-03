@@ -4,6 +4,7 @@ import { ArrowLeft, Download } from 'lucide-react';
 import { useState } from 'react';
 import { useApp } from '../app-context.js';
 import { UserBadge } from '../components/UserBadge.js';
+import { AuditList, LeakageDashboard } from './LeakageViews.js';
 
 type Preset = 'today' | 'yesterday' | 'week' | 'month' | 'custom';
 const PRESETS: Array<[Preset, string]> = [
@@ -42,9 +43,10 @@ export function ReportsScreen({ onBack }: { onBack: () => void }) {
   const table = useQuery({
     queryKey: ['report', key, range.from, range.to],
     queryFn: () => api.get<ReportTable>(`/v1/reports/${key}?from=${range.from}&to=${range.to}`),
-    enabled: !!today && range.from <= range.to,
+    enabled: !!today && range.from <= range.to && key !== 'leakage' && key !== 'audit',
   });
   const groups = [...new Set(list.data?.reports.map((r) => r.group) ?? [])];
+  const special = key === 'leakage' || key === 'audit';
 
   const download = () => {
     if (!table.data) return;
@@ -69,6 +71,19 @@ export function ReportsScreen({ onBack }: { onBack: () => void }) {
       </header>
       <div className="flex min-h-0 flex-1">
         <nav className="w-64 shrink-0 overflow-y-auto border-r border-border bg-card p-3" aria-label="Reports">
+          <div className="mb-4">
+            <p className="mb-1 px-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Owner's view</p>
+            {(
+              [
+                ['leakage', 'Leakage dashboard'],
+                ['audit', 'Audit log'],
+              ] as const
+            ).map(([k, label]) => (
+              <button key={k} className={`block w-full rounded-lg px-2 py-1.5 text-left text-sm ${key === k ? 'bg-foreground font-semibold text-background' : 'hover:bg-secondary'}`} onClick={() => setKey(k)}>
+                {label}
+              </button>
+            ))}
+          </div>
           {groups.map((g) => (
             <div key={g} className="mb-4">
               <p className="mb-1 px-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">{g}</p>
@@ -108,12 +123,19 @@ export function ReportsScreen({ onBack }: { onBack: () => void }) {
             ) : (
               <span className="text-sm text-muted-foreground">{range.from === range.to ? range.from : `${range.from} to ${range.to}`} (business dates)</span>
             )}
-            <button className="btn ml-auto" onClick={download} disabled={!table.data || table.data.rows.length === 0}>
+            <button className="btn ml-auto" onClick={download} disabled={special || !table.data || table.data.rows.length === 0}>
               <Download className="h-4 w-4" /> Download CSV
             </button>
           </div>
 
-          {table.data ? (
+          {key === 'leakage' && today ? <LeakageDashboard from={range.from} to={range.to} /> : null}
+          {key === 'audit' && today ? (
+            <>
+              <h2 className="mb-4 font-display text-2xl font-semibold">Audit log</h2>
+              <AuditList from={range.from} to={range.to} />
+            </>
+          ) : null}
+          {special ? null : table.data ? (
             <>
               <h2 className="font-display text-2xl font-semibold">{table.data.title}</h2>
               <p className="mb-4 text-sm text-muted-foreground">{table.data.description}</p>

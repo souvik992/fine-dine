@@ -436,3 +436,19 @@ describe('reports (P4-03)', () => {
     expect((await app.inject({ method: 'GET', url: '/v1/reports/daily?from=x', headers: { 'x-user-session': manager } })).statusCode).toBe(400);
   });
 });
+
+describe('leakage dashboard and audit log (P4-01)', () => {
+  it('need reports.view; a card drills into its events', async () => {
+    await seeded();
+    const manager = (await login(ids.manager, '2345')).body.token;
+    const cashier = (await login(ids.cashier, '1111')).body.token;
+    for (const url of ['/v1/leakage', '/v1/audit']) {
+      expect((await app.inject({ method: 'GET', url, headers: { 'x-user-session': cashier } })).statusCode, url).toBe(403);
+    }
+    const leakage = (await app.inject({ method: 'GET', url: '/v1/leakage', headers: { 'x-user-session': manager } })).json<{ cards: Array<{ key: string }>; unbilled: unknown }>();
+    expect(leakage.cards.map((c) => c.key)).toContain('voids');
+    const log = (await app.inject({ method: 'GET', url: '/v1/audit?limit=3', headers: { 'x-user-session': manager } })).json<{ entries: Array<{ label: string }>; next: number | null }>();
+    expect(log.entries.length).toBe(3);
+    expect((await app.inject({ method: 'GET', url: '/v1/audit?card=nope', headers: { 'x-user-session': manager } })).statusCode).toBe(404);
+  });
+});

@@ -1,4 +1,3 @@
-import { isoInZone } from '@dinepos/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { approveWithPin } from '../auth/approval.js';
@@ -33,7 +32,7 @@ export function backupRoutes(app: FastifyInstance, deps: BackupRouteDeps): void 
     db.prepare(
       `INSERT INTO audit_event (ts, device_id, user_id, approved_by, command_id, entity, entity_id, action, before_json, after_json, reason, leakage_flag)
        VALUES (?, NULL, ?, ?, NULL, 'backup', NULL, ?, NULL, ?, NULL, 0)`,
-    ).run(isoInZone(now(), deps.timeZone), user, approvedBy, action, JSON.stringify(after));
+    ).run(now().toISOString(), user, approvedBy, action, JSON.stringify(after)); // UTC, like every audit row
     return user;
   };
 

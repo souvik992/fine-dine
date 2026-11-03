@@ -122,7 +122,8 @@ table close with the last part (result `unpaidParts`).
 | `/v1/orders?state=open` | open orders |
 | `/v1/menu?areaId=&since=<version>` | `MenuSnapshot` (active items; the area's price list overrides base/variant prices) or `{ menuVersion, unchanged: true }` when `since` is current |
 | `/v1/reports/:name?from=&to=` | P4-03 (`apps/server/src/reports/catalog.ts`, right `reports.view`): a `ReportTable` (columns, rows, totals, summary; money in paise) over business dates, default today, at most a year. `GET /v1/reports` lists them: daily, items, categories, areas, tables, gst, payments, cash, discounts, voids, kot-changes |
-| `/v1/audit?from=&to=&leakage=1` | audit events |
+| `/v1/audit?from=&to=&leakage=1&card=&before=&limit=` | P4-01 (`reports.view`): `{ entries: [{ seq, at, label, ref, amountPaise, reason, leakage, by, approvedBy, device }], next }`, newest first; `card` narrows to one leakage card; dates are the outlet's calendar days |
+| `/v1/leakage?from=&to=` | P4-01 (`reports.view`): `{ cards: [{ key, label, hint, count, amountPaise, actions }], unbilled: { orders, items, amountPaise } }` |
 | `/v1/config` | outlet and billing settings with defaults applied (nothing secret) |
 | `/v1/printers` | `{ printers: [{ id, name, transport, role, widthMm, backupPrinterId?, status, queued, failedToday, lastError? }] }` |
 
