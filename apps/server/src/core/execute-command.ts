@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { commandEnvelopeSchema, isoInZone, localDate, newId, type CommandEnvelope, type CommandSuccess } from '@dinepos/shared';
 import type { z } from 'zod';
 import { approveWithPin } from '../auth/approval.js';
+import { conflictMessage, lastChange } from './conflict.js';
 import type { Db } from '../db/connection.js';
 import { getOrderSnapshot, loadOrderRow } from '../queries/order-snapshot.js';
 import { currentBusinessDate } from './business-day.js';
@@ -100,11 +101,15 @@ function runInTransaction(
     order = loadOrderRow(db, orderId) ?? null;
     if (!order) throw new PosError('NOT_FOUND', 'Order not found.', { orderId });
     if (order.version !== envelope.expectedVersion) {
-      const err = new PosError('VERSION_CONFLICT', 'The order was changed on another device.', {
+      // Say who changed it and how (docs/05: "Table changed by <user>"), so the other terminal can check first.
+      const snapshot = getOrderSnapshot(db, orderId);
+      const change = lastChange(db, orderId, deps.timeZone);
+      const err = new PosError('VERSION_CONFLICT', conflictMessage(snapshot?.table?.label ?? null, change), {
         currentVersion: order.version,
         expectedVersion: envelope.expectedVersion,
+        lastChange: change,
       });
-      err.order = getOrderSnapshot(db, orderId);
+      err.order = snapshot;
       throw err;
     }
   }

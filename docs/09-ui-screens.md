@@ -46,7 +46,8 @@ quantity instead of adding a second line (lines already sent to the kitchen are 
   course selector.
 - Footer buttons: Fire (F8), Fire course… , Print bill (F9), Settle (F10), More (discount, covers, captain,
   customer, transfer items).
-- Conflict banner when the order changed elsewhere.
+- Conflict banner when the order changed elsewhere. Built in P2-07: a refused decision (print, settle, split, move,
+  merge, move items, change a sent item) shows what was not done and who changed the table, how and when.
 - Table actions (P2-03) in the order header, by right: **Move** (pick a free table), **Merge** (pick an occupied
   table: its order joins this one), **Move items** (tick lines, pick an occupied table). Whole lines only.
 - After the KOT (P2-04): each sent line has a pencil button: "Keep" stepper (0 = cancel the line), reason chips or

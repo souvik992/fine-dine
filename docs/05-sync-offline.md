@@ -9,6 +9,20 @@
   | AddItems, FireKOT (new items), SetCovers, UpdateHeldItem, RemoveHeldItem | rebase silently: resend with new version (same commandId, once). Held-item edits are included because the server still refuses them with INVALID_STATE if the item was fired meanwhile |
   | MoveTable, MergeTables, TransferItems, PrintBill, SplitBill, Settle, Void, Cancel/Modify fired | show "Table changed by <user>" and ask |
 
+Built in P2-07:
+- `VERSION_CONFLICT` says who changed the order last and how: `details.lastChange { by, what, at }` (from the audit
+  rows of the order, its items, bills and KOTs) and a message such as "Table T5 was changed by Ravi (moved the table)
+  at 20:14. Check the order and try again." (`apps/server/src/core/conflict.ts`).
+- A decision made in a dialog (print bill, settle, split, move, merge, move items, change or cancel a sent item) is
+  sent on the version shown **when the dialog opened** (`OrderSession.holdDecision`): a change made on another terminal
+  meanwhile is refused and explained, never silently included, even though the screen already updated from the stream.
+  After the refusal the dialog decides on what is now shown, so trying again works.
+- The order screen shows a red banner: "The bill was not printed. Table T5 was changed by … Check the order and try
+  again." with "OK, I have checked". Rebased commands (adding, sending, held-item edits) never show it.
+- Acceptance: two terminals that only see their own changes add 20 items each to one table and all 40 arrive once;
+  two windows punching the same table at the same moment lose nothing; Move vs Print bill shows the banner and prints
+  nothing (unit, server and end-to-end tests).
+
 ## Idempotency
 - Every command has a client-made `commandId` (ULID).
 - `processed_command(command_id, result_json, at)` written in the same transaction.

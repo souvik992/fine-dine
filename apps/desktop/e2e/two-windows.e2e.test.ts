@@ -640,6 +640,50 @@ describe('desktop app', () => {
     await page.getByRole('button', { name: 'Floor', exact: true }).click();
   });
 
+  it('Two terminals on T4: items punched at the same moment all arrive; Move vs Print bill shows who moved the table', async () => {
+    const [a, b] = app.windows();
+    await a!.locator('[data-table="T4"]').click();
+    await a!.getByRole('dialog', { name: 'Seat table T4' }).waitFor();
+    await a!.keyboard.press('Enter');
+    await a!.getByLabel('Add item').waitFor();
+    await b!.locator('[data-table="T4"][data-state="SEATED"]').click({ timeout: 5_000 });
+    await b!.getByLabel('Add item').waitFor();
+
+    const punch = async (page: NonNullable<typeof a>, code: string, times: number) => {
+      for (let i = 0; i < times; i++) {
+        await page.getByLabel('Add item').fill(code);
+        await page.getByLabel('Add item').press('Enter');
+      }
+    };
+    await Promise.all([punch(a!, 'dm', 3), punch(b!, 'jr', 3)]); // both terminals at once
+    const floor = await get<{ tables: Array<{ label: string; orderId?: string }> }>('/v1/floor');
+    const orderUrl = `/v1/orders/${floor.tables.find((t) => t.label === 'T4')!.orderId!}`;
+    await expect
+      .poll(async () => (await get<{ items: Array<{ name: string; qty: number }> }>(orderUrl)).items.map((i) => `${i.name}×${i.qty}`).sort(), { timeout: 5_000 })
+      .toEqual(['Dal Makhani×3', 'Jeera Rice×3']); // nothing lost, nothing doubled
+
+    await a!.keyboard.press('F8');
+    await expect.poll(() => a!.getByTestId('held-items').locator('li').count(), { timeout: 5_000 }).toBe(0);
+    await a!.keyboard.press('F9'); // terminal A starts the bill…
+    const bill = a!.getByRole('dialog', { name: 'Print bill' });
+    await bill.waitFor();
+    await b!.getByRole('button', { name: 'Move', exact: true }).click(); // …while terminal B moves the table
+    await b!.getByRole('dialog', { name: 'Move to another table' }).getByRole('listitem', { name: 'Table T5' }).click();
+    await b!.getByTestId('order-title').getByText('Table T5').waitFor();
+    await bill.getByRole('button', { name: /Print/ }).last().click();
+    const banner = a!.getByTestId('conflict-banner');
+    await banner.waitFor({ timeout: 5_000 });
+    expect(await banner.innerText()).toMatch(/The bill was not printed\.[\s\S]*Table T5 was changed by Asha \(Owner\) \(moved the table\)/);
+    expect((await get<{ bills: unknown[] }>(orderUrl)).bills).toHaveLength(0);
+    await a!.keyboard.press('Escape');
+    await banner.getByRole('button', { name: 'OK, I have checked' }).click();
+    await a!.getByTestId('order-title').getByText('Table T5').waitFor(); // A now shows the table where it is
+    for (const p of [a!, b!]) {
+      await p.keyboard.press('Escape');
+      await p.keyboard.press('Escape');
+    }
+  });
+
   it('Reports: today’s daily sales and GST summary come from the server; VOID bills are counted apart', async () => {
     const [page] = app.windows();
     await page!.getByRole('button', { name: 'Floor', exact: true }).click().catch(() => undefined);

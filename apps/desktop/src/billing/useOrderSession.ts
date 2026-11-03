@@ -2,7 +2,7 @@ import type { OrderSnapshot } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../app-context.js';
-import { OrderSession } from './order-session.js';
+import { OrderSession, type ConflictInfo } from './order-session.js';
 
 /**
  * One OrderSession per open order. The query (refreshed by `order:<id>` stream events) feeds the session;
@@ -13,6 +13,8 @@ export function useOrderSession(orderId: string) {
   const session = useMemo(() => new OrderSession(api, orderId), [api, orderId]);
   const [order, setOrder] = useState<OrderSnapshot | null>(null);
   const [changedElsewhere, setChangedElsewhere] = useState(false);
+  const [conflict, setConflict] = useState<ConflictInfo | null>(null);
+  useEffect(() => session.onConflict(setConflict), [session]);
 
   const query = useQuery({ queryKey: ['order', orderId], queryFn: () => api.get<OrderSnapshot>(`/v1/orders/${orderId}`) });
 
@@ -33,5 +35,5 @@ export function useOrderSession(orderId: string) {
     return () => clearTimeout(t);
   }, [changedElsewhere]);
 
-  return { session, order, error: query.error, changedElsewhere, dismissChange: () => setChangedElsewhere(false) };
+  return { session, order, error: query.error, changedElsewhere, dismissChange: () => setChangedElsewhere(false), conflict, dismissConflict: () => setConflict(null) };
 }

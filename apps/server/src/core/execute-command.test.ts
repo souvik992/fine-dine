@@ -167,7 +167,8 @@ describe('executeCommand — VERSION_CONFLICT', () => {
       'VERSION_CONFLICT',
     );
     expect(err.httpStatus).toBe(409);
-    expect(err.details).toEqual({ currentVersion: 2, expectedVersion: 1 });
+    expect(err.details).toEqual({ currentVersion: 2, expectedVersion: 1, lastChange: { by: null, what: 'changed the order', at: '13:30' } }); // who changed it (docs/05)
+    expect(err.message).toContain('was changed by another terminal (changed the order) at 13:30');
     expect(err.order).toMatchObject({ id: orderId, version: 2 });
     expect({ audit: count('audit_event'), events: count('event_log'), done: count('processed_command') }).toEqual(before);
     expect(db.prepare('SELECT customer_name FROM "order" WHERE id = ?').pluck().get(orderId)).toBe('first');

@@ -1,6 +1,6 @@
 import { formatINR, newId, type MenuItem, type MenuSnapshot, type OrderItemSnapshot, type OrderSnapshot, type OutletConfig } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRightLeft, Flame, Merge, MoveRight, Printer, Search, Split, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, Flame, Merge, MoveRight, Printer, Search, Split, TriangleAlert, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
@@ -20,6 +20,19 @@ import { SplitDialog } from './SplitDialog.js';
 import { TableActionsDialog, type TableAction } from './TableActionsDialog.js';
 import { useOrderSession } from './useOrderSession.js';
 
+/** What a refused command was, for the "Table changed by …" banner (docs/05). */
+const NOT_DONE: Record<string, string> = {
+  PrintBill: 'The bill was not printed.',
+  SplitBill: 'The bill was not split.',
+  Settle: 'The payment was not taken.',
+  VoidBill: 'The bill was not voided.',
+  MoveTable: 'The table was not moved.',
+  MergeTables: 'The tables were not merged.',
+  TransferItems: 'The items were not moved.',
+  ModifyFiredItem: 'The item was not changed.',
+  CancelFiredItem: 'The item was not cancelled.',
+};
+
 interface Toast {
   kind: 'ok' | 'error';
   text: string;
@@ -32,7 +45,7 @@ interface Toast {
 export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: () => void }) {
   const { api, pinRequest, can } = useApp();
   const queryClient = useQueryClient();
-  const { session, order, error, changedElsewhere, dismissChange } = useOrderSession(orderId);
+  const { session, order, error, changedElsewhere, dismissChange, conflict, dismissConflict } = useOrderSession(orderId);
   const areaId = order?.table?.areaId;
   const menuQuery = useQuery({
     queryKey: ['menu', areaId ?? 'default'],
@@ -53,6 +66,15 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
   const [changing, setChanging] = useState<OrderItemSnapshot | null>(null);
   const [tableAction, setTableAction] = useState<TableAction | null>(null);
   const [splitting, setSplitting] = useState(false);
+  // While a decision dialog is open, its commands go out on the version shown when it opened (docs/05, P2-07).
+  const deciding = dialog !== null || splitting || tableAction !== null || changing !== null;
+  const orderVersion = order?.version ?? null;
+  const decidingRef = useRef(false);
+  useEffect(() => {
+    if (deciding && !decidingRef.current) session.holdDecision(orderVersion);
+    if (!deciding && decidingRef.current) session.holdDecision(null);
+    decidingRef.current = deciding;
+  }, [deciding, orderVersion, session]);
   const [settledChange, setSettledChange] = useState<number | null>(null);
   const searchBox = useRef<HTMLInputElement>(null);
 
@@ -286,6 +308,17 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
           <UserBadge />
         </div>
       </header>
+      {conflict ? (
+        <div role="alert" data-testid="conflict-banner" className="flex items-start gap-3 border-b border-danger/40 bg-danger/10 px-5 py-3 text-sm">
+          <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
+          <p className="flex-1">
+            <span className="font-semibold">{NOT_DONE[conflict.type] ?? 'That was not done.'}</span> {conflict.message}
+          </p>
+          <button className="btn h-8 shrink-0" onClick={dismissConflict}>
+            OK, I have checked
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1">
         <nav className="w-44 shrink-0 overflow-y-auto border-r border-border bg-card p-2" aria-label="Categories">
