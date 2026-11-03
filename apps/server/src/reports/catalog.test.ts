@@ -48,8 +48,8 @@ describe('reports v1', () => {
   const settled = () => bills.filter((b) => b.state === 'settled');
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
-  it('lists 11 reports', () => {
-    expect(REPORTS.map((r) => r.key)).toEqual(['daily', 'items', 'categories', 'areas', 'tables', 'gst', 'payments', 'cash', 'discounts', 'voids', 'kot-changes']);
+  it('lists 12 reports', () => {
+    expect(REPORTS.map((r) => r.key)).toEqual(['daily', 'items', 'categories', 'areas', 'tables', 'gst', 'payments', 'cash', 'discounts', 'voids', 'kot-changes', 'captains']);
   });
 
   it('daily sales: settled bills only; the void is counted apart', () => {
@@ -101,6 +101,21 @@ describe('reports v1', () => {
       ['T1', 1, 2],
       ['T2', 1, 4],
     ]);
+  });
+
+  it('captain performance (P3-04/05): per captain, paid orders only; adds up to net sales; no captain is listed last', () => {
+    // T1 was Ravi's, T2 nobody's (set before payment would be refused, so set on the order rows directly).
+    const ravi = seedId('user:captain');
+    h.db.prepare(`UPDATE "order" SET captain_id = ? WHERE table_id = ?`).run(ravi, S.t1);
+    const r = run('captains');
+    const t1Net = bills.find((b) => b.state === 'settled' && h.db.prepare('SELECT o.table_id FROM bill b JOIN "order" o ON o.id = b.order_id WHERE b.id = ?').pluck().get(b.id) === S.t1)!.total_paise;
+    expect(r.rows.map((x) => [x.captain, x.orders, x.covers, x.net, x.dishes, x.changes])).toEqual([
+      ['Ravi (Captain)', 1, 2, t1Net, 3, 0],
+      ['No captain', 1, 4, sum(settled().map((b) => b.total_paise)) - t1Net, 2, 1], // T2's dal reduced 3 → 2 with a change slip
+    ]);
+    expect(r.rows[0]!.perCover).toBe(Math.round(t1Net / 2));
+    expect(r.totals).toMatchObject({ orders: 2, covers: 6, net: sum(settled().map((b) => b.total_paise)) });
+    expect(r.summary[0]).toEqual({ label: 'Top: Ravi (Captain)', value: t1Net, type: 'money' });
   });
 
   it('refuses a wrong range or an unknown report; other days are empty', () => {

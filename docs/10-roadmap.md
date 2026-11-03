@@ -99,7 +99,7 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
 - [x] **P3-02 Order taking + course-wise firing**
 - [x] **P3-03 Offline outbox + replay + "Needs attention" list** (`05-sync-offline.md`)
 - [x] **P3-04 Captain assignment to areas/tables + Request bill notification**
-- [ ] **P3-05 Captain performance report**
+- [x] **P3-05 Captain performance report**
 
 ## Phase 4 â€” Controls, KDS, reports, cloud
 

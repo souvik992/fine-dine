@@ -403,7 +403,64 @@ const kotChanges: Def = {
   },
 };
 
-const DEFS: Def[] = [daily, items, categories, areas, tables, gst, payments, cash, discounts, voids, kotChanges];
+// ---------------------------------------------------------------- staff
+
+const captains: Def = {
+  key: 'captains',
+  title: 'Captain performance',
+  group: 'Staff',
+  description:
+    'Per captain (the one looking after each order, P3-04): paid orders, guests, net sales, per cover, average bill, dishes sent, average time at the table, and changes after the KOT.',
+  build(c) {
+    const rows = all(
+      c,
+      `SELECT COALESCE(u.name, 'No captain') AS captain, count(*) AS orders, coalesce(sum(o.covers), 0) AS covers,
+              sum((SELECT coalesce(sum(b.total_paise), 0) FROM bill b WHERE b.order_id = o.id AND b.state = 'settled')) AS net,
+              sum((SELECT count(*) FROM bill b WHERE b.order_id = o.id AND b.state = 'settled')) AS bills,
+              sum((SELECT coalesce(sum(oi.qty), 0) FROM order_item oi WHERE oi.order_id = o.id AND oi.status = 'fired')) AS dishes,
+              CAST(round(avg((julianday(o.closed_at) - julianday(o.opened_at)) * 1440)) AS INTEGER) AS minutes,
+              sum((SELECT count(*) FROM kot k WHERE k.order_id = o.id AND k.kind IN ('modify', 'cancel'))) AS changes
+       FROM "order" o LEFT JOIN app_user u ON u.id = o.captain_id
+       WHERE ${IN_RANGE} AND o.state = 'settled'
+       GROUP BY o.captain_id ORDER BY o.captain_id IS NULL, net DESC, captain`,
+      params(c),
+    ).map(({ bills, ...r }): ReportRow => ({
+      ...r,
+      perCover: avg(n(r.net), n(r.covers)),
+      avgBill: avg(n(r.net), n(bills)),
+      bills: n(bills),
+      minutes: r.minutes === null ? '' : `${n(r.minutes)} min`,
+    }));
+    const columns = [
+      col('captain', 'Captain'),
+      col('orders', 'Tables served', 'int'),
+      col('covers', 'Guests', 'int'),
+      col('net', 'Net sales', 'money'),
+      col('perCover', 'Per cover', 'money'),
+      col('avgBill', 'Average bill', 'money'),
+      col('dishes', 'Dishes sent', 'int'),
+      col('minutes', 'Average stay'),
+      col('changes', 'Changes after KOT', 'int'),
+    ];
+    const totals = totalsOf(columns, rows);
+    totals.perCover = avg(n(totals.net), n(totals.covers));
+    totals.avgBill = avg(n(totals.net), rows.reduce((s, r) => s + n(r.bills), 0));
+    const named = rows.filter((r) => r.captain !== 'No captain');
+    const top = named[0];
+    return {
+      columns,
+      rows,
+      totals,
+      summary: [
+        ...(top ? [{ label: `Top: ${String(top.captain)}`, value: n(top.net), type: 'money' as const }] : []),
+        { label: 'Captains', value: named.length, type: 'int' },
+        { label: 'Per cover', value: n(totals.perCover), type: 'money' },
+      ],
+    };
+  },
+};
+
+const DEFS: Def[] = [daily, items, categories, areas, tables, gst, payments, cash, discounts, voids, kotChanges, captains];
 
 export const REPORTS: ReportInfo[] = DEFS.map(({ key, title, group, description }) => ({ key, title, group, description }));
 

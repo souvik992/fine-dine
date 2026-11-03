@@ -78,7 +78,7 @@ quantity instead of adding a second line (lines already sent to the kitchen are 
   newest first, "Flagged only", "Show older". Same dates as the reports.
 
 ### 6. Reports (built in P4-03: `apps/desktop/src/reports/`; Floor header "Reports" for `reports.view`)
-Reports grouped Sales / Tax & money / Controls on the left; Today, Yesterday, Last 7 days, This month or dates
+Reports grouped Sales / Tax & money / Controls / Staff (Captain performance, P3-05) on the left; Today, Yesterday, Last 7 days, This month or dates
 (business dates); headline figures, the table with a Total row, Download CSV (amounts as plain rupees for Excel,
 formula-safe text, from the shared `reportToCsv`). Only settled bills count as sales; void bills keep their numbers
 and appear in Daily sales (count, amount) and in Voids and cancellations. GST by rate comes from the bills as printed.
