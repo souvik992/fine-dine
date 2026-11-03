@@ -19,6 +19,7 @@ import { sessionRoutes } from './routes/sessions.js';
 import { stockRoutes } from './routes/stock.js';
 import { cashierRoutes } from './routes/cashier.js';
 import { deviceRoutes } from './routes/devices.js';
+import { reportRoutes } from './routes/reports.js';
 import { deviceTokenOf, deviceUnpaired, isLoopback, MASTER_DEVICE_ID, resolveDevice, touchDevice } from './auth/devices.js';
 import { backupRoutes } from './routes/backups.js';
 import type { BackupScheduler } from './backup/scheduler.js';
@@ -161,6 +162,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
   stockRoutes(app, { db, now });
   cashierRoutes(app, { db, now });
   deviceRoutes(app, { db, now });
+  reportRoutes(app, { db, now, timeZone });
   if (deps.backups) backupRoutes(app, { db, now, timeZone, dataDir: deps.backups.dataDir, backups: deps.backups.scheduler, requestRestart: deps.backups.requestRestart });
   streamRoutes(app, hub, allowedOrigins);
   return Object.assign(app, { realtime: hub });

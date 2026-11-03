@@ -71,7 +71,11 @@ quantity instead of adding a second line (lines already sent to the kitchen are 
 - Cards: cancelled after fire, modified after fire, reprints, moves/transfers, voids, unbilled KOTs — counts
   for today, click to list with who/when/why.
 
-### 6. Reports
+### 6. Reports (built in P4-03: `apps/desktop/src/reports/`; Floor header "Reports" for `reports.view`)
+Reports grouped Sales / Tax & money / Controls on the left; Today, Yesterday, Last 7 days, This month or dates
+(business dates); headline figures, the table with a Total row, Download CSV (amounts as plain rupees for Excel,
+formula-safe text, from the shared `reportToCsv`). Only settled bills count as sales; void bills keep their numbers
+and appear in Daily sales (count, amount) and in Voids and cancellations. GST by rate comes from the bills as printed.
 
 ### 7. Settings (built with P2-01: `apps/desktop/src/settings/`)
 Sections are shown by right; every save is a command, so it is audited and other terminals update live.

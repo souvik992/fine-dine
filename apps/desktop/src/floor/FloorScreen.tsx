@@ -1,6 +1,6 @@
 import type { FloorSnapshot, FloorTable } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Banknote, MoonStar, ReceiptText, RefreshCw, Search, Settings } from 'lucide-react';
+import { Banknote, ChartColumn, MoonStar, ReceiptText, RefreshCw, Search, Settings } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
@@ -31,7 +31,7 @@ function columnsOf(grid: HTMLElement | null): number {
   return Math.max(1, tiles.filter((t) => (t as HTMLElement).offsetTop === top).length);
 }
 
-export function FloorScreen({ onSettings, onStock, onOpenOrder }: { onSettings: () => void; onStock: () => void; onOpenOrder: (orderId: string) => void }) {
+export function FloorScreen({ onSettings, onStock, onReports, onOpenOrder }: { onSettings: () => void; onStock: () => void; onReports: () => void; onOpenOrder: (orderId: string) => void }) {
   const { api, pinRequest, can } = useApp();
   const now = useClock();
   const floor = useQuery({
@@ -191,6 +191,11 @@ export function FloorScreen({ onSettings, onStock, onOpenOrder }: { onSettings: 
           </button>
         ) : null}
         {can('stock.manage') ? <StockButton onClick={onStock} /> : null}
+        {can('reports.view') ? (
+          <button className="btn h-10" onClick={onReports} title="Sales, GST, cash and leakage reports">
+            <ChartColumn className="h-4 w-4" /> Reports
+          </button>
+        ) : null}
         {can('dayend', true) ? (
           <button className="btn h-10" onClick={() => setClosingDay(true)} disabled={!data} title="Close the business day and print the Z-report">
             <MoonStar className="h-4 w-4" /> Day end

@@ -11,9 +11,10 @@ import { SetupScreen } from './auth/SetupScreen.js';
 import { BillingScreen } from './billing/BillingScreen.js';
 import { FloorScreen } from './floor/FloorScreen.js';
 import { SettingsScreen } from './settings/SettingsScreen.js';
+import { ReportsScreen } from './reports/ReportsScreen.js';
 import { StockScreen } from './stock/StockScreen.js';
 
-type Screen = { kind: 'floor' } | { kind: 'settings' } | { kind: 'stock' } | { kind: 'order'; orderId: string };
+type Screen = { kind: 'floor' } | { kind: 'settings' } | { kind: 'stock' } | { kind: 'reports' } | { kind: 'order'; orderId: string };
 
 export function App() {
   const { api, session, needsPairing } = useApp();
@@ -54,8 +55,10 @@ export function App() {
         <BillingScreen key={screen.orderId} orderId={screen.orderId} onBack={toFloor} />
       ) : screen.kind === 'stock' ? (
         <StockScreen onBack={toFloor} />
+      ) : screen.kind === 'reports' ? (
+        <ReportsScreen onBack={toFloor} />
       ) : (
-        <FloorScreen onSettings={() => setScreen({ kind: 'settings' })} onStock={() => setScreen({ kind: 'stock' })} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} />
+        <FloorScreen onSettings={() => setScreen({ kind: 'settings' })} onStock={() => setScreen({ kind: 'stock' })} onReports={() => setScreen({ kind: 'reports' })} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} />
       )}
       <ManagerPinDialog />
     </>

@@ -422,3 +422,17 @@ describe("today's bills and cash (P2-06)", () => {
     expect(cash.movements).toMatchObject([{ kind: 'pay_in', amountPaise: 100_000, userName: 'Asha (Owner)' }]);
   }, 20_000);
 });
+
+describe('reports (P4-03)', () => {
+  it('need reports.view: a Manager sees them, a Cashier does not', async () => {
+    await seeded();
+    const manager = (await login(ids.manager, '2345')).body.token;
+    const cashier = (await login(ids.cashier, '1111')).body.token;
+    expect((await app.inject({ method: 'GET', url: '/v1/reports', headers: { 'x-user-session': cashier } })).statusCode).toBe(403);
+    const list = (await app.inject({ method: 'GET', url: '/v1/reports', headers: { 'x-user-session': manager } })).json<{ reports: unknown[]; businessDate: string }>();
+    expect(list.reports).toHaveLength(11);
+    const daily = await app.inject({ method: 'GET', url: '/v1/reports/daily?from=2026-11-01&to=2026-11-02', headers: { 'x-user-session': manager } });
+    expect(daily.json()).toMatchObject({ key: 'daily', from: '2026-11-01', to: '2026-11-02', rows: [] });
+    expect((await app.inject({ method: 'GET', url: '/v1/reports/daily?from=x', headers: { 'x-user-session': manager } })).statusCode).toBe(400);
+  });
+});

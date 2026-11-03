@@ -640,6 +640,23 @@ describe('desktop app', () => {
     await page.getByRole('button', { name: 'Floor', exact: true }).click();
   });
 
+  it('Reports: today’s daily sales and GST summary come from the server; VOID bills are counted apart', async () => {
+    const [page] = app.windows();
+    await page!.getByRole('button', { name: 'Floor', exact: true }).click().catch(() => undefined);
+    await page!.getByRole('button', { name: 'Reports', exact: true }).click();
+    const table = page!.getByTestId('report-table');
+    await table.waitFor();
+    const daily = await get<{ rows: Array<{ bills: number; voids: number; net: number }> }>('/v1/reports/daily');
+    expect(daily.rows).toHaveLength(1);
+    expect(daily.rows[0]!.voids).toBeGreaterThan(0); // the bill voided in the Bills test
+    await page!.getByLabel('Headline figures').getByText('Net sales').waitFor();
+    expect(await table.locator('tfoot').innerText()).toContain('Total');
+
+    await page!.getByRole('navigation', { name: 'Reports' }).getByRole('button', { name: 'GST summary' }).click();
+    await page!.getByRole('table', { name: 'GST summary' }).getByText('5%').waitFor();
+    await page!.getByRole('button', { name: 'Floor', exact: true }).click();
+  });
+
   it('Backups: back up now, then restore that backup with the Owner PIN; the server restarts and the app comes back', async () => {
     const page = await openSettings('Backups');
     await page.getByRole('button', { name: 'Back up now' }).click();
