@@ -56,6 +56,9 @@ export const updateHeldItemSchema = z
 
 export const removeHeldItemSchema = z.object({ orderItemId: ulidSchema }).strict();
 
+/** Guests at the table (P3-02). Only while the order is open: the printed bill shows them. */
+export const setCoversSchema = z.object({ covers: z.number().int().min(1).max(99) }).strict();
+
 /** Exactly one selector: specific held items, one course, or everything held. */
 export const fireKotSchema = z.union([
   z.object({ itemIds: z.array(ulidSchema).min(1).max(200) }).strict(),
@@ -91,4 +94,5 @@ export type OpenTablePayload = z.infer<typeof openTableSchema>;
 export type AddItemsPayload = z.infer<typeof addItemsSchema>;
 export type UpdateHeldItemPayload = z.infer<typeof updateHeldItemSchema>;
 export type RemoveHeldItemPayload = z.infer<typeof removeHeldItemSchema>;
+export type SetCoversPayload = z.infer<typeof setCoversSchema>;
 export type FireKotPayload = z.infer<typeof fireKotSchema>;

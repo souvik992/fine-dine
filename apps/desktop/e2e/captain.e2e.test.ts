@@ -113,6 +113,8 @@ describe('captain app on a phone', () => {
     await sheet.getByRole('button', { name: 'One more guest' }).click();
     await sheet.getByRole('button', { name: 'One more guest' }).click();
     await sheet.getByRole('button', { name: 'Seat 4 guests' }).click();
+    await page.getByRole('heading', { name: 'Table T3' }).waitFor({ timeout: 5_000 }); // straight into the order
+    await page.getByRole('button', { name: 'Back to tables' }).click();
     await page.locator('[data-table="T3"][data-state="SEATED"]').waitFor({ timeout: 5_000 });
 
     const t3 = (await get<{ tables: Array<{ label: string; orderId?: string; orderVersion?: number; covers?: number }> }>('/v1/floor')).tables.find((t) => t.label === 'T3')!;
@@ -122,6 +124,70 @@ describe('captain app on a phone', () => {
     await send('FireKOT', { all: true }, { orderId: t3.orderId, expectedVersion: added.order!.version });
     await page.locator('[data-table="T3"][data-state="KOT_RUNNING"]').waitFor({ timeout: 3_000 }); // live, no refresh
     await page.locator('[data-table="T3"]').click();
-    await page.getByRole('dialog', { name: 'Table T3' }).getByText('Dal Makhani').waitFor();
+    await page.getByRole('heading', { name: 'Table T3' }).waitFor();
+    await page.getByRole('button', { name: 'Basket', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Table T3 order' }).getByText('2 × Dal Makhani').waitFor();
+    await page.getByRole('button', { name: 'Close' }).click();
+    await page.getByRole('button', { name: 'Back to tables' }).click();
+  });
+
+  // P3-02: order taking and course-wise firing on the phone.
+  it('takes an order by course on the phone: options, merge, Fire course 1, guests, then Fire all', async () => {
+    const page = await phone.firstWindow();
+    await page.locator('[data-table="T5"]').click();
+    await page.getByRole('dialog', { name: 'Seat T5' }).getByRole('button', { name: 'Seat 2 guests' }).click();
+    await page.getByRole('heading', { name: 'Table T5' }).waitFor({ timeout: 5_000 });
+
+    // Course 1: a plain dish twice (one line of 2), and a dish whose spice level must be chosen.
+    await page.getByRole('button', { name: 'Add Hara Bhara Kebab' }).click();
+    await page.getByRole('button', { name: 'Add Hara Bhara Kebab' }).click();
+    await page.getByRole('button', { name: 'Basket', exact: true }).getByText('2 to send').waitFor({ timeout: 5_000 });
+    await page.getByRole('button', { name: 'Add Paneer Tikka' }).click();
+    const options = page.getByRole('dialog', { name: 'Paneer Tikka' });
+    expect(await options.getByRole('button', { name: 'Add 1 to course 1' }).isDisabled()).toBe(true);
+    await options.getByRole('radio', { name: 'Medium' }).click();
+    await options.getByRole('button', { name: 'Add 1 to course 1' }).click();
+    await page.getByRole('button', { name: 'Basket', exact: true }).getByText('3 to send').waitFor({ timeout: 5_000 });
+
+    // Course 2: mains.
+    await page.getByRole('radiogroup', { name: 'Add to course' }).getByRole('radio', { name: '2' }).click();
+    await page.getByRole('tab', { name: 'Main Course' }).click();
+    await page.getByRole('button', { name: 'Add Chana Masala' }).click();
+    await page.getByRole('button', { name: 'Basket', exact: true }).getByText('4 to send').waitFor({ timeout: 5_000 });
+
+    await page.getByRole('button', { name: 'Basket', exact: true }).click();
+    const basket = page.getByRole('dialog', { name: 'Table T5 order' });
+    await basket.getByRole('region', { name: 'Course 2' }).getByText('Chana Masala').waitFor();
+    await basket.getByRole('button', { name: 'Fire course 1 (3)' }).click();
+    await page.getByText(/KOT \d{4}.* sent to the kitchen/).waitFor({ timeout: 5_000 });
+
+    const t5 = (await get<{ tables: Array<{ label: string; orderId?: string; state: string }> }>('/v1/floor')).tables.find((t) => t.label === 'T5')!;
+    expect(t5.state).toBe('KOT_RUNNING');
+    type Line = { name: string; qty: number; course: number; status: string; addons: Array<{ name: string }> };
+    const lines = async () => (await get<{ items: Line[]; covers: number }>(`/v1/orders/${t5.orderId}`));
+    let order = await lines();
+    expect(order.items.map((i) => [i.name, i.qty, i.course, i.status])).toEqual(
+      expect.arrayContaining([
+        ['Hara Bhara Kebab', 2, 1, 'fired'],
+        ['Paneer Tikka', 1, 1, 'fired'],
+        ['Chana Masala', 1, 2, 'held'],
+      ]),
+    );
+    expect(order.items.find((i) => i.name === 'Paneer Tikka')!.addons.map((a) => a.name)).toEqual(['Medium']);
+    await basket.getByRole('button', { name: 'Fire all (1)' }).waitFor();
+    await basket.getByRole('region', { name: 'Sent to the kitchen' }).getByText('2 × Hara Bhara Kebab').waitFor();
+    await basket.getByRole('button', { name: 'Close' }).click();
+    await basket.waitFor({ state: 'detached' });
+
+    await page.getByRole('button', { name: 'Guests: 2' }).click();
+    await page.getByRole('dialog', { name: 'Guests' }).getByRole('button', { name: 'One more guest' }).click();
+    await page.getByRole('button', { name: 'Save 3 guests' }).click();
+    await page.getByRole('button', { name: 'Guests: 3' }).waitFor({ timeout: 5_000 });
+
+    await page.getByRole('button', { name: 'Fire all' }).click();
+    await page.getByRole('button', { name: 'Basket', exact: true }).getByText('Order').waitFor({ timeout: 5_000 });
+    order = await lines();
+    expect(order.covers).toBe(3);
+    expect(order.items.every((i) => i.status === 'fired')).toBe(true);
   });
 });

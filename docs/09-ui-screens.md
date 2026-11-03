@@ -136,6 +136,14 @@ The button shows how many materials are low or need a count. Tabs:
   **Tables** (area tabs, live states, covers, time at the table, amount; offline banner; Lock). A free table opens
   a **Seat** sheet (guests stepper); an occupied one shows its order read-only until order taking (P3-02). Installable
   (web app manifest); a service worker keeps the app shell through Wi-Fi blips.
+- Order taking (P3-02): seating a table, or tapping an occupied one, opens **Table T5**: guests button (SetCovers,
+  locked once the bill is printed), running total, search, category chips and a **Course 1–5** picker for quick adds.
+  Each dish row has a **+** (adds one to the chosen course; the same dish/options/note/course raises the waiting line,
+  as on the terminal); tapping the row, or **+** on a dish with a required choice, opens the **options sheet** (size,
+  add-ons within min/max, quick notes and a note, course, quantity). The bottom bar shows what is waiting and **Fire
+  all**; the **basket** groups waiting lines by course (−/+/remove, move to another course), shows what was sent by
+  KOT, and offers **Fire all** plus **Fire course N** when more than one course waits. Changes from other devices
+  arrive live; a refused change says who changed the table.
 
 ## KDS PWA
 - Station selector on first run. Ticket columns, age colours, bump on tap, all-day counts sidebar.

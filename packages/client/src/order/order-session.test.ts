@@ -1,7 +1,7 @@
 import type { CommandSuccess, OrderSnapshot } from '@dinepos/shared';
 import { describe, expect, it } from 'vitest';
-import { ApiError, type CommandOptions } from '../api/client.js';
-import { OrderSession } from './order-session.js';
+import { ApiError, type CommandOptions } from '../client.js';
+import { MAX_REBASES, OrderSession } from './order-session.js';
 
 const snap = (version: number): OrderSnapshot => ({
   id: 'o1',
@@ -21,6 +21,8 @@ const snap = (version: number): OrderSnapshot => ({
 class FakeApi {
   version = 1;
   lastChange: { by: string; what: string } | null = null;
+  /** Another device commits just before each of our next N commands arrives. */
+  busyElsewhere = 0;
   calls: Array<{ type: string; expectedVersion?: number; commandId?: string }> = [];
   get<T>(): Promise<T> {
     return Promise.resolve(snap(this.version) as T);
@@ -28,6 +30,10 @@ class FakeApi {
   async command<R>(type: string, _payload: unknown, opts: CommandOptions = {}): Promise<CommandSuccess<R>> {
     this.calls.push({ type, expectedVersion: opts.expectedVersion, commandId: opts.commandId });
     await new Promise((r) => setTimeout(r, 1));
+    if (this.busyElsewhere > 0) {
+      this.busyElsewhere--;
+      this.version++;
+    }
     if (opts.expectedVersion !== this.version) throw new ApiError('VERSION_CONFLICT', 'changed', { currentVersion: this.version, lastChange: this.lastChange }, snap(this.version));
     this.version++;
     return { ok: true, commandId: opts.commandId!, order: snap(this.version), version: this.version, result: null as R };
@@ -54,6 +60,22 @@ describe('OrderSession', () => {
     expect(api.calls.map((c) => c.expectedVersion)).toEqual([1, 5]);
     expect(new Set(api.calls.map((c) => c.commandId)).size).toBe(1);
     expect(seen).toEqual([false, true, false]); // own load, outside change, our result
+  });
+
+  it('keeps rebasing while other devices keep changing the order, then gives up after MAX_REBASES', async () => {
+    const api = new FakeApi();
+    const s = new OrderSession(api, 'o1');
+    await s.refresh();
+    api.busyElsewhere = 3; // three outside changes in a row
+    await s.run('AddItems', {});
+    expect(api.calls.map((c) => c.expectedVersion)).toEqual([1, 2, 3, 4]);
+    expect(new Set(api.calls.map((c) => c.commandId)).size).toBe(1);
+
+    api.calls = [];
+    api.busyElsewhere = MAX_REBASES + 1;
+    await expect(s.run('AddItems', {})).rejects.toMatchObject({ code: 'VERSION_CONFLICT' });
+    expect(api.calls).toHaveLength(MAX_REBASES + 1);
+    expect(s.current?.version).toBe(api.version); // the screen still shows the latest
   });
 
   it('does not rebase an unsafe command; the conflict reaches the screen with the newer snapshot', async () => {

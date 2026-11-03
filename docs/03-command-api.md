@@ -90,6 +90,8 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 - `FireKOT` takes exactly one of `{ itemIds }`, `{ course }`, `{ all: true }`. Result `{ kots: [{ id, kotNo,
   stationId, orderItemIds }] }`, KOTs ordered by station name.
 - `AddItems`/`FireKOT` on a `billed` order return it to `open` and mark its printed bill `superseded`.
+- `SetCovers { covers: 1–99 }` (P3-02) only while the order is `open`: the printed bill shows the guests, so a
+  `billed` order refuses with `INVALID_STATE`. Audited as `order.covers` with before/after; same covers is a no-op.
 
 ### Billing command notes (P1-10; schemas in `packages/shared/src/schemas/commands/billing.ts`)
 - `PrintBill` discount `{ kind: pct|amount, value, reason }`: pct in basis points, amount in paise, reason

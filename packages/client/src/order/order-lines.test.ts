@@ -1,6 +1,6 @@
 import type { CommandSuccess, OrderItemSnapshot, OrderSnapshot } from '@dinepos/shared';
 import { describe, expect, it } from 'vitest';
-import { ApiError, type CommandOptions } from '../api/client.js';
+import { ApiError, type CommandOptions } from '../client.js';
 import { addOrMerge, changeBy, type LineCommand, type NewLine } from './order-lines.js';
 import { OrderSession } from './order-session.js';
 
@@ -57,6 +57,8 @@ describe('adding an item that is already in the cart', () => {
 class CartServer {
   version = 1;
   items: OrderItemSnapshot[] = [];
+  /** Changes another device commits just before each of our next commands arrives. */
+  elsewhere: Array<(s: CartServer) => void> = [];
   snap = (): OrderSnapshot => ({
     id: 'o1',
     version: this.version,
@@ -75,6 +77,11 @@ class CartServer {
   }
   async command<R>(type: string, payload: unknown, opts: CommandOptions = {}): Promise<CommandSuccess<R>> {
     await new Promise((r) => setTimeout(r, 1));
+    const other = this.elsewhere.shift();
+    if (other) {
+      other(this);
+      this.version++;
+    }
     if (opts.expectedVersion !== this.version) throw new ApiError('VERSION_CONFLICT', 'changed', {}, this.snap());
     const cmd = { type, payload } as LineCommand;
     if (cmd.type === 'AddItems') for (const l of cmd.payload.items) this.items.push(held({ id: l.id, itemId: l.itemId, qty: l.qty }));
@@ -98,6 +105,19 @@ describe('quick repeated taps (decided on the latest order)', () => {
     const s = new OrderSession(server, 'o1');
     await Promise.all([1, 2, 3].map(() => s.runLatest((o) => changeBy(o, 'L1', 1))));
     expect(server.items[0]!.qty).toBe(5);
+  });
+
+  it('two devices punching one table at once: every tap arrives, decided on the latest order each time', async () => {
+    const server = new CartServer();
+    const s = new OrderSession(server, 'o1');
+    await s.refresh();
+    // The other terminal adds Jeera Rice, then raises it, just before each of our first two attempts.
+    server.elsewhere = [(sv) => sv.items.push(held({ id: 'JR', itemId: 'JR', qty: 1 })), (sv) => (sv.items.find((i) => i.id === 'JR')!.qty = 2)];
+    await s.runLatest((o) => addOrMerge(o, line({ id: 'N1' })));
+    expect(server.items.map((i) => [i.itemId, i.qty])).toEqual([
+      ['JR', 2],
+      ['PT', 1],
+    ]);
   });
 
   it('after another terminal changed the order, the tap is decided again on the newer order', async () => {

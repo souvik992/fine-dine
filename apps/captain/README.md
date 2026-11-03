@@ -30,3 +30,10 @@ IndexedDB outbox (`idb` library). Allowed offline: OpenTable, AddItems, Update/R
   (app shell cache; the offline outbox is P3-03).
 - End-to-end test: `apps/desktop/e2e/captain.e2e.test.ts` (a phone-sized window pairs, signs in, seats a table and sees
   a KOT appear live).
+
+## Order taking (P3-02)
+- `src/screens/OrderScreen.tsx` (menu, course picker, basket, fire), `OptionsSheet.tsx` (variants, add-ons, note,
+  course, qty), `src/components/Sheet.tsx`, `src/use-order-session.ts`.
+- `src/order-model.ts` (pure, tested): held lines by course, the Fire buttons, KOT messages.
+- Cart rules come from `@dinepos/client` (`addOrMerge`, `changeBy`, `OrderSession`, menu helpers), the same code the
+  billing terminal runs.

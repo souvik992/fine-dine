@@ -23,6 +23,7 @@ import { reprintKot } from './reprint-kot.js';
 import { revokeDevice } from './revoke-device.js';
 import { removeHeldItem } from './remove-held-item.js';
 import { setConfig } from './set-config.js';
+import { setCovers } from './set-covers.js';
 import { setItemAvailability } from './set-item-availability.js';
 import { setRecipe } from './set-recipe.js';
 import { setupOutlet } from './setup-outlet.js';
@@ -74,6 +75,7 @@ const handlers = [
   addItems,
   updateHeldItem,
   removeHeldItem,
+  setCovers,
   fireKot,
   // after the KOT (P2-04)
   modifyFiredItem,
