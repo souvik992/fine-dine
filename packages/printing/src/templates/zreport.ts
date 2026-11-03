@@ -23,6 +23,10 @@ export interface ZReportData {
   cancelledAfterFire: number;
   cashExpectedPaise: number;
   cashCountedPaise: number;
+  /** P2-06: void bills keep their numbers and are listed here (not in sales). Optional in reports stored earlier. */
+  voids?: Array<{ billNo: string; amountPaise: number; reason: string | null }>;
+  payInPaise?: number;
+  payOutPaise?: number;
 }
 
 const signed = (p: number) => `${p < 0 ? '-' : p > 0 ? '+' : ''}${money(Math.abs(p))}`;
@@ -55,6 +59,12 @@ export function renderZReport(z: ZReportData, opts: { paper: PaperWidth; feed?: 
   for (const c of z.byCategory) p.twoCol(`  ${c.name} x${c.qty}`, money(c.amountPaise));
   p.rule();
   p.twoCol('Cancelled after KOT', String(z.cancelledAfterFire));
+  if (z.voids?.length) {
+    p.bold(true).twoCol(`VOID bills (${z.voids.length})`, money(z.voids.reduce((s, v) => s + v.amountPaise, 0))).bold(false);
+    for (const v of z.voids) p.twoCol(`  ${v.billNo} VOID`, money(v.amountPaise));
+  }
+  if (z.payInPaise) p.twoCol('Cash paid in', money(z.payInPaise));
+  if (z.payOutPaise) p.twoCol('Cash paid out', `-${money(z.payOutPaise)}`);
   p.twoCol('Cash expected', money(z.cashExpectedPaise));
   p.twoCol('Cash counted', money(z.cashCountedPaise));
   p.bold(true).twoCol('Difference', signed(z.cashCountedPaise - z.cashExpectedPaise)).bold(false);

@@ -17,6 +17,7 @@ import { healthRoutes } from './routes/health.js';
 import { queryRoutes } from './routes/queries.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { stockRoutes } from './routes/stock.js';
+import { cashierRoutes } from './routes/cashier.js';
 import { isAllowedOrigin, streamRoutes } from './routes/stream.js';
 
 export interface AppDeps {
@@ -119,6 +120,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
   );
   sessionRoutes(app, { db, now, timeZone });
   stockRoutes(app, { db, now });
+  cashierRoutes(app, { db, now });
   streamRoutes(app, hub, allowedOrigins);
   return Object.assign(app, { realtime: hub });
 }

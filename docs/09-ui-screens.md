@@ -26,6 +26,10 @@ Every state also has a text label and icon — colour is never the only signal.
 - Click: open order (or seat dialog if free). Right-click / long-press: Move, Merge, Split, Print bill, Reprint, Block.
 - Keyboard: arrows move focus, Enter opens, `M` move, `G` merge, `P` print bill.
 
+- Floor header (P2-06): **Bills** (today's numbered bills: number, table, part, payments, total, Paid / Unpaid / VOID;
+  Reprint; Void with a reason, then "give back ₹… to the guest") and **Cash** (Pay in / Pay out with amount and reason,
+  Open drawer with a reason; today's movements). Shown by right.
+
 ### 2. Order / billing (built in P1-09: `apps/desktop/src/billing/`)
 Keyboard map: type a code + Enter (`pt2`, `pt 2`, `2*pt`; an exact code wins, so `C65` works), Shift+Enter
 opens options for an item that has optional ones; in the sheet 1–9/0 toggle options, + / − quantity,

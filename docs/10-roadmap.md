@@ -80,7 +80,7 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria �
 - [x] **P2-03 MoveTable, MergeTables, TransferItems** — Accept: KOT history preserved; move_notice KOT printed; leakage flags set.
 - [x] **P2-04 ModifyFiredItem, CancelFiredItem, Reprint*** — Accept: delta slips render; leakage flags; PIN rules.
 - [x] **P2-05 SplitBill (equal/items/proportion)** — Accept: property test Σparts = total for 1,000 random orders.
-- [ ] **P2-06 VoidBill + PayIn/PayOut + OpenDrawer** — Accept: void keeps bill number; reports show VOID.
+- [x] **P2-06 VoidBill + PayIn/PayOut + OpenDrawer** — Accept: void keeps bill number; reports show VOID.
 - [ ] **P2-07 Second terminal over LAN + conflict UX** — Accept: two terminals editing T7 never lose an item; conflict banner appears for Move vs PrintBill race.
 - [ ] **P2-08 Backups + restore** — Accept: restore from a 15-min backup reproduces open orders.
 - [ ] **P2-09 Licence verification + seats** — Accept: expired key → warning, grace, then DayEnd/new date blocked; seat limit at pairing.

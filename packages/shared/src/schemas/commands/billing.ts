@@ -86,6 +86,16 @@ export const splitBillSchema = z.discriminatedUnion('mode', [
     .strict(),
 ]);
 
+// ---- void and cash (P2-06) ----
+
+const cashReason = text(120);
+/** Cancels a printed or settled bill of the current business date; payments are reversed, the number is kept. */
+export const voidBillSchema = z.object({ billId: ulidSchema, reason: cashReason }).strict();
+/** Cash put into / taken out of the drawer (float, petty expenses); recorded for the day-end count. */
+export const payInSchema = z.object({ amountPaise: z.number().int().min(1).max(1_000_000_000), reason: cashReason }).strict();
+export const payOutSchema = payInSchema;
+export const openDrawerSchema = z.object({ reason: cashReason }).strict();
+
 export const dayEndSchema = z.object({ cashCountedPaise: paise }).strict();
 
 /** Outlet settings stored in the `config` table (one JSON value per key). */

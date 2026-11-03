@@ -343,3 +343,31 @@ export interface StockUsageRow {
   usedValuePaise: number;
   wastedValuePaise: number;
 }
+
+// ---------- bills and cash of a day (P2-06) ----------
+
+/** `GET /v1/bills?date=`: every numbered bill of a business date (printed, settled or void). */
+export interface DayBill {
+  billId: string;
+  billNo: string;
+  orderId: string;
+  orderVersion: number;
+  orderState: string;
+  table: string;
+  partNo: number;
+  parts: number;
+  totalPaise: number;
+  state: 'printed' | 'superseded' | 'settled' | 'void';
+  /** Net paid per mode (after any void reversal). */
+  payments: Array<{ mode: string; amountPaise: number }>;
+  printedAt: string | null;
+}
+
+export interface CashMovementView {
+  id: string;
+  kind: 'pay_in' | 'pay_out' | 'opening' | 'closing';
+  amountPaise: number;
+  reason: string | null;
+  userName: string | null;
+  at: string;
+}

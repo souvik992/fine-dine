@@ -77,6 +77,15 @@ export function buildZReport(db: Db, businessDate: string, cashCountedPaise: num
     cancelledAfterFire: one(`SELECT count(*) FROM order_item oi JOIN "order" o ON o.id = oi.order_id WHERE o.business_date = ? AND oi.status = 'cancelled' AND oi.kot_id IS NOT NULL`),
     cashExpectedPaise: cashPayments + payIn - payOut,
     cashCountedPaise,
+    voids: db
+      .prepare(
+        `SELECT (SELECT d.bill_no_text FROM bill_document d WHERE d.bill_id = b.id ORDER BY d.revision DESC LIMIT 1) AS billNo, b.total_paise AS amountPaise,
+                (SELECT a.reason FROM audit_event a WHERE a.entity_id = b.id AND a.action = 'bill.void' ORDER BY a.seq DESC LIMIT 1) AS reason
+         FROM bill b JOIN "order" o ON o.id = b.order_id WHERE o.business_date = ? AND b.state = 'void' AND b.bill_no IS NOT NULL ORDER BY b.fy, b.bill_no`,
+      )
+      .all(businessDate) as NonNullable<ZReportData['voids']>,
+    payInPaise: one(`SELECT sum(amount_paise) FROM cash_movement WHERE business_date = ? AND kind = 'pay_in'`),
+    payOutPaise: payOut,
   };
 }
 

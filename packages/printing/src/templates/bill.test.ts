@@ -231,3 +231,12 @@ describe('split parts (P2-05)', () => {
     }
   });
 });
+
+describe('void (P2-06)', () => {
+  it('a void copy says VOID at the top and bottom with the reason', () => {
+    const p = renderBill({ ...doc, voided: { reason: 'Wrong table billed', at: '02-11-26 22:10' } }, { paper: 80 }).preview;
+    expect(p.split('\n')[0]).toContain('*** VOID ***');
+    expect(p).toContain('Reason: Wrong table billed');
+    expect(p).toContain('T1/26-27/000123'); // same number
+  });
+});

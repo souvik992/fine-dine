@@ -179,6 +179,21 @@ marked `*** SAMPLE - NOT A BILL ***` at the top and bottom; it takes no bill num
 - A superseded bill clears the order's `bill_printed_at` (the table no longer shows "bill printed"); table state
   counts sent items even when their KOT belongs to a merged order.
 
+### Void and cash (P2-06; schemas in `packages/shared/src/schemas/commands/billing.ts`)
+- `VoidBill` `{ billId, reason }` (on the bill's order; right `bill.void`, PIN per role): a `printed` or `settled` bill
+  of the **current business date** (a closed day → `INVALID_STATE`). The bill keeps its number and becomes `void`;
+  its payments are reversed with negative payment rows (append-only); a VOID copy prints with the reason. The order
+  becomes `void` when none of its bills is live (a voided part of a split leaves the others payable) and its table
+  is freed. Stock is not returned. Leakage flag. Result `{ billId, billNo, refundPaise, orderState }`.
+- `PayIn` / `PayOut` `{ amountPaise, reason }` (right `cash.move`): a `cash_movement` row of the business date
+  (counted in the day-end cash expected); a slip prints on the bill printer and the drawer opens. Pay-out is a
+  leakage flag.
+- `OpenDrawer` `{ reason }` (right `drawer.open`): drawer kick + slip on the bill printer (none → `INVALID_STATE`);
+  leakage flag.
+- Reads (session with `bill.settle`): `GET /v1/bills?date=` → `{ date, bills: DayBill[] }` (numbered bills of the
+  business date, VOID included, net payments per mode); `GET /v1/cash?date=` → `{ date, movements }`.
+- The Z-report lists VOID bills by number with their amount and reason (not in sales), and pay-ins / pay-outs.
+
 ## Stock commands (P2-10/P2-11; schemas in `packages/shared/src/schemas/commands/stock.ts` and `menu-csv.ts`)
 Quantities are integer thousandths of the material's unit (`qtyMilli`), costs integer paise per whole unit.
 | Type | Payload | Right | Effect |

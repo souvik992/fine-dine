@@ -396,3 +396,29 @@ describe('after the KOT: PIN rules (P2-04)', () => {
     expect((await modify('2345')).body.ok).toBe(true);
   }, 20_000);
 });
+
+describe("today's bills and cash (P2-06)", () => {
+  it('a Cashier sees the day’s bills (VOID ones too) and cash movements; a Captain does not; void needs a manager PIN for a Cashier', async () => {
+    const owner = await seeded();
+    const open = await send('OpenTable', { tableId: ids.t1, covers: 2 }, { token: owner });
+    const orderId = open.body.order!.id;
+    await send('AddItems', { items: [{ id: newId(), itemId: ids.dal, qty: 1 }] }, { token: owner, orderId, expectedVersion: 1 });
+    await send('FireKOT', { all: true }, { token: owner, orderId, expectedVersion: 2 });
+    const printed = await send('PrintBill', {}, { token: owner, orderId, expectedVersion: 3 });
+    const billId = (printed.body.result as { billId: string }).billId;
+    const cashier = (await login(ids.cashier, '1111')).body.token;
+    const captain = (await login(ids.captain, '3333')).body.token;
+
+    const voidIt = (pin?: string) => send('VoidBill', { billId, reason: 'Guest left' }, { token: cashier, orderId, expectedVersion: 4, ...(pin ? { pin } : {}) });
+    expect((await voidIt()).body.error?.code).toBe('PIN_REQUIRED');
+    expect((await voidIt('2345')).body.ok).toBe(true);
+    await send('PayIn', { amountPaise: 100_000, reason: 'Float' }, { token: owner });
+
+    expect((await app.inject({ method: 'GET', url: '/v1/bills', headers: { 'x-user-session': captain } })).statusCode).toBe(403);
+    const day = (await app.inject({ method: 'GET', url: '/v1/bills', headers: { 'x-user-session': cashier } })).json<{ date: string; bills: Array<{ billNo: string; state: string; table: string }> }>();
+    expect(day.date).toBe('2026-11-02');
+    expect(day.bills).toMatchObject([{ billNo: 'B/26-27/000001', state: 'void', table: 'T1' }]);
+    const cash = (await app.inject({ method: 'GET', url: '/v1/cash', headers: { 'x-user-session': cashier } })).json<{ movements: Array<{ kind: string; amountPaise: number; userName: string }> }>();
+    expect(cash.movements).toMatchObject([{ kind: 'pay_in', amountPaise: 100_000, userName: 'Asha (Owner)' }]);
+  }, 20_000);
+});

@@ -564,6 +564,39 @@ describe('desktop app', () => {
     await other!.waitForSelector('[data-table="T2"][data-state="FREE"]', { timeout: 2_000 });
   });
 
+  it("Bills and Cash: void a paid bill (keeps its number, VOID), then a pay-out prints a slip", async () => {
+    const [page] = app.windows();
+    await page!.getByRole('button', { name: 'Bills', exact: true }).click();
+    const bills = page!.getByRole('dialog', { name: /^Bills of / });
+    const row = bills.getByRole('row').filter({ hasText: 'T2' }).filter({ hasText: 'Paid' }).first();
+    const billNo = await row.locator('td').first().innerText();
+    await row.getByRole('button', { name: `Void ${billNo}` }).click();
+    await bills.getByLabel('Reason for voiding').fill('Billed twice by mistake');
+    await bills.getByRole('button', { name: 'Void bill' }).click();
+    await bills.getByRole('status').getByText(`${billNo} is void.`).waitFor();
+    await bills.getByRole('row').filter({ hasText: billNo }).getByText('VOID').waitFor(); // same number, now VOID
+    await page!.keyboard.press('Escape');
+
+    await page!.getByRole('button', { name: 'Cash', exact: true }).click();
+    const cash = page!.getByRole('dialog', { name: 'Cash drawer' });
+    await cash.getByRole('tab', { name: 'Pay out' }).click();
+    await cash.getByLabel('Amount in rupees').fill('50');
+    await cash.getByLabel('Reason').fill('Milk from the market');
+    await cash.getByRole('button', { name: 'Pay out' }).click();
+    await cash.getByRole('status').getByText(/Pay out of ₹50.00 recorded/).waitFor();
+    await cash.getByRole('list', { name: 'Cash movements today' }).getByText(/Milk from the market/).waitFor();
+    await expect
+      .poll(() => {
+        const dir = path.join(dataDir, 'prints');
+        return readdirSync(dir, { recursive: true })
+          .map(String)
+          .filter((f) => f.endsWith('.txt'))
+          .some((f) => readFileSync(path.join(dir, f), 'utf8').includes('CASH PAID OUT'));
+      }, { timeout: 5_000 })
+      .toBe(true);
+    await page!.keyboard.press('Escape');
+  });
+
   it('Menu › Bulk upload: a CSV is checked, then imported all at once', async () => {
     const page = await openSettings('Menu');
     await page.getByRole('tab', { name: 'Bulk upload' }).click();

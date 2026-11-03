@@ -1,6 +1,6 @@
 import type { FloorSnapshot, FloorTable } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
-import { MoonStar, RefreshCw, Search, Settings } from 'lucide-react';
+import { Banknote, MoonStar, ReceiptText, RefreshCw, Search, Settings } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
@@ -9,6 +9,8 @@ import { UserBadge } from '../components/UserBadge.js';
 import { canvasSize, hasLayout, TILE_H, TILE_W } from '../settings/layout-model.js';
 import { findTable, moveFocus, STATE_META, stateCounts, tablesInArea, type Arrow } from './floor-model.js';
 import { StockButton } from '../stock/StockButton.js';
+import { BillsDialog } from './BillsDialog.js';
+import { CashDialog } from './CashDialog.js';
 import { DayEndDialog } from './DayEndDialog.js';
 import { SeatDialog } from './SeatDialog.js';
 import { TableTile } from './TableTile.js';
@@ -43,6 +45,7 @@ export function FloorScreen({ onSettings, onStock, onOpenOrder }: { onSettings: 
   const [searchError, setSearchError] = useState<string | null>(null);
   const [seating, setSeating] = useState<FloorTable | null>(null);
   const [closingDay, setClosingDay] = useState(false);
+  const [panel, setPanel] = useState<'bills' | 'cash' | null>(null);
   const grid = useRef<HTMLDivElement>(null);
   const tileRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const searchBox = useRef<HTMLInputElement>(null);
@@ -95,7 +98,7 @@ export function FloorScreen({ onSettings, onStock, onOpenOrder }: { onSettings: 
   // Typing a letter or digit anywhere on the floor jumps to the table search (docs/09: type "T7" + Enter).
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (seating || closingDay || pinRequest || e.ctrlKey || e.altKey || e.metaKey) return;
+      if (seating || closingDay || panel || pinRequest || e.ctrlKey || e.altKey || e.metaKey) return;
       if (document.activeElement === searchBox.current) return;
       if (/^[a-z0-9]$/i.test(e.key)) {
         searchBox.current?.focus();
@@ -103,7 +106,7 @@ export function FloorScreen({ onSettings, onStock, onOpenOrder }: { onSettings: 
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [seating, closingDay, pinRequest]);
+  }, [seating, closingDay, panel, pinRequest]);
 
   const submitSearch = () => {
     if (!data) return;
@@ -177,6 +180,16 @@ export function FloorScreen({ onSettings, onStock, onOpenOrder }: { onSettings: 
         <time className="w-14 text-right text-sm font-semibold tabular-nums" dateTime={now.toISOString()}>
           {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })}
         </time>
+        {can('bill.settle') ? (
+          <button className="btn h-10" onClick={() => setPanel('bills')} title="Today's bills: reprint or void">
+            <ReceiptText className="h-4 w-4" /> Bills
+          </button>
+        ) : null}
+        {can('cash.move', true) || can('drawer.open', true) ? (
+          <button className="btn h-10" onClick={() => setPanel('cash')} title="Pay in, pay out, open drawer">
+            <Banknote className="h-4 w-4" /> Cash
+          </button>
+        ) : null}
         {can('stock.manage') ? <StockButton onClick={onStock} /> : null}
         {can('dayend', true) ? (
           <button className="btn h-10" onClick={() => setClosingDay(true)} disabled={!data} title="Close the business day and print the Z-report">
@@ -260,6 +273,8 @@ export function FloorScreen({ onSettings, onStock, onOpenOrder }: { onSettings: 
       </main>
 
       {closingDay && data ? <DayEndDialog floor={data} onClose={() => setClosingDay(false)} /> : null}
+      {panel === 'bills' ? <BillsDialog onClose={() => setPanel(null)} /> : null}
+      {panel === 'cash' ? <CashDialog onClose={() => setPanel(null)} /> : null}
       {seating ? <SeatDialog table={seating} onClose={() => setSeating(null)} onSeated={onOpenOrder} /> : null}
     </div>
   );

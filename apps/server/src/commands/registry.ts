@@ -9,7 +9,10 @@ import { importMenu } from './import-menu.js';
 import { mergeTables } from './merge-tables.js';
 import { modifyFiredItem } from './modify-fired-item.js';
 import { moveTable } from './move-table.js';
+import { openDrawer } from './open-drawer.js';
 import { openTable } from './open-table.js';
+import { payIn } from './pay-in.js';
+import { payOut } from './pay-out.js';
 import { printBill } from './print-bill.js';
 import { printSampleBill } from './print-sample-bill.js';
 import { printTestPage } from './print-test-page.js';
@@ -35,6 +38,7 @@ import { upsertPrinter } from './upsert-printer.js';
 import { upsertStation } from './upsert-station.js';
 import { upsertStockItem } from './upsert-stock-item.js';
 import { upsertTable } from './upsert-table.js';
+import { voidBill } from './void-bill.js';
 import { voidPurchase } from './void-purchase.js';
 
 const handlers = [
@@ -80,6 +84,11 @@ const handlers = [
   printBill,
   splitBill,
   settle,
+  voidBill,
+  // cash drawer (P2-06)
+  payIn,
+  payOut,
+  openDrawer,
   dayEnd,
 ];
 

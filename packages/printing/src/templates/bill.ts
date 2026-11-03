@@ -52,6 +52,8 @@ export interface BillDocument {
   display?: BillDisplay | null;
   /** Settings › Bill design "Print a sample": marked so it cannot pass as a bill. */
   sample?: boolean;
+  /** VoidBill (P2-06): printed with VOID at the top and bottom, and why. */
+  voided?: { reason: string; at: string } | null;
 }
 
 export interface BillLogoBits {
@@ -75,6 +77,7 @@ export function renderBill(doc: BillDocument, opts: { paper: PaperWidth; feed?: 
 
   // Header
   if (doc.sample) p.bold(true).center(SAMPLE).bold(false);
+  if (doc.voided) p.bold(true).size(1, 2).center('*** VOID ***').size(1, 1).bold(false);
   if (doc.duplicate) p.center('** DUPLICATE **');
   if (opts.logo) p.logo(opts.logo.width, opts.logo.height, opts.logo.data);
   if (d.nameSize === 'large') p.bold(true).size(1, 2).center(doc.outlet.name).size(1, 1).bold(false);
@@ -161,6 +164,11 @@ export function renderBill(doc: BillDocument, opts: { paper: PaperWidth; feed?: 
   }
   for (const f of doc.outlet.footerLines ?? []) p.center(f);
   if (doc.sample) p.bold(true).center(SAMPLE).bold(false);
+  if (doc.voided) {
+    p.bold(true).center('*** VOID ***').bold(false);
+    p.center(`Voided ${doc.voided.at}`);
+    p.wrapped(`Reason: ${doc.voided.reason}`);
+  }
   p.feed(opts.feed ?? 3).cut();
   return { bytes: p.bytes(), preview: p.preview() };
 }
