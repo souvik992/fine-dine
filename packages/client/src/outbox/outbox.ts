@@ -6,7 +6,7 @@ import { MAX_REBASES } from '../order/order-session.js';
 import { MAX_LINE_QTY } from '../order/order-lines.js';
 
 /** Allowed in the outbox (docs/05: everything else needs the server and is disabled offline). */
-export type OutboxCommand = 'OpenTable' | 'AddItems' | 'UpdateHeldItem' | 'RemoveHeldItem' | 'FireKOT' | 'SetCovers' | 'RequestBill';
+export type OutboxCommand = 'OpenTable' | 'AddItems' | 'UpdateHeldItem' | 'RemoveHeldItem' | 'FireKOT' | 'SetCovers' | 'RequestBill' | 'ReleaseTable';
 
 export interface OutboxEntry {
   /** Order of creation; replay is strictly in this order. */
@@ -119,6 +119,9 @@ export function withoutDependents(entries: readonly OutboxEntry[], dropped: Outb
  * makes sense: the line is gone, or everything it would send was already sent.
  */
 export function rebaseEntry(e: OutboxEntry, order: OrderSnapshot): { entry: OutboxEntry } | { drop: string } {
+  // Releasing decided on what the captain saw: another device changed the table since (maybe added dishes), so it is
+  // never applied to the newer order.
+  if (e.type === 'ReleaseTable') return { drop: 'The table changed on another device. Open it again and check before releasing.' };
   const next: OutboxEntry = { ...e, expectedVersion: order.version };
   const line = (id: unknown) => order.items.find((i) => i.id === id);
   if (e.type === 'UpdateHeldItem') {

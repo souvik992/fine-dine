@@ -225,6 +225,21 @@ describe('desktop app', () => {
     await first!.waitForSelector('[data-table="T1"]');
   });
 
+  it('Release table: a table seated by mistake is freed without billing; the other window follows', async () => {
+    const [first, second] = app.windows();
+    await first!.locator('[data-table="T8"]').click();
+    await first!.getByRole('dialog', { name: 'Seat table T8' }).waitFor();
+    await first!.getByRole('button', { name: 'Seat guests' }).click();
+    await first!.getByTestId('order-title').getByText('Table T8').waitFor({ timeout: 5_000 });
+    await second!.waitForSelector('[data-table="T8"][data-state="SEATED"]', { timeout: 2_000 });
+    await first!.getByRole('button', { name: 'Release' }).click();
+    const dialog = first!.getByRole('dialog', { name: 'Release T8?' });
+    await dialog.getByRole('button', { name: 'Opened by mistake' }).click();
+    await dialog.getByRole('button', { name: 'Release table' }).click();
+    await first!.waitForSelector('[data-table="T8"][data-state="FREE"]', { timeout: 5_000 }); // back on the floor
+    await second!.waitForSelector('[data-table="T8"][data-state="FREE"]', { timeout: 2_000 });
+  });
+
   // P1-09 acceptance: punch 5 items with modifiers and fire in under 20 s using the keyboard only.
   it('keyboard only: seat T3, punch 5 items with modifiers, fire, in under 20 s', async () => {
     const [page, other] = app.windows();

@@ -1,7 +1,7 @@
 import { addOrMerge, changeBy, firedByKot, hasChoices, needsChoices, orderView, visibleItems, type OrderView, type ViewItem } from '@dinepos/client';
 import { formatINR, newId, type MenuItem, type MenuSnapshot } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, Clock, Minus, Plus, ReceiptText, Search, Send, ShoppingBasket, Trash2, TriangleAlert, Users, WifiOff } from 'lucide-react';
+import { ChevronLeft, Clock, DoorOpen, Minus, Plus, ReceiptText, Search, Send, ShoppingBasket, Trash2, TriangleAlert, Users, WifiOff } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useApp } from '../app-context.js';
 import { Sheet } from '../components/Sheet.js';
@@ -81,6 +81,16 @@ export function OrderScreen({ orderId, areaId, onBack, onAttention }: { orderId:
     if (!sync.online) return sync.notify('error', 'Asking for the bill needs the outlet server. Try again when the phone is back on the Wi-Fi.');
     change(() => ({ type: 'RequestBill', payload: {}, label: 'Ask for the bill' }));
     sync.notify('ok', `The counter has been asked for Table ${order?.table?.label ?? ''}’s bill.`);
+  };
+
+  // Release table: nothing sent to the kitchen and no bill, so nothing to bill. Needs the server (the table is freed now).
+  const canRelease = order?.state === 'open' && order.bills.length === 0 && order.items.every((i) => i.status !== 'fired' && !i.queuedFire) && can('order.create');
+  const release = () => {
+    if (!sync.online) return sync.notify('error', 'Releasing a table needs the outlet server. Try again when the phone is back on the Wi-Fi.');
+    if (!window.confirm(`Release Table ${order?.table?.label ?? ''}? Nothing was sent to the kitchen, so the table becomes free.`)) return;
+    change(() => ({ type: 'ReleaseTable', payload: {}, label: 'Release the table' }));
+    sync.notify('ok', `Table ${order?.table?.label ?? ''} is free.`);
+    onBack();
   };
 
   const held = heldSummary(order?.items ?? []);
@@ -191,6 +201,11 @@ export function OrderScreen({ orderId, areaId, onBack, onAttention }: { orderId:
       </ul>
 
       <footer className="fixed inset-x-0 bottom-0 z-10 flex gap-2 border-t border-border bg-card p-3 pb-5">
+        {canRelease ? (
+          <button className="btn" onClick={release} aria-label="Release table" title="Nothing to bill: free the table">
+            <DoorOpen className="h-5 w-5" />
+          </button>
+        ) : null}
         <button className="btn flex-1 justify-between" onClick={() => setSheet('basket')} disabled={!order} aria-label="Basket">
           <span className="flex items-center gap-2">
             <ShoppingBasket className="h-5 w-5" />

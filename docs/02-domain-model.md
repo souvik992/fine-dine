@@ -39,6 +39,9 @@ Stock: StockItem, StockMovement, Purchase + PurchaseLine, RecipeLine (see "Stock
    │                                                   │
    └───────── (never reopened)            VoidBill ─────► void (reversal entries)
 ```
+- `open → void` by **ReleaseTable**: the table is freed when the order has nothing to bill — no line still `fired`
+  (cancel those first) and no bill row (a bill number was given: void that bill instead, numbers stay gap-free).
+  Held lines are dropped with it; the audit row (`order.release`, optional reason) keeps them. Not for online orders.
 
 ## Derived table state (`deriveTableState`)
 | Order of checks | Condition | State |

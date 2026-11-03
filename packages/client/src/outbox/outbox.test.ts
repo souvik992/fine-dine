@@ -253,6 +253,7 @@ describe('dependents and rebase (pure)', () => {
     expect(rebaseEntry(down, snap)).toMatchObject({ entry: { type: 'RemoveHeldItem', expectedVersion: 9, payload: { orderItemId: 'A' } } });
     expect(rebaseEntry(e(2, 'UpdateHeldItem', { orderItemId: 'Z', qty: 2 }), snap)).toEqual({ drop: 'That dish was removed on another device.' });
     expect(rebaseEntry(e(3, 'RemoveHeldItem', { orderItemId: 'Z' }), snap)).toEqual({ drop: 'That dish was already removed on another device.' });
+    expect(rebaseEntry(e(4, 'ReleaseTable', {}), snap)).toEqual({ drop: 'The table changed on another device. Open it again and check before releasing.' }); // never on a newer order
   });
 });
 

@@ -317,7 +317,7 @@ const voids: Def = {
   key: 'voids',
   title: 'Voids and cancellations',
   group: 'Controls',
-  description: 'Void bills (they keep their numbers), and items cancelled or reduced after the kitchen got them.',
+  description: 'Void bills (they keep their numbers), items cancelled or reduced after the kitchen got them, and tables released with nothing billed.',
   build(c) {
     const rows = all(
       c,
@@ -332,6 +332,10 @@ const voids: Def = {
               a.reason, ${nameOf('a.user_id')}, ${nameOf('a.approved_by')}, a.seq
        FROM audit_event a JOIN order_item oi ON oi.id = a.entity_id JOIN "order" o ON o.id = COALESCE(oi.original_order_id, oi.order_id)
        WHERE a.action IN ('item.cancel_fired', 'item.modify_fired') AND ${IN_RANGE}
+       UNION ALL
+       SELECT a.ts, 'Table released (nothing billed)', NULL, ${TABLE}, NULL, 0, a.reason, ${nameOf('a.user_id')}, ${nameOf('a.approved_by')}, a.seq
+       FROM audit_event a JOIN "order" o ON o.id = a.entity_id
+       WHERE a.action = 'order.release' AND ${IN_RANGE}
        ORDER BY 1, seq`,
       params(c),
     ).map(({ seq: _seq, ...r }): ReportRow => ({ ...r, at: local(c, r.at as string), approvedBy: r.approvedBy ?? '', byName: r.byName ?? '', reason: r.reason ?? '' }));
@@ -353,7 +357,8 @@ const voids: Def = {
       totals,
       summary: [
         { label: 'Void bills', value: rows.filter((r) => String(r.kind).startsWith('Void')).length, type: 'int' },
-        { label: 'Items taken back after KOT', value: rows.filter((r) => !String(r.kind).startsWith('Void')).length, type: 'int' },
+        { label: 'Items taken back after KOT', value: rows.filter((r) => String(r.kind).endsWith('after KOT')).length, type: 'int' },
+        { label: 'Tables released', value: rows.filter((r) => String(r.kind).startsWith('Table released')).length, type: 'int' },
         { label: 'Amount', value: n(totals.amount), type: 'money' },
       ],
     };

@@ -21,6 +21,7 @@ import { dayEnd } from './day-end.js';
 import { fireKot } from './fire-kot.js';
 import { importMenu } from './import-menu.js';
 import { installLicence } from './install-licence.js';
+import { releaseTable } from './release-table.js';
 import { recordSyncAck } from './record-sync-ack.js';
 import { renewLicence } from './renew-licence.js';
 import { resetSyncStream } from './reset-sync-stream.js';
@@ -105,6 +106,7 @@ const handlers = [
   updateHeldItem,
   removeHeldItem,
   setCovers,
+  releaseTable,
   assignCaptain,
   requestBill,
   fireKot,

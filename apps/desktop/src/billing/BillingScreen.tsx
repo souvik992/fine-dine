@@ -1,6 +1,6 @@
 import { formatINR, newId, type MenuItem, type MenuSnapshot, type OrderItemSnapshot, type OrderSnapshot, type OutletConfig } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRightLeft, Flame, Merge, MoveRight, Printer, ReceiptText, Search, Split, TriangleAlert, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, DoorOpen, Flame, Merge, MoveRight, Printer, ReceiptText, Search, Split, TriangleAlert, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
@@ -18,6 +18,7 @@ import { Modal } from '../components/Modal.js';
 import { PrintBillDialog } from './PrintBillDialog.js';
 import { SettleDialog } from './SettleDialog.js';
 import { SplitDialog } from './SplitDialog.js';
+import { ReleaseTableDialog } from './ReleaseTableDialog.js';
 import { TableActionsDialog, type TableAction } from './TableActionsDialog.js';
 import { useOrderSession } from './useOrderSession.js';
 
@@ -32,6 +33,7 @@ const NOT_DONE: Record<string, string> = {
   TransferItems: 'The items were not moved.',
   ModifyFiredItem: 'The item was not changed.',
   CancelFiredItem: 'The item was not cancelled.',
+  ReleaseTable: 'The table was not released.',
 };
 
 interface Toast {
@@ -66,9 +68,10 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
   const [dialog, setDialog] = useState<'bill' | 'settle' | null>(null);
   const [changing, setChanging] = useState<OrderItemSnapshot | null>(null);
   const [tableAction, setTableAction] = useState<TableAction | null>(null);
+  const [releasing, setReleasing] = useState(false);
   const [splitting, setSplitting] = useState(false);
   // While a decision dialog is open, its commands go out on the version shown when it opened (docs/05, P2-07).
-  const deciding = dialog !== null || splitting || tableAction !== null || changing !== null;
+  const deciding = dialog !== null || splitting || tableAction !== null || changing !== null || releasing;
   const orderVersion = order?.version ?? null;
   const decidingRef = useRef(false);
   useEffect(() => {
@@ -205,7 +208,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (sheet || dialog || changing || tableAction || splitting || settledChange !== null || pinRequest) return; // an open dialog owns the keyboard
+      if (sheet || dialog || changing || tableAction || releasing || splitting || settledChange !== null || pinRequest) return; // an open dialog owns the keyboard
       const inSearch = document.activeElement === searchBox.current;
       if (e.key === 'F8') {
         e.preventDefault();
@@ -306,6 +309,11 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
             {can('item.transfer', true) ? (
               <button className="btn h-9" onClick={() => setTableAction('items')} disabled={order.items.every((i) => i.status === 'cancelled')}>
                 <ArrowRightLeft className="h-4 w-4" /> Move items
+              </button>
+            ) : null}
+            {order.state === 'open' && order.table && order.bills.length === 0 && order.items.every((i) => i.status !== 'fired') && can('order.create', true) ? (
+              <button className="btn h-9" onClick={() => setReleasing(true)} title="Nothing to bill: free the table">
+                <DoorOpen className="h-4 w-4" /> Release
               </button>
             ) : null}
           </div>
@@ -437,6 +445,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
       ) : null}
       {splitting ? <SplitDialog order={order} onClose={() => setSplitting(false)} run={run} /> : null}
       {tableAction ? <TableActionsDialog action={tableAction} order={order} onClose={() => setTableAction(null)} run={run} /> : null}
+      {releasing ? <ReleaseTableDialog order={order} onClose={() => setReleasing(false)} run={run} onDone={onBack} /> : null}
       {changing ? <FiredItemDialog item={changing} onClose={() => setChanging(null)} run={run} /> : null}
       {dialog === 'settle' && printedBill ? (
         <SettleDialog

@@ -58,6 +58,9 @@ export const updateHeldItemSchema = z
 
 export const removeHeldItemSchema = z.object({ orderItemId: ulidSchema }).strict();
 
+/** Free the table of an order that never got anything to bill (opened by mistake, guests left). */
+export const releaseTableSchema = z.object({ reason: z.string().trim().max(200).optional() }).strict();
+
 /** Guests at the table (P3-02). Only while the order is open: the printed bill shows them. */
 export const setCoversSchema = z.object({ covers: z.number().int().min(1).max(99) }).strict();
 
@@ -104,4 +107,5 @@ export type AddItemsPayload = z.infer<typeof addItemsSchema>;
 export type UpdateHeldItemPayload = z.infer<typeof updateHeldItemSchema>;
 export type RemoveHeldItemPayload = z.infer<typeof removeHeldItemSchema>;
 export type SetCoversPayload = z.infer<typeof setCoversSchema>;
+export type ReleaseTablePayload = z.infer<typeof releaseTableSchema>;
 export type FireKotPayload = z.infer<typeof fireKotSchema>;

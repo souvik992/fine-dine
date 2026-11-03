@@ -65,6 +65,7 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 | `MergeTables` | sourceOrderId | table.merge | | source → merged, items re-parented | if fired |
 | `TransferItems` | itemIds[], toOrderId | item.transfer | | items re-parented (KOT link kept) | yes |
 | `SetCovers` / `AssignCaptain` | covers / captainId (null clears) | order.edit | | | |
+| `ReleaseTable` | reason? | order.create | | order → void, table free; refused while a line is fired or a bill row exists | |
 | `RequestBill` | — | order.edit | | bill_request row, `bill.requested` on `floor` | |
 | `SetCaptainSection` | userId, areaIds[], tableIds[] | staff.sections | | replaces the captain's section, `floor.changed` | |
 | `AcceptOnlineOrder` | onlineOrderId, prepMinutes?, acceptPriceChange? | online.orders | | order (type online, no table), KOT, bill, Online payment when paid online; outbox `accept` | |
