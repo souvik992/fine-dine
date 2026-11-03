@@ -1,4 +1,5 @@
 // Payload schemas for PrintBill, Settle, DayEnd and SetConfig (docs/03-command-api.md).
+import { onlineSettingsSchema } from '../../online.js';
 import { z } from 'zod';
 import { gstinProblem } from '../../gstin.js';
 import { BILL_PREFIX_RE } from '../../numbering.js';
@@ -46,6 +47,8 @@ export const printBillSchema = z
 
 export const TENDER_MODES = ['cash', 'card', 'upi', 'due', 'complimentary', 'other'] as const;
 export type TenderMode = (typeof TENDER_MODES)[number];
+/** Every payment mode stored: what a cashier can take, plus 'online' (paid on the website or app, P4-06). */
+export type PaymentMode = TenderMode | 'online';
 
 export const settleSchema = z
   .object({
@@ -123,6 +126,8 @@ export const configSchemas = {
   'reservation.holdMin': z.number().int().min(0).max(240),
   /** …until this many minutes after it (a no-show then stops blocking the table). */
   'reservation.graceMin': z.number().int().min(0).max(120),
+  /** P4-06: online orders through the order hub (the hub link and its device key are not here). */
+  'online.settings': onlineSettingsSchema,
   /** P2-08: a second folder for backup copies (USB drive, another disk), an absolute path; null = none. */
   'backup.copyDir': z
     .string()

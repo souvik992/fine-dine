@@ -109,4 +109,4 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
   cancelled/void, KOT modifications, area-wise, table turnover, cash register.
 - [x] **P4-04 Reservations + waitlist (blocks tables)**
 - [ ] **P4-05 Cloud sync agent (outbox up, menu/licence down)**
-- [ ] **P4-06 Online orders relay (own website first)**
+- [x] **P4-06 Online orders relay (own website first)**

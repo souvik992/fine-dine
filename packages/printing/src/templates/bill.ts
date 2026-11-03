@@ -35,6 +35,8 @@ export interface BillDocument {
   time: string;
   orderType: 'dine_in' | 'takeaway' | 'delivery' | 'online';
   tableLabel?: string | null;
+  /** P4-06: an online order's number and how it goes out, e.g. "W-1042 · DELIVERY · PAID ONLINE". */
+  orderRef?: string | null;
   areaName?: string | null;
   covers?: number | null;
   captainName?: string | null;
@@ -96,7 +98,8 @@ export function renderBill(doc: BillDocument, opts: { paper: PaperWidth; feed?: 
   if (doc.tableLabel && d.showTable) p.twoCol(`Table ${doc.tableLabel}${doc.areaName ? ` (${doc.areaName})` : ''}`, covers);
   else if (doc.tableLabel) {
     if (covers) p.line(covers);
-  } else p.line(doc.orderType === 'takeaway' ? 'Takeaway' : doc.orderType === 'delivery' ? 'Delivery' : 'Online order');
+  } else if (doc.orderRef) p.wrapped(`Online order ${doc.orderRef}`);
+  else p.line(doc.orderType === 'takeaway' ? 'Takeaway' : doc.orderType === 'delivery' ? 'Delivery' : 'Online order');
   const captain = doc.captainName && d.showCaptain ? `Captain: ${doc.captainName}` : '';
   const cashier = doc.cashierName && d.showCashier ? `Cashier: ${doc.cashierName}` : '';
   if (captain || cashier) p.twoCol(captain, cashier);

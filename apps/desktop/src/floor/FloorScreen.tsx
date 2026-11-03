@@ -1,6 +1,6 @@
 import type { FloorSnapshot, FloorTable } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Banknote, ChartColumn, MoonStar, ReceiptText, RefreshCw, Search, Settings } from 'lucide-react';
+import { Banknote, ChartColumn, MoonStar, ReceiptText, RefreshCw, Search, Settings, ShoppingBag } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
@@ -37,12 +37,14 @@ export function FloorScreen({
   onStock,
   onReports,
   onBookings,
+  onOnline,
   onOpenOrder,
 }: {
   onSettings: () => void;
   onStock: () => void;
   onReports: () => void;
   onBookings: () => void;
+  onOnline: () => void;
   onOpenOrder: (orderId: string) => void;
 }) {
   const { api, pinRequest, can } = useApp();
@@ -194,6 +196,11 @@ export function FloorScreen({
           {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })}
         </time>
         {can('reservation.manage') || can('order.create') ? <BookingsButton onClick={onBookings} /> : null}
+        {can('online.orders') ? (
+          <button className="btn h-10" onClick={onOnline} title="Orders from the website and app">
+            <ShoppingBag className="h-4 w-4" /> Online
+          </button>
+        ) : null}
         {can('bill.settle') ? (
           <button className="btn h-10" onClick={() => setPanel('bills')} title="Today's bills: reprint or void">
             <ReceiptText className="h-4 w-4" /> Bills

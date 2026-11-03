@@ -123,6 +123,7 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
     const url = await app.listen({ host: config.host, port: config.port });
     printQueue.start();
     backups.start();
+    app.online.start(); // P4-06: idle unless online orders are on and the outlet is paired with a hub
     if (restored) app.log.warn(restored, 'restored a backup; the previous database was kept aside');
     if (!businessDate) app.log.warn({ licence: licence.status(db, now()).state }, 'no business day open: the licence does not allow a new one');
     if (opts.banner) {

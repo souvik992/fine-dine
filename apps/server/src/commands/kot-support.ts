@@ -1,5 +1,6 @@
 // Issuing and reprinting kitchen tickets (docs/06 "KOT"). Every ticket is stored as printed (kot_document) so a
 // reprint matches the original; tickets go to every printer of the station and to the KDS stream.
+import { onlineRef } from '../online/online-support.js';
 import { renderKot, type KotKind, type KotTicket, type KotTicketLine, type PaperWidth } from '@dinepos/printing';
 import { isoInZone, newId } from '@dinepos/shared';
 import type { OrderRow } from '../core/command-handler.js';
@@ -22,6 +23,7 @@ export function kotHeader(ctx: CommandContext, order: OrderRow): TicketHeader {
   return {
     orderType: order.type,
     tableLabel: table?.label ?? null,
+    ...(order.type === 'online' ? { orderRef: onlineRef(db, order.id) } : {}),
     areaName: table?.area ?? null,
     covers: order.covers,
     captainName: captainName ?? null,

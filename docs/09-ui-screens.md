@@ -126,6 +126,19 @@ The button shows how many materials are low or need a count. Tabs:
 - **Usage report**: business-date range; opening, received, used, wasted, adjusted, closing per material, used
   and wasted value; Download CSV.
 
+## Online orders (built in P4-06: `apps/desktop/src/online/`, Floor header "Online")
+- Columns New / In the kitchen / Ready / Out for delivery, finished on demand. A card: order number, PICKUP or
+  DELIVERY, PAID ONLINE / CASH ON DELIVERY / PAY AT PICKUP, website or app, placed time and the minutes left before the
+  hub rejects it, customer and mobile, address and distance, rider, dishes with options and notes, the customer's total
+  and the bill (red when they differ), and any alert. Actions: Accept (or "Accept at ₹… " after a price refusal),
+  Reject (reason, a word for the customer), Preparing, Ready, Out for delivery (rider name and phone), Delivered /
+  Collected, Bill (opens the order), Cancel order (voids the bill).
+- On every other screen: "N new online orders" with a chime when one arrives.
+- Settings › Online orders: the hub link (paste the connection link / Disconnect, live status), take online orders,
+  accepting by hand or automatically, the hub's reject-after minutes, kitchen time, website/app, pickup/delivery, pay
+  online / cash, GST on charges, pickup minimum and time, packaging charge, store location and address, up to six
+  delivery bands (km, charge, minimum, free above, time) and opening hours per day (up to two times).
+
 ## Licence (built in P2-09: Settings › Licence; `apps/desktop/src/settings/LicenceSettings.tsx`)
 - Status (Licensed / Ending soon / Ended: grace period / Ended / Not licensed / Key not valid here) with the message,
   seats in use of allowed, this PC's hardware id with Copy, and a box to paste and install a key.

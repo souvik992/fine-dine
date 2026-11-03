@@ -20,6 +20,8 @@ export interface KotTicket {
   orderType: 'dine_in' | 'takeaway' | 'delivery' | 'online';
   stationName: string;
   tableLabel?: string | null;
+  /** P4-06: an online order's number and how it goes out, e.g. "W-1042 · DELIVERY · PAID ONLINE". */
+  orderRef?: string | null;
   areaName?: string | null;
   covers?: number | null;
   captainName?: string | null;
@@ -61,6 +63,7 @@ export function renderKot(t: KotTicket, opts: RenderOptions): { bytes: Uint8Arra
   if (t.tableLabel) {
     p.twoCol(`Table ${t.tableLabel}${t.areaName ? ` (${t.areaName})` : ''}`, t.covers ? `Covers ${t.covers}` : '');
   }
+  if (t.orderRef) p.bold(true).wrapped(t.orderRef).bold(false);
   p.twoCol(t.captainName ? `Captain: ${t.captainName}` : '', `${t.time}  ${t.date}`);
   if (t.forKotNo) p.bold(true).line(`Changes KOT ${String(t.forKotNo).padStart(4, '0')}`).bold(false);
   if (t.notice) p.bold(true).size(1, 2).wrapped(t.notice).size(1, 1).bold(false);

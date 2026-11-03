@@ -34,6 +34,11 @@ export interface CommandHandler<P = unknown, R = unknown> {
   needsOrder: boolean;
   /** Commands that may run with no open business date (DayEnd's successor, admin setup). */
   allowWhenDayClosed?: boolean;
+  /**
+   * P4-06: sent only by the server itself (the order-hub connector), never over /v1/commands. They still run through
+   * the same pipeline (one transaction, audit, events) as every other write.
+   */
+  internal?: boolean;
   apply(ctx: CommandContext, payload: P, order: OrderRow | null): HandlerResult<R> | void;
 }
 

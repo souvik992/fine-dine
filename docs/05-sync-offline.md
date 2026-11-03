@@ -88,3 +88,18 @@ Built in P3-03 (captain app; the desktop terminals still need the server, see be
 - Down: long-poll/WS from cloud for menu documents (versioned), licence renewals, online orders.
   Applied on the master as normal commands (audited).
 - Cloud is never required for billing.
+
+## Online orders through the order hub (P4-06)
+The hub (`pos-backend/hub`, contract v1 in `pos-backend/contract`) owns online orders and their states; DinePOS owns the
+menu, prices, bill and bill number. `apps/server/src/online/connector.ts` (started by the server; idle unless online
+orders are on and the outlet is paired):
+- One outgoing SSE stream (`GET /v1/pos/events`, `Last-Event-ID` = `online_link.last_seq`). Each event is applied by
+  `ApplyHubEvent`, which stores the order *and* the new resume point in one transaction; an event at or below it is
+  ignored (at-least-once delivery, F1, F4). Silence for 3 heartbeats (45 s) reconnects (1/2/5/10/30 s backoff).
+- An outbox (`online_outbox`): `received`, `accept`, `reject`, `state`, each with its idempotency key (`rcv-<id>`,
+  `acc-<id>`, `rej-<id>`, `st-<id>-<state>`), written in the same transaction as the change and sent after commit, in
+  order, retried until the hub answers (F2, F3). A 409/404/400 is final; an accept refused because the customer cancelled
+  first leaves the order cancelled with a note to void its bill (F11).
+- Publishes the menu when its hash changes (`PUT /v1/pos/menu`, version + 1) and `PUT /v1/pos/status { accepting }`
+  (online on + paired + a business day open). The outlet never accepts incoming connections; billing never waits for
+  the hub.

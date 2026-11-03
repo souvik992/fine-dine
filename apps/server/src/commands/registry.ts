@@ -1,5 +1,15 @@
 // type → handler. One handler per file in this folder; add each new command here (see /add-command).
 import { createRegistry, type CommandRegistry } from '../core/command-handler.js';
+import { acceptOnlineOrder } from './accept-online-order.js';
+import { advanceOnlineOrder } from './advance-online-order.js';
+import { applyHubEvent } from './apply-hub-event.js';
+import { cancelOnlineOrder } from './cancel-online-order.js';
+import { noteOnlineOrder } from './note-online-order.js';
+import { recordHubAction } from './record-hub-action.js';
+import { recordOnlinePublish } from './record-online-publish.js';
+import { rejectOnlineOrder } from './reject-online-order.js';
+import { saveOnlineLink } from './save-online-link.js';
+import { unlinkOnlineHub } from './unlink-online-hub.js';
 import { addItems } from './add-items.js';
 import { addToWaitlist } from './add-to-waitlist.js';
 import { assignCaptain } from './assign-captain.js';
@@ -116,6 +126,18 @@ const handlers = [
   addToWaitlist,
   seatFromWaitlist,
   leaveWaitlist,
+  // online orders through the hub (P4-06)
+  acceptOnlineOrder,
+  rejectOnlineOrder,
+  advanceOnlineOrder,
+  cancelOnlineOrder,
+  unlinkOnlineHub,
+  // internal: the hub connector
+  saveOnlineLink,
+  applyHubEvent,
+  recordHubAction,
+  recordOnlinePublish,
+  noteOnlineOrder,
   // billing + day
   printBill,
   splitBill,

@@ -21,9 +21,10 @@ export interface RightsPolicy {
 
 /**
  * What a device may do with nobody signed in (P4-02). A paired kitchen screen bumps tickets — nothing else. The master
- * PC can too, so a screen opened on the master itself works. Audited with the device, no user.
+ * PC can too, so a screen opened on the master itself works. Audited with the device, no user. `system` (the server's
+ * hub connector, P4-06) auto-accepts online orders when the outlet chose automatic accepting.
  */
-export const DEVICE_RIGHTS: Record<DeviceKind, readonly Right[]> = { kds: ['kds.bump'], master: ['kds.bump'], terminal: [], captain: [] };
+export const DEVICE_RIGHTS: Record<DeviceKind, readonly Right[]> = { kds: ['kds.bump'], master: ['kds.bump'], terminal: [], captain: [], system: ['online.orders'] };
 
 /** Grants every right. Tests and tools only; the server uses `roleRights`. */
 export const allowAllRights: RightsPolicy = {

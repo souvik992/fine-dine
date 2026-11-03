@@ -3,8 +3,11 @@ import type { Right } from '@dinepos/shared';
 import type { Db } from '../db/connection.js';
 
 /** Who sent the command. Device and user come from auth (P2-01/P2-02); `approvedBy` from a manager PIN. */
-/** P4-02: what kind of device sent the request; `master` = the master PC itself (loopback). */
-export type DeviceKind = 'terminal' | 'captain' | 'kds' | 'master';
+/**
+ * P4-02: what kind of device sent the request; `master` = the master PC itself (loopback). `system` = the server's own
+ * order-hub connector (P4-06): never set from an HTTP request.
+ */
+export type DeviceKind = 'terminal' | 'captain' | 'kds' | 'master' | 'system';
 
 export interface Actor {
   deviceId: string | null;

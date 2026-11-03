@@ -67,6 +67,11 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 | `SetCovers` / `AssignCaptain` | covers / captainId (null clears) | order.edit | | | |
 | `RequestBill` | — | order.edit | | bill_request row, `bill.requested` on `floor` | |
 | `SetCaptainSection` | userId, areaIds[], tableIds[] | staff.sections | | replaces the captain's section, `floor.changed` | |
+| `AcceptOnlineOrder` | onlineOrderId, prepMinutes?, acceptPriceChange? | online.orders | | order (type online, no table), KOT, bill, Online payment when paid online; outbox `accept` | |
+| `RejectOnlineOrder` | onlineOrderId, reason (contract REJECT_REASONS), reasonText? | online.orders | | state REJECTED; outbox `reject` | |
+| `AdvanceOnlineOrder` | onlineOrderId, to: PREPARING \| READY \| OUT_FOR_DELIVERY (rider) \| DELIVERED \| PICKED_UP | online.orders | | state; cash settles a COD bill on delivered/picked up; outbox `state` | |
+| `CancelOnlineOrder` | onlineOrderId, reason | bill.void | per role | voids the bill; outbox `state` CANCELLED | |
+| `UnlinkOnlineHub` | — | admin | | forgets the hub link (refused while orders are open) | |
 | `InstallLicence` | key | admin | | licence row; opens a business day when none is open (P2-09) | |
 | `CreateReservation` / `UpdateReservation` | guestName, phone?, partySize, startsAt, durationMin, tableIds[], note? | reservation.manage | | booking rows, `reservations.changed` | |
 | `CloseReservation` | reservationId, outcome: cancelled \| no_show | reservation.manage | | status | |
@@ -146,6 +151,7 @@ table close with the last part (result `unpaidParts`).
 | `/v1/orders/:id` | `OrderSnapshot` (items with addons, KOTs, bills with paid amount, version, running totals); 404 unknown, 400 not a ULID |
 | `/v1/orders?state=open` | open orders |
 | `/v1/menu?areaId=&since=<version>` | `MenuSnapshot` (active items; the area's price list overrides base/variant prices; with `areaId` also the area's tax `pricingMode`, P3-03) or `{ menuVersion, unchanged: true }` when `since` is current |
+| `/v1/online`, `/v1/online/orders` | P4-06: `OnlineStatus` (paired, store, connection, accepting, pending actions, menu version) and open + last-24-h online orders (`OnlineOrderView`). `POST /v1/online/pair { link }` (admin session): the server asks the hub with the connection link, then stores the link by command; the device key never leaves the server |
 | `/v1/licence` | P2-09: `LicenceInfo` — state, message, licensee, end date, seats and seats in use, this PC's hardware id, enforced |
 | `/v1/reservations?date=` | P4-04: `ReservationDay` — one local date's bookings (default today), every status, with tables, `late` flags and the hold/grace minutes |
 | `/v1/waitlist` | P4-04: guests still waiting, first come first, with `waitedMin` and `quotedMin` |
@@ -279,3 +285,18 @@ type OrderSnapshot = {
   totals: { subtotalPaise: number; taxPaise: number; totalPaise: number };
 };
 ```
+
+### Online orders (P4-06; schemas in `packages/shared/src/online.ts`)
+- **Internal commands** (`internal: true`): `ApplyHubEvent`, `RecordHubAction`, `RecordOnlinePublish`, `SaveOnlineLink`,
+  `NoteOnlineOrder`. Only the server's hub connector sends them (through the normal pipeline: one transaction, audit,
+  events); `/v1/commands` answers them like an unknown type.
+- `AcceptOnlineOrder` runs in one transaction: open an order of type `online` with no table → dishes at DinePOS
+  prices (sizes published as "<itemId>:<variantId>") → `FireKOT` → delivery/packaging charge lines (`item_id
+  fee:delivery|fee:packaging`, status fired, never on a KOT, GST = `online.settings.feeTaxBp`) → `PrintBill` (no service
+  charge, no discount; customer name and mobile) → `settleBill` with mode `online` when it was paid online. If DinePOS's
+  total is not the customer's (`details.reason = 'price'`, with both totals), it is refused unless `acceptPriceChange`
+  (product owner, 2026-11-03); the alert keeps both totals. Accepting again returns the same bill.
+- The KOT and the bill of an online order carry `orderRef`, e.g. "W-1042 · DELIVERY · CASH ON DELIVERY".
+- Payment mode `online` exists only for this (not a cashier tender); reports show it as "Online (website / app)".
+- Automatic accepting is done by the connector as device `system` (its only right: `online.orders`); a refusal (price,
+  no business day, a dish off the menu) is noted on the order and left for staff.

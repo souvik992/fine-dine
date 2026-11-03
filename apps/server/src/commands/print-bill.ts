@@ -5,6 +5,7 @@ import { PosError } from '../core/errors.js';
 import { getConfig } from '../core/outlet-config.js';
 import { billLogoBits, billOutlet } from './bill-design.js';
 import { billableItems, billPrinter, orderPlace, printedDateTime, toBillLines, userName } from './billing-support.js';
+import { onlineRef } from '../online/online-support.js';
 import { emitTableState, nextCounter } from './order-support.js';
 
 interface ExistingBill {
@@ -126,6 +127,7 @@ export const printBill = defineCommand({
       time: when.time,
       orderType: o.type,
       tableLabel: place.tableLabel,
+      ...(o.type === 'online' ? { orderRef: onlineRef(db, o.id) } : {}),
       areaName: place.areaName,
       covers: o.covers,
       captainName: userName(db, o.captain_id),

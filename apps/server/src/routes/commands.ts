@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { Authenticator } from '../auth/authenticate.js';
+import { PosError } from '../core/errors.js';
 import { executeCommand, type ExecuteDeps } from '../core/execute-command.js';
 
 export function commandRoutes(app: FastifyInstance, deps: ExecuteDeps, auth: Authenticator): void {
@@ -7,6 +8,8 @@ export function commandRoutes(app: FastifyInstance, deps: ExecuteDeps, auth: Aut
   app.post('/v1/commands', (req, reply) => {
     // First-run setup is the one command allowed without a session, and only while no staff exist.
     const type = (req.body as { type?: unknown } | null)?.type;
+    // Internal commands come from the server itself (P4-06): unknown to clients.
+    if (typeof type === 'string' && deps.registry.get(type)?.internal) throw new PosError('VALIDATION', `Unknown command type "${type}".`, { type });
     // A kitchen screen may run its own commands with no one signed in (DEVICE_RIGHTS, P4-02).
     const right = typeof type === 'string' ? deps.registry.get(type)?.right : undefined;
     void reply.send(executeCommand(deps, req.body, auth.authenticate(req, { allowWhenNoStaff: type === 'SetupOutlet', right: right ?? undefined })));

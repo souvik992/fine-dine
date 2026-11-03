@@ -98,3 +98,14 @@ Decided 2026-11-02 with the product owner:
   counted (a difference is a leakage flag). Stored in `business_day.z_report_json`, printed on the bill printer.
   The next business date opens in the same transaction; `processed_command` older than 7 days and all but the
   last 10,000 `event_log` rows are pruned.
+
+## Online orders (P4-06; product owner 2026-11-03)
+- The bill is DinePOS's own, at its menu prices (exclusive of GST, as orders without a table are), with no service
+  charge and no discount; the hub's total is what the customer was shown. A difference is flagged and staff decide;
+  automatic accepting never bills a different total.
+- Delivery and packaging charges are bill lines taxed at the outlet's setting (Settings › Online orders › GST on
+  charges); with no rate set, no charges can be added (the hub then refuses them too). Delivery charge by distance band
+  (free above the band's amount), from the outlet's own settings.
+- Paid online: settled at once as payment mode `online` (reference = the hub's order number). Cash at pickup / on
+  delivery: settled in cash when marked collected / delivered. Cancelling after acceptance voids the bill (keeps its
+  number; payments reversed), with the bill.void right and its PIN rule.

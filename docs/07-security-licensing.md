@@ -53,7 +53,8 @@ Roles: Owner, Manager, Cashier, Captain, Kitchen (defaults, editable). Rights ar
 Defaults (migration 0004; edit with `UpsertRole`): Owner everything; Manager everything except `users.manage`, 20%
 discount; Cashier billing and orders, 10%, with a manager PIN for `kot.modify`, `kot.cancel`, `reprint`, `bill.void`,
 `drawer.open`, `cash.move`, `staff.sections` (captains' sections; Owner and Manager, P3-04), `reservation.manage` (bookings and the waitlist; Owner,
-Manager, Cashier and Captain, P4-04); Captain orders and firing, PIN for changes to fired items; Kitchen `kds.bump`,
+Manager, Cashier and Captain, P4-04), `online.orders` (accept, reject and move on online orders; Owner, Manager and
+Cashier, P4-06); Captain orders and firing, PIN for changes to fired items; Kitchen `kds.bump`,
 `menu.stock`. `reports.view` (migration 0008) goes to Owner and Manager. `stock.manage` (materials, purchases, wastage, counts, recipes, stock reads; migration 0005) goes to
 Owner and Manager. `menu.stock` is "mark items sold out" (Owner, Manager, Cashier, Kitchen). A PrintBill discount above the role limit needs a manager PIN and is a leakage flag. Safety rules: the
 Owner role always keeps `users.manage`; nobody can deactivate themselves or change their own role; at least one
@@ -129,3 +130,9 @@ A paired kitchen screen works with nobody signed in (docs/06 "no login after pai
 `kds` device — and the master PC itself — may run commands needing `kds.bump` and nothing else
 (`DEVICE_RIGHTS` in `apps/server/src/core/rights.ts`). Those commands only change KOT timestamps; the audit row
 records the device and no user. Terminals and phones always need a staff sign-in.
+
+## The order hub link (P4-06)
+`POST /v1/online/pair` (admin) exchanges the hub's one-time connection link for a device key, stored only in
+`online_link` on the master (not in `/v1/config`, never sent to a terminal). Plain `http://` is refused except to a hub on
+the same PC. The connector acts as device `system`, whose only right is `online.orders` (automatic accepting); no HTTP
+request can carry that kind.

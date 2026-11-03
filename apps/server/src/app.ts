@@ -1,3 +1,7 @@
+import { newId } from '@dinepos/shared';
+import { OnlineConnector, SYSTEM_ACTOR, type Execute } from './online/connector.js';
+import { onlineRoutes } from './routes/online.js';
+import { executeCommand, type ExecuteDeps } from './core/execute-command.js';
 import fastifyCors from '@fastify/cors';
 import fastifyWebsocket from '@fastify/websocket';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
@@ -59,6 +63,8 @@ export interface AppDeps {
   backups?: { scheduler: BackupScheduler; dataDir: string; requestRestart: () => void };
   /** P2-09: the licence check (default: not enforced, as in tests). */
   licence?: LicenceGate;
+  /** P4-06: how the connector reaches the order hub (tests pass a fake). */
+  onlineFetch?: typeof fetch;
 }
 
 // Secrets never reach the log (docs/07-security-licensing.md).
@@ -68,7 +74,7 @@ export const LOG_REDACT = [
   'req.headers["x-manager-pin"]',
 ];
 
-export type DinePosApp = FastifyInstance & { realtime: RealtimeHub };
+export type DinePosApp = FastifyInstance & { realtime: RealtimeHub; online: OnlineConnector };
 
 /** Builds the HTTP app without listening, so tests can use `app.inject()`. */
 export function buildApp(deps: AppDeps): DinePosApp {
@@ -161,9 +167,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
   healthRoutes(app, { db, timeZone, now, startedAt, backupStatus: deps.backups ? () => deps.backups!.scheduler.status() : undefined, licence: () => licenceGate.status(db, now()) });
   licenceRoutes(app, { db, now, licence: licenceGate });
   queryRoutes(app, { db, timeZone, now, printerStatus: deps.printQueue ? (id) => deps.printQueue!.status(id) : undefined });
-  commandRoutes(
-    app,
-    {
+  const executeDeps: ExecuteDeps = {
       db,
       timeZone,
       now,
@@ -173,9 +177,17 @@ export function buildApp(deps: AppDeps): DinePosApp {
       printWaker: deps.printWaker ?? noopPrintWaker,
       licence: licenceGate,
       onPostCommitError: (err, stage) => app.log.error({ err, stage }, 'post-commit step failed'),
-    },
-    deps.auth ?? sessionAuth(db, now),
-  );
+    };
+  commandRoutes(app, executeDeps, deps.auth ?? sessionAuth(db, now));
+
+  // P4-06: online orders through the order hub. Started by the server (server.ts); idle unless switched on and paired.
+  const execute: Execute = (type, payload, actor = SYSTEM_ACTOR) =>
+    executeCommand(executeDeps, { commandId: newId(), type, payload, createdAt: now().toISOString() }, actor);
+  const online = new OnlineConnector({ db, now, execute, bus, ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}), log: { info: (m, d) => app.log.info(d ?? {}, m), warn: (m, d) => app.log.warn(d ?? {}, m) } });
+  app.addHook('onClose', async () => {
+    await online.stop();
+  });
+  onlineRoutes(app, { db, now, connector: online, execute, ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}) });
   sessionRoutes(app, { db, now, timeZone });
   stockRoutes(app, { db, now });
   cashierRoutes(app, { db, now });
@@ -185,7 +197,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
   webAppRoutes(app, 'kds', deps.kdsDir ?? defaultWebDir('kds'));
   if (deps.backups) backupRoutes(app, { db, now, timeZone, dataDir: deps.backups.dataDir, backups: deps.backups.scheduler, requestRestart: deps.backups.requestRestart });
   streamRoutes(app, hub, allowedOrigins);
-  return Object.assign(app, { realtime: hub });
+  return Object.assign(app, { realtime: hub, online });
 }
 
 function errorBody(code: string, message: string, details?: unknown) {

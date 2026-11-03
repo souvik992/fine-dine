@@ -12,6 +12,7 @@ export * from './schemas/commands/admin.js';
 export * from './schemas/commands/billing.js';
 export * from './schemas/commands/orders.js';
 export * from './schemas/commands/reservations.js';
+export * from './online.js';
 export * from './schemas/commands/stock.js';
 export * from './schemas/commands/users.js';
 export * from './schemas/envelope.js';

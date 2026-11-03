@@ -11,13 +11,15 @@ import { LicenceBanner } from './components/LicenceBanner.js';
 import { SetupScreen } from './auth/SetupScreen.js';
 import { BillingScreen } from './billing/BillingScreen.js';
 import { BookingsScreen } from './bookings/BookingsScreen.js';
+import { OnlineAlerts } from './online/OnlineAlerts.js';
+import { OnlineScreen } from './online/OnlineScreen.js';
 import { BillRequests } from './floor/BillRequests.js';
 import { FloorScreen } from './floor/FloorScreen.js';
 import { SettingsScreen } from './settings/SettingsScreen.js';
 import { ReportsScreen } from './reports/ReportsScreen.js';
 import { StockScreen } from './stock/StockScreen.js';
 
-type Screen = { kind: 'floor' } | { kind: 'settings'; section?: string } | { kind: 'stock' } | { kind: 'reports' } | { kind: 'bookings' } | { kind: 'order'; orderId: string };
+type Screen = { kind: 'floor' } | { kind: 'settings'; section?: string } | { kind: 'stock' } | { kind: 'reports' } | { kind: 'bookings' } | { kind: 'online' } | { kind: 'order'; orderId: string };
 
 export function App() {
   const { api, session, needsPairing, can } = useApp();
@@ -65,11 +67,14 @@ export function App() {
         <StockScreen onBack={toFloor} />
       ) : screen.kind === 'reports' ? (
         <ReportsScreen onBack={toFloor} />
+      ) : screen.kind === 'online' ? (
+        <OnlineScreen onBack={toFloor} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} />
       ) : screen.kind === 'bookings' ? (
         <BookingsScreen onBack={toFloor} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} />
       ) : (
-        <FloorScreen onSettings={() => setScreen({ kind: 'settings' })} onStock={() => setScreen({ kind: 'stock' })} onReports={() => setScreen({ kind: 'reports' })} onBookings={() => setScreen({ kind: 'bookings' })} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} />
+        <FloorScreen onSettings={() => setScreen({ kind: 'settings' })} onStock={() => setScreen({ kind: 'stock' })} onReports={() => setScreen({ kind: 'reports' })} onBookings={() => setScreen({ kind: 'bookings' })} onOnline={() => setScreen({ kind: 'online' })} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} />
       )}
+      <OnlineAlerts onOpen={() => setScreen({ kind: 'online' })} hidden={screen.kind === 'online'} />
       <BillRequests onOpen={(orderId) => setScreen({ kind: 'order', orderId })} hiddenOrderId={screen.kind === 'order' ? screen.orderId : undefined} compact={screen.kind !== 'floor'} />
       <LicenceBanner onOpen={can('admin') ? () => setScreen({ kind: 'settings', section: 'licence' }) : undefined} />
       <ManagerPinDialog />

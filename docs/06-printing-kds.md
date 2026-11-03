@@ -42,6 +42,8 @@ Course 2
 ```
 Change slips: header `MODIFIED KOT 0042` / `CANCELLED`, lines `+1 Paneer Tikka`, `-1 Dal Makhani`, reason.
 Move notice: `MOVED T4 → T9`. Reprints: `** DUPLICATE **`.
+Online orders (P4-06): the KOT and the bill print the order's reference under the header, e.g.
+`W-1042 · DELIVERY · CASH ON DELIVERY` (stored with the document; reprints match). Charge lines never go on a KOT.
 Built in P2-04: every ticket (new, modify, cancel) is stored as printed in `kot_document` (append-only) and a
 reprint renders that copy. Change slips print `-1 Butter Naan`, `now 2`, `Changes KOT 0041` and `Reason: …`. A long
 title wraps instead of being cut on 58 mm double-width (`CANCELLED KOT` / `0043`).

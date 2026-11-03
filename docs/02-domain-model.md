@@ -9,6 +9,7 @@
 | CaptainSection | userId, areaId \| tableId | P3-04: who looks after which area/table (`captain_section`) |
 | BillRequest | orderId, requestedAt, requestedBy | P3-04: open "Request bill", cleared by PrintBill (`bill_request`) |
 | Reservation | id, guestName, phone?, partySize, startsAt (UTC), durationMin, tableIds[], note?, status(booked/seated/cancelled/no_show), orderId? | P4-04 (`reservation`, `reservation_table`); never deleted |
+| OnlineOrder | hub order id, number ("W-1042"), state (contract OrderState), the hub's order as sent, localOrderId, billId, posTotal, prepMinutes, alert | P4-06 (`online_order`); the DinePOS order is type `online`, no table |
 | WaitlistEntry | id, guestName, phone?, partySize, quotedMin?, status(waiting/seated/left/cancelled), joinedAt, tableId?, orderId? | P4-04 (`waitlist_entry`) |
 | OrderItem | id, orderId, itemId, variantId, nameSnapshot, qty, unitPricePaise, taxRateBp, note, course, stationId, kotId, status | Snapshots at add time |
 | OrderItemAddon | orderItemId, addonId, nameSnapshot, qty, pricePaise | |

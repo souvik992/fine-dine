@@ -219,7 +219,7 @@ const gst: Def = {
   },
 };
 
-const MODE: Record<string, string> = { cash: 'Cash', card: 'Card', upi: 'UPI', due: 'Due (pay later)', complimentary: 'Complimentary', other: 'Other' };
+const MODE: Record<string, string> = { cash: 'Cash', card: 'Card', upi: 'UPI', due: 'Due (pay later)', complimentary: 'Complimentary', other: 'Other', online: 'Online (website / app)' };
 const payments: Def = {
   key: 'payments',
   title: 'Payment modes',
