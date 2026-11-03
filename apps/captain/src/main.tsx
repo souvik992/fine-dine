@@ -3,6 +3,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
 import { AppProvider } from './app-context.js';
+import { SyncProvider } from './offline/sync-context.js';
 import './styles.css';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true } } });
@@ -11,7 +12,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <AppProvider>
-        <App />
+        <SyncProvider>
+          <App />
+        </SyncProvider>
       </AppProvider>
     </QueryClientProvider>
   </StrictMode>,

@@ -1,10 +1,18 @@
 /* global self, caches */
 // DinePOS Captain service worker (P3-01): keeps the app itself available when the shop Wi-Fi blips. Data (orders,
-// menu) always comes from the outlet server; the offline outbox arrives in P3-03.
-const CACHE = 'dinepos-captain-v1';
+// menu) comes from the outlet server; the last copy and the offline outbox live in IndexedDB (P3-03).
+const CACHE = 'dinepos-captain-v2';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/captain/', '/captain/manifest.webmanifest', '/captain/icon.svg'])));
+  // The page and the hashed scripts/styles it loads, so the app opens with no connection (P3-03).
+  event.waitUntil(
+    caches.open(CACHE).then(async (c) => {
+      await c.addAll(['/captain/', '/captain/manifest.webmanifest', '/captain/icon.svg']);
+      const page = await (await c.match('/captain/')).text();
+      const assets = [...new Set(page.match(/\/captain\/assets\/[^"']+/g) ?? [])];
+      await c.addAll(assets);
+    }),
+  );
   self.skipWaiting();
 });
 

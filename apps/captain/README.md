@@ -13,9 +13,12 @@ Read first: `docs/09-ui-screens.md` (Captain), `docs/05-sync-offline.md`, `docs/
 5. Request bill, covers, notes
 6. Needs attention (offline replays that conflicted)
 
-## Offline
-IndexedDB outbox (`idb` library). Allowed offline: OpenTable, AddItems, Update/RemoveHeldItem, FireKOT
-(shown as "queued"). Everything else disabled with a reason.
+## Offline (P3-03)
+Every change goes through the outbox in `@dinepos/client` (`Outbox`, `orderView`), stored in IndexedDB
+(`src/offline/idb.ts`, no extra library). `src/offline/sync-context.tsx` decides each change on the latest view,
+replays when the stream is live and every 10 s, keeps the last floor/menu/orders for offline use and shows the
+messages. Allowed offline: OpenTable, AddItems, Update/RemoveHeldItem, FireKOT (shown as "queued"); SetCovers needs the
+server. Refused replays go to `src/screens/AttentionSheet.tsx`. Details and limits: `docs/05-sync-offline.md`.
 
 ## Notes
 - Service worker caches the app shell and the last menu snapshot.

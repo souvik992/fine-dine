@@ -144,6 +144,9 @@ The button shows how many materials are low or need a count. Tabs:
   all**; the **basket** groups waiting lines by course (−/+/remove, move to another course), shows what was sent by
   KOT, and offers **Fire all** plus **Fire course N** when more than one course waits. Changes from other devices
   arrive live; a refused change says who changed the table.
+- Offline (P3-03): an Offline banner, "N changes waiting to send" on Tables and on the order, a clock on tables and
+  lines that are only on the phone, "Queued — not in the kitchen yet" in the basket, and a red **N need(s) attention**
+  bar opening **Needs attention** (Try again / Discard / Seat at another table). Guests are locked while offline.
 
 ## KDS PWA
 - Station selector on first run. Ticket columns, age colours, bump on tap, all-day counts sidebar.

@@ -10,4 +10,8 @@ Browser clients for the outlet server, shared by the desktop terminal, the capta
   rebase for cart commands, conflicts explained), `addOrMerge` / `changeBy` (which cart command a tap becomes) and the
   menu helpers (search, quick entry, option sheet rules, KOT grouping). Tests next to them.
 
+- Offline outbox (`src/outbox/`, P3-03): `Outbox` (durable via an `OutboxStore`, strictly ordered replay with the
+  original commandId, silent rebase, Needs attention, dropping dependants), `rebaseEntry`, `withoutDependents`, and
+  `orderView` (server snapshot + waiting changes, priced from the menu). Used by the captain app.
+
 API/stream tests live with the desktop (`apps/desktop/src/api/api.test.ts`), which re-exports this package.

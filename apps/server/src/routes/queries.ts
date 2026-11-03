@@ -42,7 +42,7 @@ export function queryRoutes(app: FastifyInstance, deps: QueryDeps): void {
   });
 
   app.get('/v1/printers', (_req, reply) => {
-    void reply.header('cache-control', 'no-store').send({ printers: getPrinters(deps.db, deps.printerStatus) });
+    void reply.header('cache-control', 'no-store').send({ printers: getPrinters(deps.db, deps.printerStatus, deps.now()) });
     return reply;
   });
 

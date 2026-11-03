@@ -93,6 +93,8 @@ describe('floor + menu queries', () => {
     const menu = getMenu(h.db, { areaId });
     if (!('items' in menu)) throw new Error('expected items');
     expect(menu.items[0]).toMatchObject({ pricePaise: 25_000, variants: [{ pricePaise: 35_000 }] });
+    expect(menu.pricingMode).toBe('exclusive'); // the area's tax pricing, for totals on the phone (P3-03)
+    expect('pricingMode' in (getMenu(h.db) as object)).toBe(false);
     expect(() => getMenu(h.db, { areaId: newId() })).toThrow(/Area not found/);
   });
 

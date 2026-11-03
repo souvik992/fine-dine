@@ -18,6 +18,13 @@ export interface CommandOptions {
   expectedVersion?: number;
   /** Reuse an id when the user retries the same action (idempotent replay on the server). */
   commandId?: string;
+  /** Network attempts for this command (default: the client's). The offline outbox uses 1 and retries later. */
+  attempts?: number;
+  /**
+   * Send as this staff session instead of the signed-in one (P3-03: a queued command goes out as the captain who
+   * made it). A refused session then does not sign the current user out.
+   */
+  sessionToken?: string | null;
 }
 
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
@@ -89,7 +96,7 @@ export class ApiClient {
     let managerPin: string | null = null;
     for (;;) {
       try {
-        return await this.sendCommand<R>(body, managerPin);
+        return await this.sendCommand<R>(body, managerPin, opts);
       } catch (err) {
         // A manager approves by PIN; the same command (same commandId) is sent again with it.
         const askable = err instanceof ApiError && err.code === 'PIN_REQUIRED' && (err.details as { reason?: string } | undefined)?.reason !== 'too_many_tries';
@@ -100,27 +107,29 @@ export class ApiClient {
     }
   }
 
-  private async sendCommand<R>(body: string, managerPin: string | null): Promise<CommandSuccess<R>> {
+  private async sendCommand<R>(body: string, managerPin: string | null, opts: CommandOptions): Promise<CommandSuccess<R>> {
     const headers: Record<string, string> = { 'content-type': 'application/json', ...(managerPin ? { 'x-manager-pin': managerPin } : {}) };
+    const attempts = opts.attempts ?? this.attempts;
     let lastNetworkError: ApiError | undefined;
-    for (let attempt = 1; attempt <= this.attempts; attempt++) {
+    for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
-        return await this.request<CommandSuccess<R>>('/v1/commands', { method: 'POST', headers, body });
+        return await this.request<CommandSuccess<R>>('/v1/commands', { method: 'POST', headers, body }, opts.sessionToken);
       } catch (err) {
         if (!(err instanceof ApiError) || err.code !== 'NETWORK') throw err;
         lastNetworkError = err;
-        if (attempt < this.attempts) await new Promise((r) => setTimeout(r, this.retryDelayMs * attempt));
+        if (attempt < attempts) await new Promise((r) => setTimeout(r, this.retryDelayMs * attempt));
       }
     }
     throw lastNetworkError!;
   }
 
-  private async request<T>(path: string, init: RequestInit): Promise<T> {
+  /** `sessionToken`: undefined = the signed-in session; otherwise exactly this one (null = none). */
+  private async request<T>(path: string, init: RequestInit, sessionToken?: string | null): Promise<T> {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
     let res: Response;
     try {
-      const token = this.opts.getToken?.();
+      const token = sessionToken === undefined ? this.opts.getToken?.() : sessionToken;
       const device = this.opts.getDeviceToken?.();
       const headers = {
         ...(init.headers as Record<string, string> | undefined),
@@ -143,7 +152,7 @@ export class ApiClient {
     if (res.ok) return json as T;
     const fail = json as Partial<CommandFailure>;
     if (fail.error?.code === 'UNAUTHENTICATED' && (fail.error.details as { reason?: string } | undefined)?.reason === 'device_not_paired') this.opts.onDeviceUnpaired?.();
-    else if (fail.error?.code === 'UNAUTHENTICATED' && path !== '/v1/sessions') this.opts.onUnauthenticated?.();
+    else if (fail.error?.code === 'UNAUTHENTICATED' && path !== '/v1/sessions' && sessionToken === undefined) this.opts.onUnauthenticated?.();
     throw new ApiError(fail.error?.code ?? 'INTERNAL', fail.error?.message ?? `Request failed (HTTP ${res.status}).`, fail.error?.details, fail.order);
   }
 }

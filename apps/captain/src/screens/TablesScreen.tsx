@@ -1,25 +1,43 @@
-import { ApiError } from '@dinepos/client';
 import { formatINR, type FloorSnapshot, type FloorTable } from '@dinepos/shared';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Lock, Minus, Plus, Users, WifiOff } from 'lucide-react';
-import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Clock, Lock, Minus, Plus, TriangleAlert, Users, WifiOff } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useApp } from '../app-context.js';
 import { Sheet } from '../components/Sheet.js';
+import { floorWithPending, waitingByTable } from '../offline/pending-model.js';
+import { useSync } from '../offline/sync-context.js';
 import { elapsedText, STATE_CLASS, STATE_LABEL, stateCounts, tablesOf } from '../tables-model.js';
+import { AttentionSheet } from './AttentionSheet.js';
 import { OrderScreen } from './OrderScreen.js';
 
-/** My tables (docs/09 Captain): area tabs, live table states; a free table is seated, an occupied one opens its order. */
+/**
+ * My tables (docs/09 Captain): area tabs, live table states; a free table is seated, an occupied one opens its order.
+ * Offline (P3-03): the last floor stays on screen, tables seated on this phone show as seated, and the header counts
+ * what is waiting to be sent and what needs attention.
+ */
 export function TablesScreen() {
-  const { api, session, signOut, stream, can } = useApp();
-  const floor = useQuery({ queryKey: ['floor'], queryFn: () => api.get<FloorSnapshot>('/v1/floor'), refetchInterval: 60_000 });
+  const { session, signOut, stream, can } = useApp();
+  const sync = useSync();
+  const floor = useQuery({ queryKey: ['floor'], queryFn: () => sync.cachedGet<FloorSnapshot>('/v1/floor'), refetchInterval: 60_000 });
   const [areaId, setAreaId] = useState<string | null>(null);
   const [picked, setPicked] = useState<FloorTable | null>(null);
   const [open, setOpen] = useState<{ orderId: string; areaId: string | null } | null>(null);
-  const data = floor.data;
+  const [attentionOpen, setAttentionOpen] = useState(false);
+  const data = useMemo(() => (floor.data ? floorWithPending(floor.data, sync.entries) : undefined), [floor.data, sync.entries]);
+  const waiting = useMemo(() => waitingByTable(sync.entries), [sync.entries]);
   const area = areaId ?? data?.areas[0]?.id ?? null;
   const tables = data ? tablesOf(data, area) : [];
+  const queued = sync.entries.filter((e) => e.status === 'queued').length;
+  const attention = sync.entries.length - queued;
 
-  if (open) return <OrderScreen orderId={open.orderId} areaId={open.areaId} onBack={() => setOpen(null)} />;
+  const attentionSheet = attentionOpen ? <AttentionSheet floor={data} onClose={() => setAttentionOpen(false)} /> : null;
+  if (open)
+    return (
+      <>
+        <OrderScreen orderId={open.orderId} areaId={open.areaId} onBack={() => setOpen(null)} onAttention={() => setAttentionOpen(true)} />
+        {attentionSheet}
+      </>
+    );
 
   const pick = (t: FloorTable) => (t.orderId ? setOpen({ orderId: t.orderId, areaId: t.areaId }) : setPicked(t));
   return (
@@ -45,8 +63,21 @@ export function TablesScreen() {
       </header>
       {stream !== 'live' ? (
         <p role="status" className="flex items-center gap-2 bg-warn/30 px-4 py-2 text-sm font-semibold">
-          <WifiOff className="h-4 w-4" /> {stream === 'offline' ? 'Offline: reconnecting to the outlet server…' : 'Connecting…'}
+          <WifiOff className="h-4 w-4 shrink-0" /> {stream === 'offline' ? 'Offline: orders are kept on this phone and sent when the connection is back.' : 'Connecting…'}
         </p>
+      ) : null}
+      {attention ? (
+        <button className="flex items-center gap-2 bg-danger px-4 py-2 text-left font-semibold text-white" onClick={() => setAttentionOpen(true)}>
+          <TriangleAlert className="h-5 w-5 shrink-0" /> {attention} need{attention === 1 ? 's' : ''} attention
+        </button>
+      ) : null}
+      {queued ? (
+        <p role="status" className="flex items-center gap-2 bg-secondary px-4 py-2 text-sm font-semibold" data-testid="waiting-count">
+          <Clock className="h-4 w-4 shrink-0" /> {queued} change{queued === 1 ? '' : 's'} waiting to send
+        </p>
+      ) : null}
+      {!sync.durable ? (
+        <p role="status" className="bg-warn/30 px-4 py-2 text-sm">This browser does not let the app keep data. Do not close it while changes are waiting.</p>
       ) : null}
 
       <main className="flex-1 px-3 py-3">
@@ -58,31 +89,40 @@ export function TablesScreen() {
           ))}
         </div>
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" aria-label="Tables">
-          {tables.map((t) => (
-            <li key={t.id}>
-              <button className={`tile w-full ${STATE_CLASS[t.state]}`} data-table={t.label} data-state={t.state} disabled={t.state === 'BLOCKED'} onClick={() => pick(t)}>
-                <span className="flex items-start justify-between">
-                  <span className="font-display text-2xl font-bold">{t.label}</span>
-                  {t.covers ? (
-                    <span className="flex items-center gap-1 text-sm">
-                      <Users className="h-4 w-4" /> {t.covers}
-                    </span>
-                  ) : t.seats ? (
-                    <span className="text-xs opacity-70">{t.seats} seats</span>
-                  ) : null}
-                </span>
-                <span className="text-sm font-semibold">{STATE_LABEL[t.state]}</span>
-                {t.orderId ? (
-                  <span className="flex justify-between text-xs">
-                    <span>{elapsedText(t.elapsedMin)}</span>
-                    <span className="tabular-nums">{t.amountPaise ? formatINR(t.amountPaise) : ''}</span>
+          {tables.map((t) => {
+            const w = waiting.get(t.id);
+            return (
+              <li key={t.id}>
+                <button className={`tile w-full ${STATE_CLASS[t.state]}`} data-table={t.label} data-state={t.state} disabled={t.state === 'BLOCKED'} onClick={() => pick(t)}>
+                  <span className="flex items-start justify-between">
+                    <span className="font-display text-2xl font-bold">{t.label}</span>
+                    {t.covers ? (
+                      <span className="flex items-center gap-1 text-sm">
+                        <Users className="h-4 w-4" /> {t.covers}
+                      </span>
+                    ) : t.seats ? (
+                      <span className="text-xs opacity-70">{t.seats} seats</span>
+                    ) : null}
                   </span>
-                ) : null}
-              </button>
-            </li>
-          ))}
+                  <span className="text-sm font-semibold">{STATE_LABEL[t.state]}</span>
+                  {w ? (
+                    <span className={`flex items-center gap-1 text-xs font-bold ${w.attention ? 'text-danger' : ''}`} data-testid="table-waiting">
+                      {w.attention ? <TriangleAlert className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                      {w.attention ? 'needs attention' : `${w.waiting} waiting`}
+                    </span>
+                  ) : t.orderId ? (
+                    <span className="flex justify-between text-xs">
+                      <span>{elapsedText(t.elapsedMin)}</span>
+                      <span className="tabular-nums">{t.amountPaise ? formatINR(t.amountPaise) : ''}</span>
+                    </span>
+                  ) : null}
+                </button>
+              </li>
+            );
+          })}
         </ul>
         {data && tables.length === 0 ? <p className="mt-10 text-center text-muted-foreground">No tables in this area.</p> : null}
+        {floor.error && !data ? <p className="mt-10 text-center text-muted-foreground">Cannot reach the outlet server, and no tables are saved on this phone yet.</p> : null}
       </main>
 
       {picked ? (
@@ -90,7 +130,8 @@ export function TablesScreen() {
           <SeatSheet
             table={picked}
             onClose={() => setPicked(null)}
-            onSeated={(orderId) => {
+            onSeat={(covers) => {
+              const orderId = sync.openTable(picked, covers);
               setPicked(null);
               setOpen({ orderId, areaId: picked.areaId });
             }}
@@ -101,29 +142,13 @@ export function TablesScreen() {
           </Sheet>
         )
       ) : null}
+      {attentionSheet}
     </div>
   );
 }
 
-function SeatSheet({ table, onClose, onSeated }: { table: FloorTable; onClose: () => void; onSeated: (orderId: string) => void }) {
-  const { api } = useApp();
-  const qc = useQueryClient();
+function SeatSheet({ table, onClose, onSeat }: { table: FloorTable; onClose: () => void; onSeat: (covers: number) => void }) {
   const [covers, setCovers] = useState(Math.min(table.seats ?? 2, 2));
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const seat = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await api.command<{ orderId: string }>('OpenTable', { tableId: table.id, covers });
-      void qc.invalidateQueries({ queryKey: ['floor'] });
-      onSeated(res.result.orderId);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not seat the table.');
-    } finally {
-      setBusy(false);
-    }
-  };
   return (
     <Sheet title={`Seat ${table.label}`} onClose={onClose}>
       <p className="mb-2 font-semibold">Guests</p>
@@ -138,12 +163,7 @@ function SeatSheet({ table, onClose, onSeated }: { table: FloorTable; onClose: (
           <Plus className="h-6 w-6" />
         </button>
       </div>
-      {error ? (
-        <p role="alert" className="mb-3 font-semibold text-danger">
-          {error}
-        </p>
-      ) : null}
-      <button className="btn btn-primary w-full" onClick={() => void seat()} disabled={busy}>
+      <button className="btn btn-primary w-full" onClick={() => onSeat(covers)}>
         Seat {covers} guest{covers === 1 ? '' : 's'}
       </button>
     </Sheet>

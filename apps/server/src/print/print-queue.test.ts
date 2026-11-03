@@ -7,7 +7,7 @@ import { newId } from '@dinepos/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EventBus, type PublishedEvent } from '../core/events.js';
 import { getPrinters } from '../queries/printers.js';
-import { useHarness } from '../testing/command-harness.js';
+import { TEST_NOW, useHarness } from '../testing/command-harness.js';
 import { line, orderHelpers, S, seedOutlet } from '../testing/order-fixture.js';
 import { PrintQueue, REROUTE_MARK } from './print-queue.js';
 
@@ -127,7 +127,7 @@ describe('PrintQueue', () => {
     expect(statuses.map((s) => s.status)).toEqual(['retrying', 'offline']);
     expect(statuses[1]!.printerId).toBe(S.kitchenPrinter);
     expect(h.count('event_log', "event = 'print.status'")).toBe(2);
-    expect(getPrinters(h.db).find((p) => p.id === S.kitchenPrinter)).toMatchObject({ status: 'offline', queued: 0, failedToday: 1 });
+    expect(getPrinters(h.db, undefined, TEST_NOW()).find((p) => p.id === S.kitchenPrinter)).toMatchObject({ status: 'offline', queued: 0, failedToday: 1 });
   });
 
   it('prints to a real TCP socket, sending every byte', async () => {

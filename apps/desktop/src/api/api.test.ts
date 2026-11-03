@@ -224,6 +224,20 @@ describe('ApiClient: sessions and manager approval', () => {
     await expect(api.send('POST', '/v1/sessions', { userId: 'u', pin: '0000' })).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
     expect(signedOut).toBe(1);
   });
+
+  it('P3-03: a queued command goes out as the captain who made it, once; a refused old session signs nobody out', async () => {
+    const tokens: Array<string | null> = [];
+    let signedOut = 0;
+    const fetch: Fetch = (_url, init) => {
+      tokens.push((init?.headers as Record<string, string>)['x-user-session'] ?? null);
+      return tokens.length === 1 ? Promise.reject(new TypeError('offline')) : reply({ ok: false, error: { code: 'UNAUTHENTICATED', message: 'Please sign in.' } }, 401);
+    };
+    const api = new ApiClient({ baseUrl: 'http://s', fetch, retryDelayMs: 1, getToken: () => 'now-signed-in', onUnauthenticated: () => signedOut++ });
+    await expect(api.command('AddItems', {}, { attempts: 1, sessionToken: 'ravi' })).rejects.toMatchObject({ code: 'NETWORK' });
+    await expect(api.command('AddItems', {}, { attempts: 1, sessionToken: 'ravi' })).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    expect(tokens).toEqual(['ravi', 'ravi']);
+    expect(signedOut).toBe(0);
+  });
 });
 
 describe('device pairing in the client (P2-02)', () => {

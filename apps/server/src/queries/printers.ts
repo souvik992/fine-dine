@@ -18,7 +18,7 @@ export interface PrinterInfo {
  * Printer list + status for `GET /v1/printers`. Status comes from the live worker when there is one,
  * otherwise from the queue: a job waiting to retry → retrying; last finished job failed → offline.
  */
-export function getPrinters(db: Db, liveStatus?: (printerId: string) => PrinterStatus | undefined): PrinterInfo[] {
+export function getPrinters(db: Db, liveStatus?: (printerId: string) => PrinterStatus | undefined, now: Date = new Date()): PrinterInfo[] {
   const rows = db.prepare('SELECT id, name, transport, role, width_mm, backup_printer_id FROM printer ORDER BY name COLLATE NOCASE').all() as Array<{
     id: string;
     name: string;
@@ -31,7 +31,7 @@ export function getPrinters(db: Db, liveStatus?: (printerId: string) => PrinterS
   const retrying = db.prepare(`SELECT 1 FROM print_job WHERE printer_id = ? AND state = 'retry' LIMIT 1`).pluck();
   const last = db.prepare(`SELECT state, last_error FROM print_job WHERE printer_id = ? AND state IN ('done', 'failed') ORDER BY done_at DESC, rowid DESC LIMIT 1`);
   const failedToday = db.prepare(`SELECT count(*) FROM print_job WHERE printer_id = ? AND state = 'failed' AND created_at >= ?`).pluck();
-  const dayStart = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const dayStart = new Date(now.getTime() - 24 * 3600_000).toISOString();
 
   return rows.map((r) => {
     const lastRow = last.get(r.id) as { state: string; last_error: string | null } | undefined;

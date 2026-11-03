@@ -46,6 +46,29 @@ Built in P2-07:
    ids for `OpenTable` if the table is still free; otherwise returns `INVALID_STATE` and the captain picks
    another table.
 
+Built in P3-03 (captain app; the desktop terminals still need the server, see below):
+- Every change from the phone goes through the outbox (`packages/client/src/outbox/outbox.ts`), online too: stored in
+  IndexedDB (`apps/captain/src/offline/idb.ts`), sent at once when the server answers, otherwise replayed when the
+  stream is live again and every 10 s while anything waits. Strictly first-in first-out; one replay at a time.
+- Each queued command keeps its `commandId`, its `expectedVersion` (the version the phone predicted: the server's plus
+  one per change already waiting) and the session of the captain who made it, so a lost answer is answered
+  `DUPLICATE` and the change is credited to the right person even if someone else signed in on the phone.
+- `VERSION_CONFLICT` → rebased silently on the newer snapshot (up to 5 times): a quantity change keeps its difference
+  (+2 stays +2 if the terminal changed the line meanwhile; below 1 becomes a removal), a fire keeps only the dishes
+  still waiting (none left → skipped), a change to a line removed elsewhere is skipped.
+- Fire from the phone names the dishes the captain saw (`{ itemIds }`), so dishes added meanwhile at a terminal are
+  not sent with it. Fired offline: shown as "Queued — not in the kitchen yet" and treated as sent for later taps.
+- Refused after waiting offline → **Needs attention** (who, what, when, the server's reason). Later changes to that
+  order wait behind it. Actions: Try again (as the captain signed in now), Discard (with the changes that need it), and
+  for a table taken meanwhile, Seat at another table (same order id, so its dishes follow). Refused while online →
+  shown at once as a message and dropped with the changes that depended on it.
+- The phone shows what it last saw when offline: floor, menu and orders are kept in IndexedDB; tables seated offline
+  show as seated; dish names, prices and totals of waiting lines come from the cached menu and the shared bill
+  calculator. SetCovers needs the server (disabled offline with the reason); signing in needs it too.
+- Limits: the service worker only runs on a secure origin (https, or the master PC itself), so on a phone opening
+  `http://<lan-ip>:7420/captain` a reload with no connection cannot open the app; queued changes stay in IndexedDB and
+  go out when it opens again. Desktop terminals have no outbox yet (they are usually wired to the master).
+
 ## Numbering
 | Number | Assigned by | Scope | Where |
 | --- | --- | --- | --- |

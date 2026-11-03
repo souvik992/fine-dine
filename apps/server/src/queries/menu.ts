@@ -1,4 +1,4 @@
-import type { MenuAddonGroup, MenuItem, MenuSnapshot, MenuUnchanged } from '@dinepos/shared';
+import type { MenuAddonGroup, MenuItem, MenuSnapshot, MenuUnchanged, PricingMode } from '@dinepos/shared';
 import { currentMenuVersion } from '../commands/admin-support.js';
 import { PosError } from '../core/errors.js';
 import type { Db } from '../db/connection.js';
@@ -33,10 +33,14 @@ export function getMenu(db: Db, q: MenuQuery = {}): MenuSnapshot | MenuUnchanged
   if (q.since !== undefined && q.since === menuVersion) return { menuVersion, unchanged: true };
 
   let priceListId: string | null = null;
+  let pricingMode: PricingMode | undefined;
   if (q.areaId) {
-    const area = db.prepare('SELECT price_list_id FROM area WHERE id = ?').get(q.areaId) as { price_list_id: string | null } | undefined;
+    const area = db
+      .prepare('SELECT a.price_list_id, tp.pricing_mode FROM area a LEFT JOIN tax_profile tp ON tp.id = a.tax_profile_id WHERE a.id = ?')
+      .get(q.areaId) as { price_list_id: string | null; pricing_mode: PricingMode | null } | undefined;
     if (!area) throw new PosError('NOT_FOUND', 'Area not found.', { areaId: q.areaId });
     priceListId = area.price_list_id;
+    pricingMode = area.pricing_mode ?? 'exclusive';
   }
   const overrides = new Map<string, number>();
   if (priceListId) {
@@ -116,5 +120,5 @@ export function getMenu(db: Db, q: MenuQuery = {}): MenuSnapshot | MenuUnchanged
     addonGroupIds: groupsByItem.get(i.id) ?? [],
   }));
 
-  return { menuVersion, ...(q.areaId ? { areaId: q.areaId } : {}), stations, categories, addonGroups, items };
+  return { menuVersion, ...(q.areaId ? { areaId: q.areaId, pricingMode } : {}), stations, categories, addonGroups, items };
 }

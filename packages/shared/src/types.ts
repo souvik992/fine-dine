@@ -1,6 +1,7 @@
 // Wire types shared by the server and every client (docs/03-command-api.md).
 import type { Right } from './rights.js';
 import type { TableState } from './table-state.js';
+import type { PricingMode } from './tax.js';
 import type { StockUnit } from './stock.js';
 
 export const ERROR_CODES = [
@@ -196,6 +197,8 @@ export interface MenuSnapshot {
   menuVersion: number;
   /** Area whose price list was applied, if any. */
   areaId?: string;
+  /** That area's tax pricing (P3-03: the phone totals waiting lines like the server does). */
+  pricingMode?: PricingMode;
   stations: MenuStation[];
   categories: MenuCategory[];
   addonGroups: MenuAddonGroup[];

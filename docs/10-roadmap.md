@@ -97,7 +97,7 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
 
 - [x] **P3-01 Captain PWA shell served at /captain** (pairing, PIN login, tables list)
 - [x] **P3-02 Order taking + course-wise firing**
-- [ ] **P3-03 Offline outbox + replay + "Needs attention" list** (`05-sync-offline.md`)
+- [x] **P3-03 Offline outbox + replay + "Needs attention" list** (`05-sync-offline.md`)
 - [ ] **P3-04 Captain assignment to areas/tables + Request bill notification**
 - [ ] **P3-05 Captain performance report**
 

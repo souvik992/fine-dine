@@ -4,3 +4,5 @@ export * from './stream.js';
 export * from './order/menu-model.js';
 export * from './order/order-lines.js';
 export * from './order/order-session.js';
+export * from './outbox/outbox.js';
+export * from './outbox/local-view.js';

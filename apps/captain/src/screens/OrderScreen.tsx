@@ -1,46 +1,39 @@
-import { addOrMerge, ApiError, changeBy, firedByKot, hasChoices, needsChoices, visibleItems } from '@dinepos/client';
-import { formatINR, newId, type MenuItem, type MenuSnapshot, type OrderItemSnapshot, type OrderSnapshot } from '@dinepos/shared';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Minus, Plus, Search, Send, ShoppingBasket, Trash2, Users, WifiOff } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { addOrMerge, changeBy, firedByKot, hasChoices, needsChoices, orderView, visibleItems, type OrderView, type ViewItem } from '@dinepos/client';
+import { formatINR, newId, type MenuItem, type MenuSnapshot } from '@dinepos/shared';
+import { useQuery } from '@tanstack/react-query';
+import { ChevronLeft, Clock, Minus, Plus, Search, Send, ShoppingBasket, Trash2, TriangleAlert, Users, WifiOff } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useApp } from '../app-context.js';
 import { Sheet } from '../components/Sheet.js';
-import { COURSES, fireChoices, firedMessage, heldByCourse, heldSummary, kotText } from '../order-model.js';
-import { useOrderSession } from '../use-order-session.js';
+import { fireItemIds } from '../offline/pending-model.js';
+import { useSync, type Change } from '../offline/sync-context.js';
+import { COURSES, fireChoices, heldByCourse, heldSummary, kotText } from '../order-model.js';
 import { OptionsSheet, type OptionsResult } from './OptionsSheet.js';
 
-type Toast = { kind: 'ok' | 'error'; text: string } | null;
+type FireChoice = { all: true } | { course: number };
 
 /**
  * Taking an order on the phone (docs/09 Captain): category chips and an item list with + buttons; a held basket
- * with course tags; Fire all / Fire course N; guests. Every change is a command on the order's latest version,
- * through the same OrderSession the billing terminal uses.
+ * with course tags; Fire all / Fire course N; guests. Every change goes through the outbox (P3-03): shown at once,
+ * sent now when the outlet server is reachable, or when it is back.
  */
-export function OrderScreen({ orderId, areaId, onBack }: { orderId: string; areaId: string | null; onBack: () => void }) {
-  const { api, can, stream } = useApp();
-  const qc = useQueryClient();
-  const { session, order, error, changedElsewhere, conflict, dismissConflict } = useOrderSession(orderId);
-  const menu = useQuery({ queryKey: ['menu', areaId ?? 'default'], queryFn: () => api.get<MenuSnapshot>(`/v1/menu${areaId ? `?areaId=${areaId}` : ''}`) });
+export function OrderScreen({ orderId, areaId, onBack, onAttention }: { orderId: string; areaId: string | null; onBack: () => void; onAttention: () => void }) {
+  const { can } = useApp();
+  const sync = useSync();
+  const base = useQuery({ queryKey: ['order', orderId], queryFn: () => sync.getOrder(orderId) });
+  const menu = useQuery({ queryKey: ['menu', areaId ?? 'default'], queryFn: () => sync.cachedGet<MenuSnapshot>(`/v1/menu${areaId ? `?areaId=${areaId}` : ''}`) });
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [course, setCourse] = useState(1);
   const [options, setOptions] = useState<MenuItem | null>(null);
   const [sheet, setSheet] = useState<'basket' | 'guests' | null>(null);
-  const [toast, setToast] = useState<Toast>(null);
-  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), toast.kind === 'ok' ? 2_500 : 5_000);
-    return () => clearTimeout(t);
-  }, [toast]);
-
-  const fail = (e: unknown, what: string) => setToast({ kind: 'error', text: e instanceof ApiError ? e.message : `${what} did not go through. Check the Wi-Fi and try again.` });
+  const m = menu.data;
+  const order = useMemo(() => orderView(orderId, base.data, sync.entries, m), [orderId, base.data, sync.entries, m]);
   const editable = order?.state === 'open' || order?.state === 'billed';
   const canEdit = editable && can('order.edit');
   const canFire = editable && can('kot.fire');
 
-  const m = menu.data;
   const category = categoryId ?? m?.categories[0]?.id ?? null;
   const items = useMemo(() => (m ? visibleItems(m, category, query) : []), [m, category, query]);
   const inBasket = useMemo(() => {
@@ -49,33 +42,53 @@ export function OrderScreen({ orderId, areaId, onBack }: { orderId: string; area
     return n;
   }, [order]);
 
+  const change = (decide: (v: OrderView) => Change | null) => sync.change(orderId, m, decide);
   const add = (item: MenuItem, r: OptionsResult) => {
     const line = { id: newId(), itemId: item.id, variantId: r.variantId, qty: r.qty, addons: r.addonIds.map((addonId) => ({ addonId, qty: 1 })), note: r.note, course: r.course };
-    session.runLatest((s) => addOrMerge(s, line)).catch((e: unknown) => fail(e, 'Adding the item'));
+    change((v) => {
+      const c = addOrMerge(v, line);
+      if (c.type === 'AddItems') return { ...c, label: `Add ${r.qty} × ${item.name}` };
+      return { ...c, label: `${item.name}: make it ${c.payload.qty}`, qtyFrom: v.items.find((i) => i.id === c.payload.orderItemId)?.qty };
+    });
   };
   const tapItem = (item: MenuItem, viaPlus: boolean) => {
     if (!canEdit || !m) return;
-    if (!item.available) return setToast({ kind: 'error', text: `${item.name} is sold out.` });
+    if (!item.available) return sync.notify('error', `${item.name} is sold out.`);
     if (needsChoices(m, item) || (!viaPlus && hasChoices(m, item))) return setOptions(item);
     add(item, { variantId: null, addonIds: [], qty: 1, note: null, course });
   };
-  const fire = async (payload: { all: true } | { course: number }) => {
-    setBusy(true);
-    try {
-      const res = await session.run<{ kots?: Array<{ kotNo: number }> }>('FireKOT', payload);
-      setToast({ kind: 'ok', text: firedMessage(res.result) });
-      void qc.invalidateQueries({ queryKey: ['floor'] });
-      if (order && heldByCourse(res.order?.items ?? []).length === 0) setSheet(null);
-    } catch (e) {
-      fail(e, 'Sending to the kitchen');
-    } finally {
-      setBusy(false);
-    }
+  const step = (i: ViewItem, delta: number) =>
+    change((v) => {
+      const line = v.items.find((x) => x.id === i.id && x.status === 'held');
+      if (!line) return null;
+      if (line.qty + delta < 1) return { type: 'RemoveHeldItem', payload: { orderItemId: i.id }, label: `Remove ${i.name}` };
+      const c = changeBy(v, i.id, delta);
+      return c?.type === 'UpdateHeldItem' ? { ...c, label: `${i.name}: make it ${c.payload.qty}`, qtyFrom: line.qty } : null;
+    });
+  const moveCourse = (i: ViewItem, to: number) => change(() => ({ type: 'UpdateHeldItem', payload: { orderItemId: i.id, course: to }, label: `${i.name}: course ${to}` }));
+  const fire = (choice: FireChoice) => {
+    change((v) => {
+      const itemIds = fireItemIds(v, choice);
+      return itemIds.length ? { type: 'FireKOT', payload: { itemIds }, label: 'all' in choice ? 'Send all to the kitchen' : `Send course ${choice.course} to the kitchen` } : null;
+    });
+    if (!sync.online) sync.notify('ok', 'Queued: it goes to the kitchen as soon as the phone reaches the outlet server.');
+    if (order && ('all' in choice || heldByCourse(order.items).length <= 1)) setSheet(null);
   };
 
   const held = heldSummary(order?.items ?? []);
   const choices = canFire ? fireChoices(order?.items ?? []) : [];
   const label = order?.table?.label ?? '';
+
+  if (!order && !base.isPending) {
+    return (
+      <main className="flex min-h-full flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="font-semibold">{base.error ? 'Could not load this order.' : 'This table is not seated any more.'}</p>
+        <button className="btn" onClick={onBack}>
+          Back to tables
+        </button>
+      </main>
+    );
+  }
 
   return (
     <div className="flex min-h-full flex-col pb-28">
@@ -115,19 +128,18 @@ export function OrderScreen({ orderId, areaId, onBack }: { orderId: string; area
         </div>
       </header>
 
-      {stream !== 'live' ? (
+      {!sync.online ? (
         <p role="status" className="flex items-center gap-2 bg-warn/30 px-4 py-2 text-sm font-semibold">
-          <WifiOff className="h-4 w-4" /> {stream === 'offline' ? 'Offline: changes may not reach the kitchen until Wi-Fi is back.' : 'Connecting…'}
+          <WifiOff className="h-4 w-4 shrink-0" /> Offline: keep taking the order. It is kept on this phone and sent when the connection is back.
         </p>
       ) : null}
-      {changedElsewhere ? (
-        <p role="status" className="bg-secondary px-4 py-2 text-sm font-semibold">
-          This order was just changed on another device. You are seeing the latest.
-        </p>
-      ) : null}
-      {conflict ? (
-        <p role="alert" className="flex items-start gap-2 bg-warn/30 px-4 py-2 text-sm font-semibold" onClick={dismissConflict}>
-          {conflict.message}
+      {order?.attention ? (
+        <button className="flex items-center gap-2 bg-danger px-4 py-2 text-left text-sm font-semibold text-white" onClick={onAttention}>
+          <TriangleAlert className="h-4 w-4 shrink-0" /> A change to this table was refused. Open Needs attention.
+        </button>
+      ) : order?.waiting ? (
+        <p role="status" className="flex items-center gap-2 bg-secondary px-4 py-2 text-sm font-semibold" data-testid="order-waiting">
+          <Clock className="h-4 w-4 shrink-0" /> {order.waiting} change{order.waiting === 1 ? '' : 's'} waiting to send
         </p>
       ) : null}
       {order && !editable ? (
@@ -139,7 +151,6 @@ export function OrderScreen({ orderId, areaId, onBack }: { orderId: string; area
           The bill is printed. Anything you send now needs a fresh bill at the counter.
         </p>
       ) : null}
-      {error && !order ? <p className="p-4 font-semibold text-danger">Could not load this order.</p> : null}
 
       <ul className="flex-1 divide-y divide-border" aria-label="Menu">
         {items.map((it) => (
@@ -162,6 +173,7 @@ export function OrderScreen({ orderId, areaId, onBack }: { orderId: string; area
         ))}
         {m && items.length === 0 ? <li className="p-6 text-center text-muted-foreground">{query ? 'No dish matches.' : 'No dishes in this category.'}</li> : null}
         {!m && !menu.error ? <li className="p-6 text-center text-muted-foreground">Loading the menu…</li> : null}
+        {menu.error && !m ? <li className="p-6 text-center text-muted-foreground">The menu is not on this phone yet. Connect to the outlet Wi-Fi once.</li> : null}
       </ul>
 
       <footer className="fixed inset-x-0 bottom-0 z-10 flex gap-2 border-t border-border bg-card p-3 pb-5">
@@ -173,17 +185,11 @@ export function OrderScreen({ orderId, areaId, onBack }: { orderId: string; area
           {held.qty ? <span className="tabular-nums">{formatINR(held.amountPaise)}</span> : null}
         </button>
         {choices[0] ? (
-          <button className="btn btn-primary" onClick={() => void fire(choices[0]!.payload)} disabled={busy}>
+          <button className="btn btn-primary" onClick={() => fire(choices[0]!.payload)}>
             <Send className="h-5 w-5" /> Fire all
           </button>
         ) : null}
       </footer>
-
-      {toast ? (
-        <p role={toast.kind === 'error' ? 'alert' : 'status'} className={`fixed inset-x-3 top-3 z-40 rounded-lg p-3 font-semibold shadow-lg ${toast.kind === 'error' ? 'bg-danger text-white' : 'bg-foreground text-background'}`} onClick={() => setToast(null)}>
-          {toast.text}
-        </p>
-      ) : null}
 
       {options && m ? (
         <OptionsSheet
@@ -197,20 +203,15 @@ export function OrderScreen({ orderId, areaId, onBack }: { orderId: string; area
           }}
         />
       ) : null}
-      {sheet === 'basket' && order ? (
-        <BasketSheet order={order} canEdit={canEdit} choices={choices} busy={busy} onFire={(p) => void fire(p)} onClose={() => setSheet(null)} onError={fail} session={session} />
-      ) : null}
+      {sheet === 'basket' && order ? <BasketSheet order={order} canEdit={canEdit} choices={choices} onFire={fire} onStep={step} onMoveCourse={moveCourse} onClose={() => setSheet(null)} /> : null}
       {sheet === 'guests' && order ? (
         <GuestsSheet
           covers={order.covers}
-          locked={order.state !== 'open' || !can('order.edit')}
+          locked={!sync.online ? 'Guests can change only while the phone reaches the outlet server.' : order.state !== 'open' ? 'Guests cannot change once the bill is printed.' : !can('order.edit') ? 'Your role cannot change guests.' : null}
           onClose={() => setSheet(null)}
           onSave={(covers) => {
             setSheet(null);
-            session
-              .run('SetCovers', { covers })
-              .then(() => qc.invalidateQueries({ queryKey: ['floor'] }))
-              .catch((e: unknown) => fail(e, 'Changing the guests'));
+            change(() => ({ type: 'SetCovers', payload: { covers }, label: `Guests: ${covers}` }));
           }}
         />
       ) : null}
@@ -226,42 +227,31 @@ function VegMark({ veg }: { veg: boolean }) {
   );
 }
 
-function lineDetail(i: OrderItemSnapshot): string {
+function lineDetail(i: ViewItem): string {
   return [...i.addons.map((a) => a.name), i.note].filter(Boolean).join(' · ');
 }
 
-/** What is waiting by course (change quantity, remove) and what was sent, by KOT; the fire buttons at the bottom. */
+/** What is waiting by course (change quantity, remove), what is queued for the kitchen, and what was sent, by KOT. */
 function BasketSheet({
   order,
   canEdit,
   choices,
-  busy,
   onFire,
+  onStep,
+  onMoveCourse,
   onClose,
-  onError,
-  session,
 }: {
-  order: OrderSnapshot;
+  order: OrderView;
   canEdit: boolean;
   choices: ReturnType<typeof fireChoices>;
-  busy: boolean;
-  onFire: (p: { all: true } | { course: number }) => void;
+  onFire: (p: FireChoice) => void;
+  onStep: (i: ViewItem, delta: number) => void;
+  onMoveCourse: (i: ViewItem, course: number) => void;
   onClose: () => void;
-  onError: (e: unknown, what: string) => void;
-  session: ReturnType<typeof useOrderSession>['session'];
 }) {
   const groups = heldByCourse(order.items);
+  const queued = order.items.filter((i) => i.queuedFire);
   const sent = firedByKot(order.items);
-  const step = (i: OrderItemSnapshot, delta: number) => {
-    if (i.qty + delta < 1) {
-      session.run('RemoveHeldItem', { orderItemId: i.id }).catch((e: unknown) => onError(e, 'Removing the item'));
-      return;
-    }
-    session.runLatest((s) => changeBy(s, i.id, delta)).catch((e: unknown) => onError(e, 'Changing the quantity'));
-  };
-  const moveCourse = (i: OrderItemSnapshot, course: number) => {
-    session.run('UpdateHeldItem', { orderItemId: i.id, course }).catch((e: unknown) => onError(e, 'Changing the course'));
-  };
 
   return (
     <Sheet
@@ -271,7 +261,7 @@ function BasketSheet({
         choices.length ? (
           <div className="flex flex-wrap gap-2">
             {choices.map((c, n) => (
-              <button key={c.label} className={`btn whitespace-nowrap ${n === 0 ? 'btn-primary w-full' : 'flex-1 px-2 text-sm'}`} onClick={() => onFire(c.payload)} disabled={busy}>
+              <button key={c.label} className={`btn whitespace-nowrap ${n === 0 ? 'btn-primary w-full' : 'flex-1 px-2 text-sm'}`} onClick={() => onFire(c.payload)}>
                 <Send className="h-4 w-4" /> {c.label} ({c.qty})
               </button>
             ))}
@@ -287,13 +277,18 @@ function BasketSheet({
             <span className="tabular-nums">{formatINR(g.amountPaise)}</span>
           </h3>
           <ul className="divide-y divide-border rounded-lg border border-border">
-            {g.items.map((i) => (
+            {(g.items as ViewItem[]).map((i) => (
               <li key={i.id} className="flex items-center gap-2 p-2" data-line={i.name}>
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold">{i.name}</span>
                   {lineDetail(i) ? <span className="block text-sm text-muted-foreground">{lineDetail(i)}</span> : null}
+                  {i.waiting ? (
+                    <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+                      <Clock className="h-3 w-3" /> on this phone, not sent yet
+                    </span>
+                  ) : null}
                   {canEdit ? (
-                    <select className="mt-1 h-8 rounded border border-border bg-card px-1 text-sm" value={i.course} onChange={(e) => moveCourse(i, Number(e.target.value))} aria-label={`Course for ${i.name}`}>
+                    <select className="mt-1 h-8 rounded border border-border bg-card px-1 text-sm" value={i.course} onChange={(e) => onMoveCourse(i, Number(e.target.value))} aria-label={`Course for ${i.name}`}>
                       {COURSES.map((c) => (
                         <option key={c} value={c}>
                           Course {c}
@@ -304,11 +299,11 @@ function BasketSheet({
                 </span>
                 {canEdit ? (
                   <span className="flex items-center gap-1">
-                    <button className="btn h-10 w-10 px-0" onClick={() => step(i, -1)} aria-label={i.qty === 1 ? `Remove ${i.name}` : `One less ${i.name}`}>
+                    <button className="btn h-10 w-10 px-0" onClick={() => onStep(i, -1)} aria-label={i.qty === 1 ? `Remove ${i.name}` : `One less ${i.name}`}>
                       {i.qty === 1 ? <Trash2 className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
                     </button>
                     <span className="w-7 text-center font-bold tabular-nums">{i.qty}</span>
-                    <button className="btn h-10 w-10 px-0" onClick={() => step(i, 1)} aria-label={`One more ${i.name}`}>
+                    <button className="btn h-10 w-10 px-0" onClick={() => onStep(i, 1)} aria-label={`One more ${i.name}`}>
                       <Plus className="h-4 w-4" />
                     </button>
                   </span>
@@ -320,6 +315,19 @@ function BasketSheet({
           </ul>
         </section>
       ))}
+
+      {queued.length ? (
+        <section aria-label="Queued for the kitchen" className="mb-3">
+          <h3 className="mb-1 text-sm font-bold uppercase tracking-wide text-muted-foreground">Queued — not in the kitchen yet</h3>
+          <ul className="rounded-lg border-2 border-dashed border-border p-2">
+            {queued.map((i) => (
+              <li key={i.id} className="text-sm">
+                {i.qty} × {i.name} <span className="text-muted-foreground">· course {i.course}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {sent.length ? (
         <section aria-label="Sent to the kitchen">
@@ -348,12 +356,12 @@ function BasketSheet({
   );
 }
 
-function GuestsSheet({ covers: initial, locked, onSave, onClose }: { covers: number; locked: boolean; onSave: (covers: number) => void; onClose: () => void }) {
+function GuestsSheet({ covers: initial, locked, onSave, onClose }: { covers: number; locked: string | null; onSave: (covers: number) => void; onClose: () => void }) {
   const [covers, setCovers] = useState(Math.max(1, initial));
   return (
     <Sheet title="Guests" onClose={onClose}>
       {locked ? (
-        <p className="mb-4">Guests cannot change once the bill is printed.</p>
+        <p className="mb-4">{locked}</p>
       ) : (
         <>
           <div className="mb-5 flex items-center justify-center gap-6">

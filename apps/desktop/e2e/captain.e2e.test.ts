@@ -1,5 +1,6 @@
 // P3-01 acceptance in a real browser: a phone opens /captain on the outlet server, pairs (a manager approves the
-// code), signs in with a PIN, sees the tables live and seats one.
+// code), signs in with a PIN, sees the tables live and seats one. P3-02: takes an order by course. P3-03: keeps taking
+// orders while the server is down and replays them when it is back.
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -34,8 +35,8 @@ const ulid = () => {
 };
 const get = async <T,>(url: string) => (await (await fetch(`${SERVER}${url}`, { headers: { authorization: `Device ${approver}` } })).json()) as T;
 /** A command from the manager's terminal. */
-async function send(type: string, payload: unknown, extra: Record<string, unknown> = {}, headers: Record<string, string> = {}) {
-  const res = await fetch(`${SERVER}/v1/commands`, {
+async function send(type: string, payload: unknown, extra: Record<string, unknown> = {}, headers: Record<string, string> = {}, base = SERVER) {
+  const res = await fetch(`${base}/v1/commands`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Device ${approver}`, 'x-user-session': manager, ...headers },
     body: JSON.stringify({ commandId: ulid(), type, payload, createdAt: new Date().toISOString(), ...extra }),
@@ -43,23 +44,35 @@ async function send(type: string, payload: unknown, extra: Record<string, unknow
   return (await res.json()) as { ok: boolean; error?: unknown; order?: { id: string; version: number } };
 }
 
+/** The outlet server on this data folder (another port = the same outlet reached by another terminal). */
+async function startServer(port = PORT): Promise<ChildProcess> {
+  const child = spawn(process.execPath, ['--import', 'tsx', 'apps/server/src/index.ts'], {
+    cwd: repo,
+    env: cleanEnv({ DATA_DIR: dataDir, DINEPOS_PORT: String(port), DINEPOS_HOST: '127.0.0.1', LOG_LEVEL: 'warn', DINEPOS_TRUST_LOOPBACK: '0' }),
+    stdio: 'ignore',
+  });
+  for (let i = 0; i < 150; i++) {
+    try {
+      if ((await fetch(`http://127.0.0.1:${port}/v1/health`)).ok) return child;
+    } catch {
+      // starting
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  throw new Error(`server on ${port} did not start`);
+}
+async function stopServer(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null) return;
+  const exited = new Promise((r) => child.once('exit', r));
+  child.kill();
+  await exited;
+}
+
 describe('captain app on a phone', () => {
   beforeAll(async () => {
     execSync('npm run build -w @dinepos/captain', { cwd: repo, stdio: 'ignore' });
     dataDir = mkdtempSync(path.join(tmpdir(), 'dinepos-captain-'));
-    server = spawn(process.execPath, ['--import', 'tsx', 'apps/server/src/index.ts'], {
-      cwd: repo,
-      env: cleanEnv({ DATA_DIR: dataDir, DINEPOS_PORT: String(PORT), DINEPOS_HOST: '127.0.0.1', LOG_LEVEL: 'warn', DINEPOS_TRUST_LOOPBACK: '0' }),
-      stdio: 'ignore',
-    });
-    for (let i = 0; i < 100; i++) {
-      try {
-        if ((await fetch(`${SERVER}/v1/health`)).ok) break;
-      } catch {
-        // starting
-      }
-      await new Promise((r) => setTimeout(r, 200));
-    }
+    server = await startServer();
     // A paired terminal (the manager's) straight in the database, then the demo outlet through it.
     approver = randomBytes(32).toString('base64url');
     const db = new Database(path.join(dataDir, 'dev.db'));
@@ -85,7 +98,7 @@ describe('captain app on a phone', () => {
 
   afterAll(async () => {
     await phone?.close();
-    server?.kill();
+    if (server) await stopServer(server);
     await new Promise((r) => setTimeout(r, 500));
     rmSync(dataDir, { recursive: true, force: true });
   });
@@ -189,5 +202,76 @@ describe('captain app on a phone', () => {
     order = await lines();
     expect(order.covers).toBe(3);
     expect(order.items.every((i) => i.status === 'fired')).toBe(true);
+  });
+
+  // P3-03: the outlet server goes down mid-service. The phone keeps the orders, replays them in order when the server
+  // is back, and a table taken meanwhile at a terminal lands in Needs attention, where the captain seats them elsewhere.
+  it('offline: orders wait on the phone, replay in order when the server is back; a refused one goes to Needs attention', async () => {
+    const page = await phone.firstWindow();
+    await page.getByRole('button', { name: 'Back to tables' }).click();
+    await stopServer(server);
+    await page.getByText('Offline: orders are kept on this phone and sent when the connection is back.').waitFor({ timeout: 30_000 });
+
+    // T6: seated, two Jeera Rice (one line of 2), all sent to the kitchen — all on the phone only.
+    await page.locator('[data-table="T6"]').click();
+    await page.getByRole('dialog', { name: 'Seat T6' }).getByRole('button', { name: 'Seat 2 guests' }).click();
+    await page.getByRole('heading', { name: 'Table T6' }).waitFor();
+    await page.getByRole('tab', { name: 'Rice & Biryani' }).click();
+    await page.getByRole('button', { name: 'Add Jeera Rice' }).click();
+    await page.getByRole('button', { name: 'Add Jeera Rice' }).click();
+    await page.getByRole('button', { name: 'Basket', exact: true }).getByText('2 to send').waitFor({ timeout: 5_000 });
+    await page.getByRole('button', { name: 'Fire all' }).click();
+    await page.getByText(/Queued: it goes to the kitchen/).waitFor();
+    await page.getByTestId('order-waiting').getByText('4 changes waiting to send').waitFor();
+    await page.getByRole('button', { name: 'Basket', exact: true }).click();
+    await page.getByRole('region', { name: 'Queued for the kitchen' }).getByText('2 × Jeera Rice').waitFor();
+    await page.getByRole('dialog', { name: 'Table T6 order' }).getByRole('button', { name: 'Close' }).click();
+    await page.getByRole('button', { name: 'Back to tables' }).click();
+    await page.locator('[data-table="T6"][data-state="SEATED"]').getByText('4 waiting').waitFor();
+
+    // T7: seated with a Masala Chai — but a terminal will take T7 before the phone is back.
+    await page.locator('[data-table="T7"]').click();
+    await page.getByRole('dialog', { name: 'Seat T7' }).getByRole('button', { name: 'Seat 2 guests' }).click();
+    await page.getByRole('tab', { name: 'Beverages' }).click();
+    await page.getByRole('button', { name: 'Add Masala Chai' }).click();
+    await page.getByTestId('order-waiting').getByText('2 changes waiting to send').waitFor();
+    await page.getByRole('button', { name: 'Back to tables' }).click();
+    await page.getByTestId('waiting-count').getByText('6 changes waiting to send').waitFor();
+
+    // Meanwhile the counter seats T7 (the same outlet reached on another port), then the server restarts.
+    const other = `http://127.0.0.1:${PORT + 1}`;
+    const counter = await startServer(PORT + 1);
+    const otherFloor = (await (await fetch(`${other}/v1/floor`, { headers: { authorization: `Device ${approver}` } })).json()) as { tables: Array<{ id: string; label: string }> };
+    const t7 = otherFloor.tables.find((t) => t.label === 'T7')!;
+    expect((await send('OpenTable', { tableId: t7.id, covers: 3 }, {}, {}, other)).ok).toBe(true);
+    await stopServer(counter);
+    server = await startServer();
+
+    // Back: T6 replays in order (one KOT), T7 is refused and waits for the captain; its chai waits behind it.
+    await page.getByRole('button', { name: '1 needs attention' }).waitFor({ timeout: 30_000 });
+    await page.getByTestId('waiting-count').getByText('1 change waiting to send').waitFor();
+    const floor = await get<{ tables: Array<{ label: string; orderId?: string; state: string; covers?: number }> }>('/v1/floor');
+    const t6 = floor.tables.find((t) => t.label === 'T6')!;
+    expect(t6.state).toBe('KOT_RUNNING');
+    const t6order = await get<{ items: Array<{ name: string; qty: number; status: string }> }>(`/v1/orders/${t6.orderId}`);
+    expect(t6order.items.map((i) => [i.name, i.qty, i.status])).toEqual([['Jeera Rice', 2, 'fired']]);
+    expect(floor.tables.find((t) => t.label === 'T7')!.covers).toBe(3); // the counter's guests, untouched
+
+    // Still there after the page is reloaded (kept in IndexedDB).
+    await page.reload();
+    await page.getByRole('button', { name: '1 needs attention' }).click();
+    const item = page.locator('[data-attention="T7"]');
+    await item.getByText('Table T7 is already occupied.').waitFor();
+    await item.getByText('1 more change to this table waits for this one.').waitFor();
+    await item.getByRole('button', { name: 'Seat at another table' }).click();
+    await item.getByRole('button', { name: 'T8', exact: true }).click();
+    await page.getByText('Nothing needs attention.').waitFor({ timeout: 10_000 });
+
+    type Floor = { tables: Array<{ label: string; orderId?: string }> };
+    await expect.poll(async () => (await get<Floor>('/v1/floor')).tables.find((t) => t.label === 'T8')?.orderId, { timeout: 10_000 }).toBeTruthy();
+    const t8 = (await get<Floor>('/v1/floor')).tables.find((t) => t.label === 'T8')!;
+    const t8order = await get<{ covers: number; items: Array<{ name: string; qty: number; status: string }> }>(`/v1/orders/${t8.orderId}`);
+    expect(t8order.covers).toBe(2);
+    expect(t8order.items.map((i) => [i.name, i.qty, i.status])).toEqual([['Masala Chai', 1, 'held']]);
   });
 });
