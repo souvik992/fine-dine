@@ -5,7 +5,7 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 ## Headers
 | Header | Value |
 | --- | --- |
-| `Authorization` | `Device <deviceToken>` |
+| `Authorization` | `Device <deviceToken>` (P2-02; not needed from the master PC itself) |
 | `X-User-Session` | session token from `POST /v1/sessions` (PIN login) |
 | `X-Manager-Pin` | only when a command answered `PIN_REQUIRED` |
 

@@ -41,3 +41,13 @@ export function saveServerUrl(store: SettingsStore, url: string): string {
   store.setItem(KEY, clean);
   return clean;
 }
+
+/** P2-02: this terminal's device token for one outlet server (a token belongs to the server that issued it). */
+const deviceKey = (serverUrl: string) => `dinepos.device:${serverUrl}`;
+export function loadDeviceToken(store: SettingsStore | undefined, serverUrl: string): string | null {
+  return store?.getItem(deviceKey(serverUrl)) ?? null;
+}
+export function saveDeviceToken(store: (SettingsStore & { removeItem(key: string): void }) | undefined, serverUrl: string, token: string | null): void {
+  if (token) store?.setItem(deviceKey(serverUrl), token);
+  else store?.removeItem(deviceKey(serverUrl));
+}

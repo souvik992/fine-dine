@@ -71,7 +71,7 @@ function sessionInfo(db: Db, userId: string, expiresAt: string): SessionInfo {
  * Checks a PIN with lockout: 5 wrong PINs lock that person for 5 minutes (audited). The failure count is
  * written even though sign-in fails, so guessing cannot be retried for free.
  */
-export function login(db: Db, userId: string, pin: string, now: Date): LoginResult {
+export function login(db: Db, userId: string, pin: string, now: Date, deviceId: string = UNPAIRED_DEVICE_ID): LoginResult {
   const at = now.toISOString();
   const result = db
     .transaction((): LoginResult | PosError => {
@@ -97,7 +97,7 @@ export function login(db: Db, userId: string, pin: string, now: Date): LoginResu
       db.prepare('INSERT INTO user_session (token_hash, user_id, device_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)').run(
         tokenHash(token),
         u.id,
-        UNPAIRED_DEVICE_ID,
+        deviceId,
         at,
         expiresAt,
       );

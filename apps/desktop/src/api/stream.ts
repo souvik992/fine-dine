@@ -25,6 +25,9 @@ export interface SocketLike {
 export interface StreamOptions {
   url: string;
   topics: string[];
+  /** P2-02: sent in the hello; the server refuses an unknown device (close 4401) and cuts a revoked one (4403). */
+  deviceToken?: () => string | null;
+  onUnpaired?: () => void;
   onEvent: (e: StreamEvent) => void;
   /** Called when replay is impossible (server pruned the events): refetch everything. */
   onResync: () => void;
@@ -82,12 +85,14 @@ export class StreamClient {
     const s = make(this.opts.url);
     this.socket = s;
     s.onopen = () => {
-      s.send(JSON.stringify({ type: 'hello', resumeFrom: this.lastSeq, topics: this.opts.topics }));
+      const deviceToken = this.opts.deviceToken?.();
+      s.send(JSON.stringify({ type: 'hello', ...(deviceToken ? { deviceToken } : {}), resumeFrom: this.lastSeq, topics: this.opts.topics }));
       this.armSilence();
     };
     s.onmessage = (ev) => this.onMessage(ev.data);
     s.onerror = () => undefined; // onclose follows
-    s.onclose = () => {
+    s.onclose = (ev) => {
+      if (ev.code === 4401 || ev.code === 4403) this.opts.onUnpaired?.();
       if (this.socket !== s) return;
       this.socket = null;
       this.clearTimers();

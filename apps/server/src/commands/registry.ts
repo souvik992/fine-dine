@@ -11,6 +11,7 @@ import { modifyFiredItem } from './modify-fired-item.js';
 import { moveTable } from './move-table.js';
 import { openDrawer } from './open-drawer.js';
 import { openTable } from './open-table.js';
+import { pairDevice } from './pair-device.js';
 import { payIn } from './pay-in.js';
 import { payOut } from './pay-out.js';
 import { printBill } from './print-bill.js';
@@ -19,6 +20,7 @@ import { printTestPage } from './print-test-page.js';
 import { recordPurchase } from './record-purchase.js';
 import { reprintBill } from './reprint-bill.js';
 import { reprintKot } from './reprint-kot.js';
+import { revokeDevice } from './revoke-device.js';
 import { removeHeldItem } from './remove-held-item.js';
 import { setConfig } from './set-config.js';
 import { setItemAvailability } from './set-item-availability.js';
@@ -65,6 +67,8 @@ const handlers = [
   setupOutlet,
   upsertUser,
   upsertRole,
+  pairDevice,
+  revokeDevice,
   // orders
   openTable,
   addItems,

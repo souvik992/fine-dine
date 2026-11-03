@@ -24,7 +24,7 @@ export function sessionRoutes(app: FastifyInstance, deps: { db: Db; now: () => D
   app.post('/v1/sessions', (req, reply) => {
     const body = loginSchema.safeParse(req.body);
     if (!body.success) throw new PosError('VALIDATION', 'Choose your name and type your PIN (4 to 6 digits).');
-    return reply.headers(noStore).send(login(db, body.data.userId, body.data.pin, now()));
+    return reply.headers(noStore).send(login(db, body.data.userId, body.data.pin, now(), req.deviceId ?? undefined));
   });
 
   app.get('/v1/session', (req, reply) => reply.headers(noStore).send(resolveSession(db, token(req), now())));

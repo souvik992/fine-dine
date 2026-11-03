@@ -27,10 +27,11 @@ export function sessionAuth(db: Db, now: () => Date = () => new Date()): Authent
     mode: 'staff-session',
     authenticate(req, opts = {}) {
       const token = header(req, 'x-user-session');
-      if (!token && opts.allowWhenNoStaff && staffCount(db) === 0) return { deviceId: UNPAIRED_DEVICE_ID, userId: null };
+      const deviceId = req.deviceId ?? UNPAIRED_DEVICE_ID; // set by the device check (P2-02)
+      if (!token && opts.allowWhenNoStaff && staffCount(db) === 0) return { deviceId, userId: null };
       const session = resolveSession(db, token, now());
       return {
-        deviceId: UNPAIRED_DEVICE_ID,
+        deviceId,
         userId: session.user.id,
         managerPin: header(req, 'x-manager-pin') ?? null,
         sessionKey: createHash('sha256').update(`approval:${token}`).digest('hex').slice(0, 32),

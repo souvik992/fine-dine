@@ -13,6 +13,11 @@ export interface HubOptions {
   /** A client this far behind (bytes queued) is disconnected; it resumes on reconnect. */
   maxBufferedBytes?: number;
   now?: () => Date;
+  /**
+   * P2-02: the device a hello's token belongs to (or the master PC for a loopback client), or null to refuse.
+   * Default: everyone allowed (tools and tests).
+   */
+  authorizeDevice?: (deviceToken: string | null, remoteAddress: string | undefined) => string | null;
 }
 
 const topicSchema = z.string().regex(/^[a-z]+(:([A-Za-z0-9_-]+|\*))?$/, 'invalid topic');
@@ -33,7 +38,7 @@ export type ServerMessage =
   | (PublishedEvent & { type?: undefined });
 
 /** Close codes (4000-4999 are free for applications). */
-export const CLOSE = { BAD_HELLO: 4400, HELLO_TIMEOUT: 4408, TOO_SLOW: 4429, SHUTDOWN: 1001 } as const;
+export const CLOSE = { BAD_HELLO: 4400, UNPAIRED: 4401, REVOKED: 4403, HELLO_TIMEOUT: 4408, TOO_SLOW: 4429, SHUTDOWN: 1001 } as const;
 
 /** ws delivers a Buffer, an ArrayBuffer or Buffer fragments. */
 export function rawText(raw: RawData): string {
@@ -47,6 +52,9 @@ export function topicMatches(patterns: readonly string[], topic: string): boolea
 
 export class RealtimeHub {
   private readonly clients = new Set<WebSocket>();
+  /** The device behind each socket, so a revoked device is cut off at once (P2-02). */
+  private readonly deviceOf = new Map<WebSocket, string>();
+  private readonly authorizeDevice: NonNullable<HubOptions['authorizeDevice']>;
   private readonly heartbeatMs: number;
   private readonly helloTimeoutMs: number;
   private readonly maxBuffered: number;
@@ -61,6 +69,12 @@ export class RealtimeHub {
     this.helloTimeoutMs = opts.helloTimeoutMs ?? 10_000;
     this.maxBuffered = opts.maxBufferedBytes ?? 1024 * 1024;
     this.now = opts.now ?? (() => new Date());
+    this.authorizeDevice = opts.authorizeDevice ?? (() => 'any');
+    this.bus.subscribe((e) => {
+      if (e.event !== 'device.revoked') return;
+      const { deviceId } = e.data as { deviceId: string };
+      for (const [socket, id] of this.deviceOf) if (id === deviceId) socket.close(CLOSE.REVOKED, 'device revoked');
+    });
   }
 
   get size(): number {
@@ -72,7 +86,7 @@ export class RealtimeHub {
   }
 
   /** Takes over a freshly upgraded socket. */
-  attach(socket: WebSocket): void {
+  attach(socket: WebSocket, remoteAddress?: string): void {
     this.clients.add(socket);
     let topics: string[] | null = null;
     let backlog: PublishedEvent[] | null = null; // live events held back while replaying
@@ -117,6 +131,13 @@ export class RealtimeHub {
         return;
       }
       clearTimeout(helloTimer);
+      const deviceId = this.authorizeDevice(hello.data.deviceToken ?? null, remoteAddress);
+      if (!deviceId) {
+        send({ type: 'error', message: 'This device is not paired with the outlet server.' });
+        socket.close(CLOSE.UNPAIRED, 'device not paired');
+        return;
+      }
+      this.deviceOf.set(socket, deviceId);
       topics = hello.data.topics;
 
       // Subscribe before reading the log, so an event committed during the replay is not missed.
@@ -162,6 +183,7 @@ export class RealtimeHub {
       if (heartbeat) clearInterval(heartbeat);
       unsubscribe?.();
       this.clients.delete(socket);
+      this.deviceOf.delete(socket);
     });
     socket.on('error', () => socket.terminate());
   }

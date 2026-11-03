@@ -2,7 +2,7 @@ import type { LoginResult, Right, SessionInfo } from '@dinepos/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ApiClient, type ApiError } from './api/client.js';
-import { loadServerUrl, saveServerUrl } from './api/settings.js';
+import { loadDeviceToken, loadServerUrl, saveDeviceToken, saveServerUrl } from './api/settings.js';
 import { StreamClient, streamUrl, type StreamStatus } from './api/stream.js';
 
 /** The signed-in person on this terminal. */
@@ -28,6 +28,10 @@ interface AppContextValue {
   /** Whether the signed-in role has a right; `withPin` also accepts rights that need a manager PIN. */
   can: (right: Right, withPin?: boolean) => boolean;
   pinRequest: PinRequest | null;
+  /** P2-02: the server does not know this terminal; show the pairing screen. */
+  needsPairing: boolean;
+  /** Store the token a pairing produced and start again as a paired terminal. */
+  setDeviceToken: (token: string | null) => void;
 }
 
 const Ctx = createContext<AppContextValue | null>(null);
@@ -70,6 +74,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pinRequest, setPinRequest] = useState<PinRequest | null>(null);
   const sessionRef = useRef(session);
   sessionRef.current = session;
+  const [deviceToken, setDeviceTokenState] = useState(() => loadDeviceToken(storage(), serverUrl));
+  const deviceRef = useRef(deviceToken);
+  deviceRef.current = deviceToken;
+  const [needsPairing, setNeedsPairing] = useState(false);
 
   const dropSession = useCallback(() => {
     storage()?.removeItem(SESSION_KEY);
@@ -87,6 +95,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         baseUrl: serverUrl,
         getToken: () => sessionRef.current?.token ?? null,
         onUnauthenticated: dropSession,
+        getDeviceToken: () => deviceRef.current,
+        onDeviceUnpaired: () => setNeedsPairing(true),
         requestManagerPin: (err: ApiError) => new Promise((resolve) => setPinRequest({ message: err.message, resolve })),
       }),
     [serverUrl, dropSession],
@@ -152,6 +162,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const stream = new StreamClient({
       url: streamUrl(serverUrl),
       topics: TOPICS,
+      deviceToken: () => deviceRef.current,
+      onUnpaired: () => setNeedsPairing(true),
       onEvent: (e) => {
         for (const queryKey of queriesFor(e.topic)) void queryClient.invalidateQueries({ queryKey });
       },
@@ -164,7 +176,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     stream.start();
     return () => stream.stop();
-  }, [serverUrl, queryClient]);
+  }, [serverUrl, queryClient, deviceToken]);
 
   const value = useMemo<AppContextValue>(
     () => ({
@@ -181,6 +193,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setPinRequest(null);
         },
       },
+      needsPairing,
+      setDeviceToken: (token) => {
+        saveDeviceToken(storage(), serverUrl, token);
+        setDeviceTokenState(token);
+        setNeedsPairing(false);
+        queryClient.clear();
+      },
       can: (right, withPin = false) => session?.rights.some((r) => r.right === right && (withPin || !r.needsPin)) ?? false,
       setServerUrl: (url) => {
         const store = storage();
@@ -188,9 +207,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (clean !== serverUrl) dropSession(); // a session belongs to one server
         queryClient.clear();
         setUrl(clean);
+        setDeviceTokenState(loadDeviceToken(store, clean)); // a token belongs to one server
+        setNeedsPairing(false);
       },
     }),
-    [api, serverUrl, streamStatus, session, signIn, signOut, pinRequest, queryClient, dropSession],
+    [api, serverUrl, streamStatus, session, signIn, signOut, pinRequest, queryClient, dropSession, needsPairing],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

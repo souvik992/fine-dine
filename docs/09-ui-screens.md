@@ -96,6 +96,9 @@ Sections are shown by right; every save is a command, so it is audited and other
 - **Backups** (admin, P2-08): last backup and its health, "Back up now", the copy folder, the list of backups
   (time, kind, size) and, for staff managers, **Restore** (type RESTORE + Owner PIN; the app reconnects when the server
   is back). The top bar shows "Backup late" when there was no backup for an hour.
+- **Devices** (admin, P2-02): waiting codes with Approve (manager PIN) or type a code; paired devices (kind, paired,
+  last seen, signed-in count, "this terminal", "the server") with Revoke. An unpaired terminal shows **Pair this
+  terminal**: a name, then a 6-digit code to approve; it opens the sign-in screen once approved.
 - **Staff & roles** (users.manage): people (name, role, new PIN, active) and roles (discount limit, each right
   allowed / allowed with manager PIN / not allowed).
 - **This terminal** (everyone): server address and connection test.

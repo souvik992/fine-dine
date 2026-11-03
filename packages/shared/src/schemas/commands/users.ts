@@ -41,3 +41,12 @@ export const loginSchema = z.object({ userId: ulidSchema, pin: pinSchema }).stri
 export type SetupOutletPayload = z.infer<typeof setupOutletSchema>;
 export type UpsertUserPayload = z.infer<typeof upsertUserSchema>;
 export type UpsertRolePayload = z.infer<typeof upsertRoleSchema>;
+
+// ---- devices (P2-02, docs/07 "Device pairing") ----
+
+/** Approves the device showing this 6-digit code; the name is what the Devices list will show. Manager PIN. */
+export const pairDeviceSchema = z
+  .object({ code: z.string().regex(/^\d{6}$/, 'the 6-digit code shown on the new device'), name: z.string().trim().min(1).max(40).optional() })
+  .strict();
+/** Cuts a device off at once: its token stops working, its sign-ins end and its live connection closes. */
+export const revokeDeviceSchema = z.object({ deviceId: ulidSchema }).strict();

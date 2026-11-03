@@ -27,7 +27,7 @@ export function streamRoutes(app: FastifyInstance, hub: RealtimeHub, allowedOrig
           void reply.status(403).send({ ok: false, error: { code: 'FORBIDDEN', message: 'Origin not allowed.' } });
         },
       },
-      (socket) => hub.attach(socket),
+      (socket, req) => hub.attach(socket, req.ip),
     );
     done();
   });

@@ -19,6 +19,11 @@ export interface ServerConfig {
    * and problems (the shop sees a readable server window). Development logs JSON to the console.
    */
   logToFile: boolean;
+  /**
+   * P2-02: requests from this PC itself (127.0.0.1) count as the built-in "Master PC" device. Off only for tests that
+   * play a second PC (DINEPOS_TRUST_LOOPBACK=0); optional so configs made before P2-02 stay valid.
+   */
+  trustLoopback?: boolean;
 }
 
 export const DEFAULT_ALLOWED_ORIGINS = ['app://dinepos', 'http://localhost:5173', 'http://127.0.0.1:5173'];
@@ -78,5 +83,6 @@ export function loadConfig(
     logLevel: e.LOG_LEVEL,
     allowedOrigins: e.DINEPOS_ALLOWED_ORIGINS,
     logToFile: e.DINEPOS_LOG_TO_FILE ? e.DINEPOS_LOG_TO_FILE === '1' : e.NODE_ENV === 'production',
+    trustLoopback: env.DINEPOS_TRUST_LOOPBACK !== '0',
   };
 }

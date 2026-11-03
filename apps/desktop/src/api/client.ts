@@ -33,6 +33,10 @@ export interface ApiClientOptions {
   getToken?: () => string | null;
   /** Called when the server says the session is missing or over (except while signing in). */
   onUnauthenticated?: () => void;
+  /** P2-02: this terminal's device token (sent as `Authorization: Device <token>`). */
+  getDeviceToken?: () => string | null;
+  /** The server does not know this device (never paired, or revoked): the terminal must pair. */
+  onDeviceUnpaired?: () => void;
   /**
    * Asks for a manager PIN when a command answers PIN_REQUIRED. Resolve with the PIN to resend the SAME command,
    * or null to give up (the PIN_REQUIRED error is then thrown).
@@ -117,7 +121,12 @@ export class ApiClient {
     let res: Response;
     try {
       const token = this.opts.getToken?.();
-      const headers = { ...(init.headers as Record<string, string> | undefined), ...(token ? { 'x-user-session': token } : {}) };
+      const device = this.opts.getDeviceToken?.();
+      const headers = {
+        ...(init.headers as Record<string, string> | undefined),
+        ...(token ? { 'x-user-session': token } : {}),
+        ...(device ? { authorization: `Device ${device}` } : {}),
+      };
       res = await this.fetchImpl(`${this.baseUrl}${path}`, { ...init, headers, signal: ctrl.signal });
     } catch {
       throw new ApiError('NETWORK', 'Cannot reach the outlet server. On the master PC, open “DinePOS Server” from the Start menu; on a billing terminal, check the network and the server address in Settings.');
@@ -133,7 +142,8 @@ export class ApiClient {
     }
     if (res.ok) return json as T;
     const fail = json as Partial<CommandFailure>;
-    if (fail.error?.code === 'UNAUTHENTICATED' && path !== '/v1/sessions') this.opts.onUnauthenticated?.();
+    if (fail.error?.code === 'UNAUTHENTICATED' && (fail.error.details as { reason?: string } | undefined)?.reason === 'device_not_paired') this.opts.onDeviceUnpaired?.();
+    else if (fail.error?.code === 'UNAUTHENTICATED' && path !== '/v1/sessions') this.opts.onUnauthenticated?.();
     throw new ApiError(fail.error?.code ?? 'INTERNAL', fail.error?.message ?? `Request failed (HTTP ${res.status}).`, fail.error?.details, fail.order);
   }
 }

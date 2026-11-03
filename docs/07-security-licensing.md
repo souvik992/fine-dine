@@ -9,6 +9,23 @@ phones, disk failure. Not: nation-state attackers.
 3. Server issues a 256-bit random device token, stores SHA-256 hash, device name, kind (terminal/captain/kds).
 4. Every HTTP/WS call carries the token. Revoke = delete row → immediate 401.
 
+Built in P2-02 (`apps/server/src/auth/devices.ts`, migration 0007):
+- `POST /v1/pairing-requests` `{ name, kind }` (public) → `{ requestId, secret, code, expiresAt }`: a 6-digit code for
+  10 minutes (at most 20 waiting). The device polls `POST /v1/pairing-requests/:id/collect` `{ secret }`; after
+  approval the first collect makes the token (only `sha256("device:" + token)` is stored) and closes the request, so
+  the token is handed out once.
+- `PairDevice` `{ code, name? }` (right `admin`, **always** a manager PIN) creates the device row and approves the
+  request. `RevokeDevice` `{ deviceId }` sets `revoked_at`, clears the token hash (the row stays for the audit trail),
+  ends the device's sign-ins and closes its live connection at once (`device.revoked`, WS close 4403). The master PC
+  and the requesting device itself cannot be revoked.
+- Every request except `/v1/health` and pairing needs `Authorization: Device <token>`; otherwise 401 with
+  `details.reason = "device_not_paired"`. The stream checks the hello's `deviceToken` (refused: close 4401).
+- **Decided 2026-11-03:** requests from the master PC itself (loopback) are the built-in device "Master PC" (the row
+  from 0004) and need no token: whoever can use that PC can already read its disk, and an existing install keeps
+  working after the upgrade. `DINEPOS_TRUST_LOOPBACK=0` turns this off (tests that play a second PC).
+- Sign-ins record their device (`user_session.device_id`); `GET /v1/devices` (admin) lists devices and waiting codes;
+  `GET /v1/device` names this device. Terminals show "Pair this terminal" when the server does not know them.
+
 ## Users and PINs
 - Staff log in with a 4–6 digit PIN (unique per outlet). Hash: Argon2id.
 - 5 wrong PINs → lock that user 5 min; audit it.

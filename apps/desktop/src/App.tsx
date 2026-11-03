@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ApiError } from './api/client.js';
 import { useApp } from './app-context.js';
 import { LoginScreen } from './auth/LoginScreen.js';
+import { PairScreen } from './auth/PairScreen.js';
 import { ManagerPinDialog } from './auth/ManagerPinDialog.js';
 import { SetupScreen } from './auth/SetupScreen.js';
 import { BillingScreen } from './billing/BillingScreen.js';
@@ -15,13 +16,14 @@ import { StockScreen } from './stock/StockScreen.js';
 type Screen = { kind: 'floor' } | { kind: 'settings' } | { kind: 'stock' } | { kind: 'order'; orderId: string };
 
 export function App() {
-  const { api, session } = useApp();
+  const { api, session, needsPairing } = useApp();
   const [screen, setScreen] = useState<Screen>({ kind: 'floor' });
   const toFloor = () => setScreen({ kind: 'floor' });
   // Public: first-run setup or the staff list. Refetched whenever nobody is signed in.
   const setup = useQuery({ queryKey: ['setup-state'], queryFn: () => api.get<SetupState>('/v1/setup-state'), enabled: !session, retry: 1 });
 
   if (screen.kind === 'settings') return <SettingsScreen onBack={toFloor} />;
+  if (needsPairing) return <PairScreen onSettings={() => setScreen({ kind: 'settings' })} />;
 
   if (!session) {
     if (setup.isError) {

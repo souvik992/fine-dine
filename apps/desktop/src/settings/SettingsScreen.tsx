@@ -5,6 +5,7 @@ import { useApp } from '../app-context.js';
 import { UserBadge } from '../components/UserBadge.js';
 import { BackupSettings } from './BackupSettings.js';
 import { BillDesignSettings } from './BillDesignSettings.js';
+import { DeviceSettings } from './DeviceSettings.js';
 import { FloorSettings } from './FloorSettings.js';
 import { KitchenSettings } from './KitchenSettings.js';
 import { MenuSettings } from './MenuSettings.js';
@@ -12,7 +13,7 @@ import { OutletSettings } from './OutletSettings.js';
 import { StaffSettings } from './StaffSettings.js';
 import { TerminalSettings } from './TerminalSettings.js';
 
-type SectionKey = 'outlet' | 'bill' | 'backups' | 'floor' | 'menu' | 'kitchen' | 'staff' | 'terminal';
+type SectionKey = 'outlet' | 'bill' | 'backups' | 'devices' | 'floor' | 'menu' | 'kitchen' | 'staff' | 'terminal';
 
 const SECTIONS: Array<{ key: SectionKey; label: string; hint: string; icon: ComponentType<{ className?: string }>; right: Right | null }> = [
   { key: 'outlet', label: 'Outlet & bills', hint: 'Name, GSTIN, bill number, round-off, UPI', icon: Store, right: 'admin' },
@@ -21,6 +22,7 @@ const SECTIONS: Array<{ key: SectionKey; label: string; hint: string; icon: Comp
   { key: 'menu', label: 'Menu', hint: 'Categories, items, options and add-ons', icon: UtensilsCrossed, right: 'admin' },
   { key: 'kitchen', label: 'Kitchen & printers', hint: 'Stations, printers, test print', icon: ChefHat, right: 'admin' },
   { key: 'backups', label: 'Backups', hint: 'Every 15 minutes; copy folder; restore', icon: DatabaseBackup, right: 'admin' },
+  { key: 'devices', label: 'Devices', hint: 'Pair terminals and phones; revoke', icon: MonitorSmartphone, right: 'admin' },
   { key: 'staff', label: 'Staff & roles', hint: 'People, PINs, rights and discount limits', icon: Users, right: 'users.manage' },
   { key: 'terminal', label: 'This terminal', hint: 'Outlet server address', icon: MonitorSmartphone, right: null },
 ];
@@ -64,6 +66,7 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
           {current.key === 'outlet' ? <OutletSettings /> : null}
           {current.key === 'bill' ? <BillDesignSettings /> : null}
           {current.key === 'backups' ? <BackupSettings /> : null}
+          {current.key === 'devices' ? <DeviceSettings /> : null}
           {current.key === 'floor' ? <FloorSettings /> : null}
           {current.key === 'menu' ? <MenuSettings /> : null}
           {current.key === 'kitchen' ? <KitchenSettings /> : null}

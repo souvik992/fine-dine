@@ -225,3 +225,35 @@ describe('ApiClient: sessions and manager approval', () => {
     expect(signedOut).toBe(1);
   });
 });
+
+describe('device pairing in the client (P2-02)', () => {
+  it('sends the device token and calls onDeviceUnpaired (not sign-out) when the server does not know the device', async () => {
+    const seen: Array<string | null> = [];
+    const unpaired = vi.fn();
+    const signedOut = vi.fn();
+    const fetch: Fetch = (_u, init) => {
+      seen.push((init?.headers as Record<string, string>).authorization ?? null);
+      return Promise.resolve(new Response(JSON.stringify({ ok: false, error: { code: 'UNAUTHENTICATED', message: 'pair', details: { reason: 'device_not_paired' } } }), { status: 401 }));
+    };
+    const api = new ApiClient({ baseUrl: 'http://s', fetch, getDeviceToken: () => 'tok', onDeviceUnpaired: unpaired, onUnauthenticated: signedOut });
+    await api.get('/v1/floor').catch(() => undefined);
+    expect(seen).toEqual(['Device tok']);
+    expect(unpaired).toHaveBeenCalledOnce();
+    expect(signedOut).not.toHaveBeenCalled();
+  });
+
+  it('the stream hello carries the device token; a refused or revoked device asks to pair', () => {
+    vi.useFakeTimers();
+    FakeSocket.all = [];
+    const onUnpaired = vi.fn();
+    const c = new StreamClient({ url: 'ws://s/v1/stream', topics: ['floor'], onEvent: () => undefined, onResync: () => undefined, createSocket: (u) => new FakeSocket(u), deviceToken: () => 'tok', onUnpaired, backoffMs: [10] });
+    c.start();
+    const s = FakeSocket.all[0]!;
+    s.open();
+    expect(JSON.parse(s.sent[0]!)).toMatchObject({ type: 'hello', deviceToken: 'tok' });
+    s.onclose?.({ code: 4403 });
+    expect(onUnpaired).toHaveBeenCalledOnce();
+    c.stop();
+    vi.useRealTimers();
+  });
+});

@@ -107,6 +107,7 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
       printWaker: printQueue,
       printQueue,
       allowedOrigins: config.allowedOrigins,
+      trustLoopback: config.trustLoopback ?? true,
       backups: { scheduler: backups, dataDir: config.dataDir, requestRestart: opts.requestRestart ?? (() => undefined) },
     });
     logSink.log = (level, msg, data) => app.log[level](data ?? {}, msg);
