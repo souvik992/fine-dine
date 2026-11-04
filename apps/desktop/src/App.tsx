@@ -28,7 +28,15 @@ export function App() {
   // Public: first-run setup or the staff list. Refetched whenever nobody is signed in.
   const setup = useQuery({ queryKey: ['setup-state'], queryFn: () => api.get<SetupState>('/v1/setup-state'), enabled: !session, retry: 1 });
 
-  if (screen.kind === 'settings') return <SettingsScreen onBack={toFloor} initial={screen.section} />;
+  if (screen.kind === 'settings') {
+    // Settings has its own PIN actions (approving a device, staff changes): the PIN prompt must be shown here too.
+    return (
+      <>
+        <SettingsScreen onBack={toFloor} initial={screen.section} />
+        <ManagerPinDialog />
+      </>
+    );
+  }
   if (needsPairing) return <PairScreen onSettings={() => setScreen({ kind: 'settings' })} />;
 
   if (!session) {

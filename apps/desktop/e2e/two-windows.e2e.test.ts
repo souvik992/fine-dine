@@ -373,6 +373,22 @@ describe('desktop app', () => {
     return page!;
   }
 
+  it('Devices: a kitchen screen is approved from Settings with the manager PIN (asked on the Settings screen), then collects its pass', async () => {
+    // the kitchen screen asks to pair (as apps/kds does)
+    const ticket = (await (await fetch(`${SERVER}/v1/pairing-requests`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Tandoor screen', kind: 'kds' }) })).json()) as { requestId: string; code: string; secret: string };
+    const page = await openSettings('Devices');
+    const row = page.getByRole('listitem').filter({ hasText: ticket.code });
+    await row.getByRole('button', { name: 'Approve' }).click();
+    const pin = page.getByRole('dialog', { name: 'Manager approval' });
+    await pin.waitFor({ timeout: 5_000 }); // before the fix, Settings never showed this and the approval hung
+    await page.keyboard.type('1234');
+    await page.keyboard.press('Enter');
+    await page.getByText('Tandoor screen is paired.').waitFor();
+    const collected = (await (await fetch(`${SERVER}/v1/pairing-requests/${ticket.requestId}/collect`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ secret: ticket.secret }) })).json()) as { status: string; deviceToken?: string };
+    expect(collected.status).toBe('paired');
+    expect(collected.deviceToken).toBeTruthy();
+  });
+
   it('Outlet & bills: renaming the restaurant is saved', async () => {
     const page = await openSettings('Outlet & bills');
     const name = page.getByRole('textbox', { name: 'Restaurant name' });
