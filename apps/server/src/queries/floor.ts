@@ -1,8 +1,9 @@
-import { deriveTableState, isoInZone, kitchenLevel, localDate, type FloorSnapshot, type FloorTable, type TableKitchen } from '@dinepos/shared';
+import { deriveTableState, isoInZone, type FloorSnapshot, type FloorTable } from '@dinepos/shared';
 import type { Db } from '../db/connection.js';
 import { getConfig } from '../core/outlet-config.js';
 import { sectionCaptains } from '../commands/captain-support.js';
 import { billRequestOf, getOrderSnapshot } from './order-snapshot.js';
+import { kitchenCounts, screenStations, tableKitchen } from './kitchen-status.js';
 import { nextBookings } from './reservations.js';
 
 interface FloorRow {
@@ -28,42 +29,6 @@ const opt = <T>(v: T | null): T | undefined => (v === null ? undefined : v);
 const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
 
 /** Areas and tables with derived state (docs/02 deriveTableState), elapsed time and running amount. */
-/**
- * Stations that use a kitchen screen: marked so in Settings › Kitchen & printers, or with a ticket bumped (ready or
- * served) on a screen in the last 7 business days (a screen works for any station). Paper-only stations never report.
- */
-function screenStations(db: Db, now: Date, timeZone: string): Set<string> {
-  const since = localDate(new Date(now.getTime() - 7 * 86_400_000), timeZone);
-  return new Set(
-    db
-      .prepare(`SELECT id FROM station WHERE has_kds = 1 UNION SELECT DISTINCT station_id FROM kot WHERE business_date >= ? AND (ready_at IS NOT NULL OR served_at IS NOT NULL)`)
-      .pluck()
-      .all(since) as string[],
-  );
-}
-
-/** The kitchen screens' view of one order: its tickets (with food still on this order) at those stations, cooking or ready. */
-function kitchenOf(db: Db, orderId: string, stations: Set<string>, now: Date, limits: { amber: number; red: number }): TableKitchen | null {
-  if (stations.size === 0) return null;
-  const kots = (
-    db
-      .prepare(
-        `SELECT station_id, fired_at, ready_at, served_at FROM kot
-         WHERE kind = 'new' AND served_at IS NULL
-           AND id IN (SELECT kot_id FROM order_item WHERE order_id = ? AND status = 'fired' AND kot_id IS NOT NULL)`,
-      )
-      .all(orderId) as Array<{ station_id: string; fired_at: string; ready_at: string | null; served_at: string | null }>
-  ).filter((k) => stations.has(k.station_id));
-  const cooking = kots.filter((k) => !k.ready_at);
-  const ready = kots.length - cooking.length;
-  if (kots.length === 0) return null;
-  const oldest = cooking.map((k) => k.fired_at).sort()[0] ?? null;
-  const r = { cooking: cooking.length, ready, oldest };
-  const waitingMin = r.oldest ? Math.max(0, Math.floor((now.getTime() - Date.parse(r.oldest)) / 60_000)) : null;
-  const bounds = { amberMin: limits.amber, redMin: limits.red };
-  return { cooking: r.cooking, ready: r.ready, cookingSince: r.oldest, waitingMin, level: kitchenLevel(waitingMin, bounds), ...bounds };
-}
-
 export function getFloor(db: Db, now: Date, timeZone: string): FloorSnapshot {
   const areas = db.prepare('SELECT id, name, sort FROM area ORDER BY sort, name COLLATE NOCASE').all() as FloorSnapshot['areas'];
   const areaOrder = new Map(areas.map((a, i) => [a.id, i]));
@@ -82,11 +47,13 @@ export function getFloor(db: Db, now: Date, timeZone: string): FloorSnapshot {
 
   const bookings = nextBookings(db, now, timeZone);
   const cfg = getConfig(db);
-  const limits = { amber: cfg['kds.amberMin'], red: cfg['kds.redMin'] };
+  const limits = { amberMin: cfg['kds.amberMin'], redMin: cfg['kds.redMin'] };
   const stations = screenStations(db, now, timeZone);
   const tables: FloorTable[] = rows.map((r) => {
+    // the kitchen screens' view of the food: chips on the tile, and FOOD_READY / SERVED once nothing is cooking
+    const counts = r.order_id && r.has_kot === 1 ? kitchenCounts(db, r.order_id, stations) : null;
     const order = r.order_id
-      ? { hasFiredKot: r.has_kot === 1, lastKotAt: r.last_kot_at, billPrintedAt: r.bill_printed_at }
+      ? { hasFiredKot: r.has_kot === 1, lastKotAt: r.last_kot_at, billPrintedAt: r.bill_printed_at, kitchen: counts }
       : null;
     const table: FloorTable = {
       id: r.id,
@@ -112,7 +79,7 @@ export function getFloor(db: Db, now: Date, timeZone: string): FloorSnapshot {
       table.since = opt(r.opened_at);
       if (r.opened_at) table.elapsedMin = Math.max(0, Math.floor((now.getTime() - Date.parse(r.opened_at)) / 60_000));
       table.amountPaise = getOrderSnapshot(db, r.order_id)?.totals.totalPaise ?? 0;
-      const kitchen = kitchenOf(db, r.order_id, stations, now, limits);
+      const kitchen = tableKitchen(counts, now, limits);
       if (kitchen) table.kitchen = kitchen;
     }
     return table;

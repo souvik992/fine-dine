@@ -50,8 +50,14 @@ Stock: StockItem, StockMovement, Purchase + PurchaseLine, RecipeLine (see "Stock
 | 2 | table.status = reserved, or a booking holds it (P4-04: from `reservation.holdMin` before its time until `reservation.graceMin` after), and no open order | `RESERVED` |
 | 3 | no open order | `FREE` |
 | 4 | order has no fired KOT | `SEATED` |
-| 5 | billPrintedAt is null or lastKotAt > billPrintedAt | `KOT_RUNNING` |
-| 6 | otherwise | `BILL_PRINTED` |
+| 5 | billPrintedAt set and not older than lastKotAt | `BILL_PRINTED` |
+| 6 | the kitchen screens know all the food (no ticket at a station without a screen), none cooking, some ready | `FOOD_READY` |
+| 7 | the same, none cooking or ready (all served) | `SERVED` ("Served · print bill") |
+| 8 | otherwise | `KOT_RUNNING` |
+
+Kitchen counts (6–7): the order's tickets with food still on it, at stations using a screen (marked for one, or with a
+ticket bumped there in the last 7 business days), `apps/server/src/queries/kitchen-status.ts`. Without screens the
+states are as before (KOT_RUNNING until the bill).
 
 ## Order item states
 `held` → (FireKOT) → `fired` → (CancelFiredItem) → `cancelled`.

@@ -20,6 +20,10 @@
   --seated-ink: oklch(42% .12 250);
   --kot: oklch(90% .09 75);
   --kot-ink: oklch(45% .12 60);
+  --ready: oklch(90% .1 150);
+  --ready-ink: oklch(38% .12 150);
+  --served: oklch(91% .05 345);
+  --served-ink: oklch(42% .12 350);
   --bill: oklch(90% .06 185);
   --bill-ink: oklch(40% .08 190);
   --reserved-ink: oklch(48% .16 300);
@@ -67,6 +71,8 @@
   .tile-free { @apply border-border bg-card; }
   .tile-seated { background: var(--seated); border-color: transparent; color: var(--seated-ink); }
   .tile-kot { background: var(--kot); border-color: transparent; color: var(--kot-ink); }
+  .tile-ready { background: var(--ready); border-color: transparent; color: var(--ready-ink); }
+  .tile-served { background: var(--served); border-color: transparent; color: var(--served-ink); }
   .tile-bill { background: var(--bill); border-color: transparent; color: var(--bill-ink); }
   .tile-reserved { @apply bg-card border-dashed; border-color: var(--reserved-ink); color: var(--reserved-ink); }
   .tile-blocked { background: var(--blocked); border-color: transparent; @apply text-muted-foreground; }

@@ -1,6 +1,6 @@
 import { initials } from '@dinepos/client';
 import { formatINR, kitchenLevel, type FloorTable } from '@dinepos/shared';
-import { Ban, BellRing, CalendarClock, ChefHat, Circle, Flame, ReceiptText, Users } from 'lucide-react';
+import { Ban, BellRing, CalendarClock, CheckCheck, ChefHat, Circle, Flame, ReceiptText, Users } from 'lucide-react';
 import { bookingTime } from './SeatDialog.js';
 import { forwardRef, type ComponentType, type CSSProperties } from 'react';
 import { formatElapsed, elapsedMinutes, STATE_META, type StateMeta } from './floor-model.js';
@@ -9,6 +9,8 @@ const ICONS: Record<StateMeta['icon'], ComponentType<{ className?: string }>> = 
   circle: Circle,
   users: Users,
   flame: Flame,
+  bell: BellRing,
+  check: CheckCheck,
   receipt: ReceiptText,
   calendar: CalendarClock,
   ban: Ban,

@@ -26,7 +26,9 @@ Every state also has a text label and icon — colour is never the only signal.
 - Kitchen status on the tile (and on the captain's tables): **Cooking n · m min** (plain, then amber / red at the
   kitchen screen's `kds.amberMin` / `kds.redMin`) and **Ready n** in green (food waiting at the pass). From the kitchen
   screens' bumps, at stations marked for a screen or with a ticket bumped there in the last 7 business days; live on
-  every bump (`kot.status` also goes to the `floor` topic). `FloorTable.kitchen` in `GET /v1/floor`.
+  every bump (`kot.status` also goes to the `floor` topic). `FloorTable.kitchen` in `GET /v1/floor`. When nothing
+  is cooking the table's state follows: **Food ready** (green) while food waits at the pass, then **Served · print
+  bill** (rose) once all is served; KOT running stays while any food is at a station without a screen.
 - Click: open order (or seat dialog if free). Right-click / long-press: Move, Merge, Split, Print bill, Reprint, Block.
 - Keyboard: arrows move focus, Enter opens, `M` move, `G` merge, `P` print bill.
 

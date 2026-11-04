@@ -580,7 +580,7 @@ describe('desktop app', () => {
     await page!.getByRole('button', { name: 'Floor', exact: true }).click();
   });
 
-  it('Kitchen status on the floor: a ticket bumped ready on a kitchen screen shows Ready on the table, live in both windows', async () => {
+  it('Kitchen status on the floor: a ticket bumped ready shows Food ready (no longer KOT running), then Served · print bill, live in both windows', async () => {
     const [page, other] = app.windows();
     const menu = await get<{ stations: Array<{ id: string; name: string }> }>('/v1/menu');
     const tandoor = menu.stations.find((x) => x.name === 'Tandoor')!.id; // T6's Paneer Tikka went there (Stock test)
@@ -594,7 +594,20 @@ describe('desktop app', () => {
     expect(bump.ok).toBe(true);
     for (const p of [page!, other!]) await p.locator('[data-table="T6"]').getByTestId('kitchen-ready').getByText('Ready 1').waitFor({ timeout: 5_000 });
     expect(await page!.locator('[data-table="T6"]').getAttribute('aria-label')).toContain('1 ready to serve');
+    // nothing cooking any more: the table is "Food ready", not "KOT running", and the Cooking chip is gone
+    await page!.locator('[data-table="T6"][data-state="FOOD_READY"]').getByText('Food ready').waitFor({ timeout: 5_000 });
+    expect(await page!.locator('[data-table="T6"]').getByTestId('kitchen-cooking').count()).toBe(0);
     await page!.locator('[data-table="T6"]').screenshot({ path: path.join(tmpdir(), 'dinepos-kitchen-tile.png') });
+    // served: the table now waits for its bill
+    const served = await fetch(`${SERVER}/v1/commands`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-user-session': testToken },
+      body: JSON.stringify({ commandId: ulid(), type: 'MarkKotServed', payload: { kotId: kot.id }, createdAt: new Date().toISOString() }),
+    });
+    expect(served.ok).toBe(true);
+    for (const p of [page!, other!]) await p.locator('[data-table="T6"][data-state="SERVED"]').getByText('Served · print bill').waitFor({ timeout: 5_000 });
+    expect(await page!.locator('[data-table="T6"]').getByTestId('kitchen-status').count()).toBe(0);
+    await page!.locator('[data-table="T6"]').screenshot({ path: path.join(tmpdir(), 'dinepos-kitchen-tile-served.png') });
   });
 
   it('Billing: right-click marks an item sold out for everyone, and again puts it back', async () => {

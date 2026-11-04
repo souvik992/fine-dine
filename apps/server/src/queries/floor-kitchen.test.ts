@@ -48,6 +48,29 @@ describe('kitchen status on the floor', () => {
     expect(t1(new Date(TEST_NOW().getTime() + 8 * 86_400_000)).kitchen).toMatchObject({ cooking: 1, ready: 0 }); // that bump is old news a week on
   });
 
+  it('the table state follows the kitchen: KOT running → Food ready → Served, then Bill printed; a paper-only station keeps it running', () => {
+    // T1 has food at the Tandoor too, which has no screen: nobody reports it, so T1 stays "KOT running"
+    h.run('MarkKotReady', { kotId: kitchenKot });
+    h.run('MarkKotServed', { kotId: kitchenKot });
+    expect(t1().state).toBe('KOT_RUNNING');
+
+    // T2: only kitchen food
+    const id = o.open(S.t2, 2).order!.id;
+    o.run('AddItems', id, { items: [line(S.dalMakhani)] });
+    const kot = (o.run('FireKOT', id, { all: true }).result as { kots: Array<{ id: string }> }).kots[0]!.id;
+    const t2 = () => getFloor(h.db, TEST_NOW(), 'Asia/Kolkata').tables.find((t) => t.id === S.t2)!;
+    expect(t2().state).toBe('KOT_RUNNING');
+    h.run('MarkKotReady', { kotId: kot });
+    expect([t2().state, t2().kitchen]).toEqual(['FOOD_READY', expect.objectContaining({ cooking: 0, ready: 1 })]);
+    h.run('MarkKotServed', { kotId: kot });
+    expect([t2().state, t2().kitchen]).toEqual(['SERVED', undefined]); // no chips: nothing cooking or waiting
+    o.run('PrintBill', id, {});
+    expect(t2().state).toBe('BILL_PRINTED');
+    // the table.state event says the same
+    const last = h.db.prepare("SELECT payload_json FROM event_log WHERE event = 'table.state' ORDER BY seq DESC LIMIT 1").pluck().get() as string;
+    expect(JSON.parse(last)).toMatchObject({ tableId: S.t2, state: 'BILL_PRINTED' });
+  });
+
   it('a bump on a kitchen screen tells the floor (every terminal redraws the tile)', () => {
     h.run('MarkKotReady', { kotId: kitchenKot });
     expect(h.count('event_log', "event = 'kot.status' AND topic = 'floor'")).toBe(1);

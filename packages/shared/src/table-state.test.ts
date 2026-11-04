@@ -34,6 +34,18 @@ describe('deriveTableState (checks in docs/02 order)', () => {
     ).toBe('BILL_PRINTED');
   });
 
+  it('5b. the kitchen screens say the food is done: FOOD_READY while some waits at the pass, then SERVED', () => {
+    const kot = { hasFiredKot: true, lastKotAt: '2026-11-02T14:00:00Z' };
+    const k = (cooking: number, ready: number, served: number, unknown = 0) => ({ ...kot, kitchen: { cooking, ready, served, unknown } });
+    expect(deriveTableState(active, k(1, 1, 0))).toBe('KOT_RUNNING'); // something still cooking
+    expect(deriveTableState(active, k(0, 1, 2))).toBe('FOOD_READY');
+    expect(deriveTableState(active, k(0, 0, 3))).toBe('SERVED');
+    expect(deriveTableState(active, k(0, 0, 3, 1))).toBe('KOT_RUNNING'); // a ticket at a station without a screen: unknown
+    expect(deriveTableState(active, k(0, 0, 0, 0))).toBe('KOT_RUNNING'); // no ticket the screens know of
+    expect(deriveTableState(active, { ...k(0, 0, 3), billPrintedAt: '2026-11-02T14:30:00Z' })).toBe('BILL_PRINTED'); // the bill wins
+    expect(deriveTableState(active, { ...k(1, 0, 3), billPrintedAt: '2026-11-02T13:30:00Z' })).toBe('KOT_RUNNING'); // more food after the bill
+  });
+
   it('compares instants, not strings with different offsets', () => {
     // 20:00+05:30 is 14:30Z, which is after 14:00Z.
     expect(

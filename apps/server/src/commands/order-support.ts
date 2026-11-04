@@ -6,6 +6,7 @@ import { PosError } from '../core/errors.js';
 import type { Db } from '../db/connection.js';
 import { getOrderSnapshot } from '../queries/order-snapshot.js';
 import { getConfig } from '../core/outlet-config.js';
+import { kitchenCounts, screenStations } from '../queries/kitchen-status.js';
 
 /** States in which items may be added, edited or fired. */
 export function requireEditable(order: OrderRow): void {
@@ -192,9 +193,10 @@ export function emitTableState(ctx: CommandContext, tableId: string | null): voi
   const hasKot = order
     ? ctx.db.prepare('SELECT 1 FROM kot WHERE order_id = @id UNION ALL SELECT 1 FROM order_item WHERE order_id = @id AND kot_id IS NOT NULL LIMIT 1').get({ id: order.id }) !== undefined
     : false;
+  const kitchen = order && hasKot ? kitchenCounts(ctx.db, order.id, screenStations(ctx.db, ctx.now, ctx.timeZone)) : null;
   const state = deriveTableState(
     { status: t.status },
-    order ? { hasFiredKot: hasKot, lastKotAt: order.last_kot_at, billPrintedAt: order.bill_printed_at } : null,
+    order ? { hasFiredKot: hasKot, lastKotAt: order.last_kot_at, billPrintedAt: order.bill_printed_at, kitchen } : null,
   );
   ctx.emit('floor', 'table.state', {
     tableId,

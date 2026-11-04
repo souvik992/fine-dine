@@ -4,7 +4,7 @@ import type { FloorSnapshot, FloorTable, TableState } from '@dinepos/shared';
 export interface StateMeta {
   label: string;
   /** lucide icon name, mapped in TableTile. Colour is never the only signal (docs/09). */
-  icon: 'circle' | 'users' | 'flame' | 'receipt' | 'calendar' | 'ban';
+  icon: 'circle' | 'users' | 'flame' | 'bell' | 'check' | 'receipt' | 'calendar' | 'ban';
   className: string;
 }
 
@@ -12,6 +12,8 @@ export const STATE_META: Record<TableState, StateMeta> = {
   FREE: { label: 'Free', icon: 'circle', className: 'tile-free' },
   SEATED: { label: 'Seated', icon: 'users', className: 'tile-seated' },
   KOT_RUNNING: { label: 'KOT running', icon: 'flame', className: 'tile-kot' },
+  FOOD_READY: { label: 'Food ready', icon: 'bell', className: 'tile-ready' },
+  SERVED: { label: 'Served · print bill', icon: 'check', className: 'tile-served' },
   BILL_PRINTED: { label: 'Bill printed', icon: 'receipt', className: 'tile-bill' },
   RESERVED: { label: 'Reserved', icon: 'calendar', className: 'tile-reserved' },
   BLOCKED: { label: 'Blocked', icon: 'ban', className: 'tile-blocked' },

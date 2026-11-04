@@ -50,3 +50,4 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-04 Fix: the manager PIN prompt was never shown on the Settings screen, so approving a device (Settings › Devices) and other PIN actions there silently hung; e2e now approves a kitchen screen through the screen
 - 2026-11-04 DinePOS Kitchen: Windows installer for a kitchen PC (apps/kitchen) opening the server's kitchen display full screen; asks the server address once, starts with Windows, keeps the screen awake, retries when the server is down, opens only the server's pages
 - 2026-11-05 Kitchen status on the floor: table tiles (desktop and captain) show Cooking n · minutes (amber / red at the KDS limits) and Ready n from the kitchen screens' bumps; floor refreshes on every bump
+- 2026-11-05 Table states FOOD_READY ("Food ready") and SERVED ("Served · print bill") from the kitchen screens: KOT running ends when nothing is cooking; tiles on the desktop and captain apps
