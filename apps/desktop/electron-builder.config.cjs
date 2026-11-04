@@ -13,6 +13,8 @@ module.exports = {
   directories: { app: '.stage', output: 'release', buildResources: 'build' },
   electronVersion: require('electron/package.json').version,
   electronDist: path.join(electronDir, 'dist'),
+  // Chromium's own text (context menus, file dialogs) in English only; DinePOS's screens carry their own text. Saves ~48 MB.
+  electronLanguages: ['en-US'],
   npmRebuild: false,
   nodeGypRebuild: false,
   asar: true,
