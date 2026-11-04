@@ -116,3 +116,12 @@ Built in P4-02 (`apps/kds`, served at `/kds`; shell shared with the captain app 
   `kot.recall`; `kot.status` on `station:<id>`, `order:<id>` and `kds`.
 - Report **Kitchen speed** (Reports › Kitchen): per station, tickets bumped, average and slowest KOT → ready, how
   many took longer than the amber time, on-time share, tickets never bumped.
+
+### DinePOS Kitchen (Windows app for a kitchen PC, `apps/kitchen`)
+- An installer (`npm run dist -w @dinepos/kitchen` → `apps/kitchen/release/DinePOS-Kitchen-Setup-<version>.exe`) that
+  opens the server's `/kds` full screen (kiosk). It copies nothing of the display: the server's page is always the one shown.
+- Asks for the main PC's address once (checked with `GET /v1/health`), starts with Windows (can be switched off), keeps
+  the screen awake, plays the chime without a tap, and retries every 10 s while the server is not reachable.
+- The window shows only that server's pages and its own setup page; other sites and new windows are refused, all
+  permission requests denied. Keys: Ctrl+Shift+S setup · F5 reload · Ctrl+Shift+Q close.
+- Pairing and station choice are the display's own (as in a browser): approve the code in Settings › Devices.

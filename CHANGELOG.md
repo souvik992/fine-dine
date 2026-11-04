@@ -48,3 +48,4 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-04 P2-14 Recipe bulk upload: ImportRecipes (all or none) from a CSV checked line by line, download of current recipes in the same format, Stock › Recipes › Bulk upload
 - 2026-11-04 Online orders: cash-on-delivery payment taken on Delivered / Collected (cash, UPI, card, other; split; change), with the Settle dialog; AdvanceOnlineOrder takes tenders (none: all cash, as before)
 - 2026-11-04 Fix: the manager PIN prompt was never shown on the Settings screen, so approving a device (Settings › Devices) and other PIN actions there silently hung; e2e now approves a kitchen screen through the screen
+- 2026-11-04 DinePOS Kitchen: Windows installer for a kitchen PC (apps/kitchen) opening the server's kitchen display full screen; asks the server address once, starts with Windows, keeps the screen awake, retries when the server is down, opens only the server's pages

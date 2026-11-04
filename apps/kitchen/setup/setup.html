@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DinePOS Kitchen</title>
+  <link rel="stylesheet" href="setup.css">
+  <script src="setup.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>DinePOS Kitchen</h1>
+    <p class="lead">The kitchen display, from your DinePOS main PC.</p>
+
+    <div id="problem" class="problem" role="alert" hidden>
+      <p id="problemText"></p>
+      <p id="retryText" class="muted"></p>
+    </div>
+
+    <form id="form" action="connect" method="get">
+      <label for="server">Address of the DinePOS main PC</label>
+      <input id="server" name="server" autocomplete="off" spellcheck="false" placeholder="192.168.1.4" required>
+      <p class="muted">On the main PC: Settings › Kitchen &amp; printers shows it (for example 192.168.1.4).</p>
+      <label class="check"><input id="autostart" type="checkbox" name="autostart" value="1"> Open by itself when Windows starts</label>
+      <button type="submit">Connect</button>
+    </form>
+
+    <section class="help">
+      <h2>After connecting</h2>
+      <ol>
+        <li>The screen shows a 6-digit code. On the main PC open Settings › Devices, press Approve and enter a manager PIN.</li>
+        <li>Choose this screen’s station (Kitchen, Tandoor, Bar…). It is remembered.</li>
+      </ol>
+      <p class="muted">Keys: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> this page · <kbd>F5</kbd> reload · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Q</kbd> close</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -29,6 +29,9 @@
       "path": "apps/desktop/electron"
     },
     {
+      "path": "apps/kitchen/electron"
+    },
+    {
       "path": "apps/desktop/e2e"
     }
   ]

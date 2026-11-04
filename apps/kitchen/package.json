@@ -1,0 +1,18 @@
+{
+  "name": "@dinepos/kitchen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DinePOS Kitchen: the kitchen display (served by the outlet server at /kds) as a full-screen Windows app.",
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/build.mjs && node scripts/run.mjs",
+    "dist": "node scripts/dist.mjs"
+  },
+  "devDependencies": {
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2"
+  }
+}

@@ -14,7 +14,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['packages/*/src/**/*.test.ts', 'apps/*/src/**/*.test.ts', 'apps/desktop/electron/**/*.test.ts'],
+    include: ['packages/*/src/**/*.test.ts', 'apps/*/src/**/*.test.ts', 'apps/desktop/electron/**/*.test.ts', 'apps/kitchen/electron/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/*.e2e.test.ts'],
     environment: 'node',
     passWithNoTests: false,
