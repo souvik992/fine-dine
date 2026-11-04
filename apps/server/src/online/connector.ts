@@ -249,6 +249,8 @@ export class OnlineConnector {
     const { body, hash } = publishedMenu(this.o.db, cfg['online.settings'], cfg);
     const link = linkRow(this.o.db);
     if (force || hash !== link.menu_hash) {
+      // photos first: a failure leaves the menu unrecorded, so the whole publish is tried again on the next tick
+      await this.sendPhotos(body.items.map((i) => i.image));
       const version = link.menu_version + 1;
       const r = await this.o.fetch(this.url('/v1/pos/menu'), { method: 'PUT', headers: this.headers({ 'content-type': 'application/json' }), body: JSON.stringify({ ...body, version }), signal: AbortSignal.timeout(15_000) });
       if (!r.ok) {
@@ -264,6 +266,31 @@ export class OnlineConnector {
       body: JSON.stringify(accepting ? { accepting: true } : { accepting: false, reason: 'The restaurant is not taking online orders right now.' }),
       signal: AbortSignal.timeout(10_000),
     });
+  }
+
+  /**
+   * The menu's photos the hub does not have yet (it lists what it holds, so a new or restored hub gets them all).
+   * Sent with each menu publish; a photo refused is tried again with the next one.
+   */
+  private async sendPhotos(names: Array<string | null>): Promise<void> {
+    const want = [...new Set(names.filter((n): n is string => Boolean(n)))];
+    if (want.length === 0) return;
+    const r = await this.o.fetch(this.url('/v1/pos/images'), { headers: this.headers(), signal: AbortSignal.timeout(10_000) });
+    if (!r.ok) throw new Error(`the hub did not list its photos (${r.status})`);
+    const have = new Set(((await r.json()) as { names?: string[] }).names ?? []);
+    const read = this.o.db.prepare('SELECT bytes FROM menu_image WHERE name = ?').pluck();
+    for (const name of want) {
+      if (have.has(name) || !this.running) continue;
+      const bytes = read.get(name) as Buffer | undefined;
+      if (!bytes) continue;
+      const up = await this.o.fetch(this.url(`/v1/pos/images/${encodeURIComponent(name)}`), {
+        method: 'PUT',
+        headers: this.headers({ 'content-type': 'application/json' }),
+        body: JSON.stringify({ dataBase64: bytes.toString('base64') }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!up.ok) throw new Error(`the hub refused a photo (${up.status})`);
+    }
   }
 
   /**

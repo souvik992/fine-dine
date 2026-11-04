@@ -21,6 +21,9 @@ import { dayEnd } from './day-end.js';
 import { fireKot } from './fire-kot.js';
 import { importMenu } from './import-menu.js';
 import { installLicence } from './install-licence.js';
+import { importRecipes } from './import-recipes.js';
+import { removeItemImage } from './remove-item-image.js';
+import { setItemImage } from './set-item-image.js';
 import { releaseTable } from './release-table.js';
 import { recordSyncAck } from './record-sync-ack.js';
 import { renewLicence } from './renew-licence.js';
@@ -82,6 +85,8 @@ const handlers = [
   upsertAddonGroup,
   upsertMenuItem,
   importMenu,
+  setItemImage,
+  removeItemImage,
   setConfig,
   printTestPage,
   printSampleBill,
@@ -92,6 +97,7 @@ const handlers = [
   recordPurchase,
   voidPurchase,
   setRecipe,
+  importRecipes,
   // staff
   setupOutlet,
   upsertUser,

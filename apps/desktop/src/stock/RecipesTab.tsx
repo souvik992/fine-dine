@@ -1,12 +1,13 @@
 import { formatINR, formatQty, parseQty, stockAmount, sumPaise, UNIT_LABELS, type RecipeLineView, type StockItemView } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
-import { CookingPot, Plus, Search, Trash2 } from 'lucide-react';
+import { CookingPot, FileUp, Plus, Search, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useApp } from '../app-context.js';
 import { Modal } from '../components/Modal.js';
 import { VegMark } from '../components/VegMark.js';
 import { DialogButtons, Empty, ErrorText } from '../settings/common.js';
 import { useMenu, useStock, useStockCommand } from './common.js';
+import { RecipeImport } from './RecipeImport.js';
 
 type OwnerKind = RecipeLineView['ownerKind'];
 interface Owner {
@@ -23,6 +24,7 @@ export function RecipesTab() {
   const recipes = useQuery({ queryKey: ['recipes'], queryFn: () => api.get<{ lines: RecipeLineView[] }>('/v1/recipes') });
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<{ title: string; owners: Owner[] } | null>(null);
+  const [importing, setImporting] = useState(false);
   const byOwner = useMemo(() => {
     const m = new Map<string, RecipeLineView[]>();
     for (const l of recipes.data?.lines ?? []) m.set(`${l.ownerKind}:${l.ownerId}`, [...(m.get(`${l.ownerKind}:${l.ownerId}`) ?? []), l]);
@@ -47,7 +49,11 @@ export function RecipesTab() {
         <span className="text-sm text-muted-foreground">
           {withRecipe} of {menu.data.items.length} dishes have a recipe
         </span>
+        <button className="btn" onClick={() => setImporting(true)}>
+          <FileUp className="h-4 w-4" /> Bulk upload
+        </button>
       </div>
+      {importing ? <RecipeImport recipes={recipes.data.lines} onClose={() => setImporting(false)} /> : null}
       {stock.data.items.length === 0 ? <Empty>Add materials first (Materials tab), then say what each dish uses.</Empty> : null}
       <table className="w-full rounded-xl border border-border bg-card text-sm" aria-label="Recipes">
         <thead>

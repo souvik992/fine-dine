@@ -29,6 +29,8 @@ export interface PublishedMenuBody {
     modifierGroupIds: string[];
     available: boolean;
     channels: Array<'app' | 'website'>;
+    /** The dish's photo ("<sha256>.webp"), served by the hub once the connector uploaded it. */
+    image: string | null;
   }>;
   modifierGroups: Array<{ id: string; name: string; minSelect: number; maxSelect: number; modifiers: Array<{ id: string; name: string; price: number }> }>;
   roundToRupee: boolean;
@@ -49,7 +51,7 @@ export function publishedMenu(db: Db, settings: OnlineSettings, cfg: OutletConfi
   const channels = (['app', 'website'] as const).filter((c) => settings.channels[c]);
   const items: PublishedMenuBody['items'] = [];
   for (const i of menu.items) {
-    const base = { categoryId: i.categoryId, unit: 'nos', isVeg: i.veg, rateBp: i.taxRateBp, cessBp: 0, priceIncludesTax: false, modifierGroupIds: i.addonGroupIds, available: i.available, channels: [...channels] };
+    const base = { categoryId: i.categoryId, unit: 'nos', isVeg: i.veg, rateBp: i.taxRateBp, cessBp: 0, priceIncludesTax: false, modifierGroupIds: i.addonGroupIds, available: i.available, channels: [...channels], image: i.image ?? null };
     if (i.variants.length === 0) items.push({ ...base, id: i.id, name: i.name, price: i.pricePaise });
     else for (const v of i.variants) items.push({ ...base, id: onlineItemId(i.id, v.id), name: `${i.name} (${v.name})`, price: v.pricePaise });
   }

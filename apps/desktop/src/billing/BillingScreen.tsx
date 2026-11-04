@@ -6,7 +6,6 @@ import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { HealthDots } from '../components/HealthDots.js';
 import { UserBadge } from '../components/UserBadge.js';
-import { VegMark } from '../components/VegMark.js';
 import { elapsedMinutes, formatElapsed } from '../floor/floor-model.js';
 import { CaptainPicker } from './CaptainPicker.js';
 import { Cart } from './Cart.js';
@@ -18,6 +17,7 @@ import { Modal } from '../components/Modal.js';
 import { PrintBillDialog } from './PrintBillDialog.js';
 import { SettleDialog } from './SettleDialog.js';
 import { SplitDialog } from './SplitDialog.js';
+import { MenuItemTile, MenuViewSwitch, useMenuView } from './MenuItemTile.js';
 import { ReleaseTableDialog } from './ReleaseTableDialog.js';
 import { TableActionsDialog, type TableAction } from './TableActionsDialog.js';
 import { useOrderSession } from './useOrderSession.js';
@@ -69,6 +69,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
   const [changing, setChanging] = useState<OrderItemSnapshot | null>(null);
   const [tableAction, setTableAction] = useState<TableAction | null>(null);
   const [releasing, setReleasing] = useState(false);
+  const [menuView, setMenuView] = useMenuView();
   const [splitting, setSplitting] = useState(false);
   // While a decision dialog is open, its commands go out on the version shown when it opened (docs/05, P2-07).
   const deciding = dialog !== null || splitting || tableAction !== null || changing !== null || releasing;
@@ -353,48 +354,36 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
 
         <main className="flex min-w-0 flex-1 flex-col">
           <form
-            className="relative border-b border-border px-4 py-3"
+            className="flex items-center gap-3 border-b border-border px-4 py-3"
             onSubmit={(e) => {
               e.preventDefault();
             }}
           >
-            <Search className="pointer-events-none absolute left-7 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-            <input
-              ref={searchBox}
-              className="input h-11 pl-10 text-base"
-              placeholder="Short code or name — e.g. pt2 then Enter (Shift+Enter for options)"
-              aria-label="Add item"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  submitSearch(e.shiftKey);
-                }
-              }}
-            />
-          </form>
-          <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto p-4 [grid-template-columns:repeat(auto-fill,minmax(170px,1fr))]" aria-label="Items">
-            {items.map((it) => (
-              <button
-                key={it.id}
-                onClick={() => choose(it, 1, true)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  toggleSoldOut(it);
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <input
+                ref={searchBox}
+                className="input h-11 pl-10 text-base"
+                placeholder="Short code or name — e.g. pt2 then Enter (Shift+Enter for options)"
+                aria-label="Add item"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submitSearch(e.shiftKey);
+                  }
                 }}
-                className={`flex min-h-20 flex-col justify-between rounded-xl border border-border bg-card p-3 text-left hover:border-ring ${it.available ? '' : 'opacity-50'}`}
-                title={it.available ? (can('menu.stock', true) ? 'Right-click: mark sold out' : undefined) : 'Sold out'}
-              >
-                <span className="flex items-start gap-2 text-sm font-semibold">
-                  <VegMark veg={it.veg} />
-                  {it.name}
-                </span>
-                <span className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                  {it.available ? <span className="font-mono">{it.shortCode}</span> : <span className="rounded bg-danger px-1.5 font-bold uppercase text-white">Sold out</span>}
-                  <span className="font-semibold tabular-nums text-foreground">{it.variants.length ? `from ${formatINR(Math.min(...it.variants.map((v) => v.pricePaise)))}` : formatINR(it.pricePaise)}</span>
-                </span>
-              </button>
+              />
+            </div>
+            <MenuViewSwitch view={menuView} onChange={setMenuView} />
+          </form>
+          <div
+            className={`grid min-h-0 flex-1 content-start gap-2 overflow-y-auto p-4 ${menuView === 'photos' ? '[grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]' : '[grid-template-columns:repeat(auto-fill,minmax(170px,1fr))]'}`}
+            aria-label="Items"
+          >
+            {items.map((it) => (
+              <MenuItemTile key={it.id} item={it} view={menuView} onChoose={() => choose(it, 1, true)} onToggleSoldOut={() => toggleSoldOut(it)} canMarkSoldOut={can('menu.stock', true)} />
             ))}
             {items.length === 0 ? <p className="text-sm text-muted-foreground">No matching items.</p> : null}
           </div>

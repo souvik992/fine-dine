@@ -219,6 +219,8 @@ export interface MenuItem {
   sort: number;
   variants: MenuVariant[];
   addonGroupIds: string[];
+  /** The dish's photo, "<sha256>.webp" (GET /v1/menu/images/<name>); absent when it has none. */
+  image?: string;
 }
 
 export interface MenuSnapshot {

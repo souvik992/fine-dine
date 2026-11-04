@@ -3,14 +3,17 @@ import { Plus, Search, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { bpToPercentText, paiseToInput, rupeesToPaise } from '../billing/money-input.js';
 import { Modal } from '../components/Modal.js';
+import { DishPhoto } from '../components/DishPhoto.js';
 import { VegMark } from '../components/VegMark.js';
+import { BulkPhotos } from './BulkPhotos.js';
+import { ItemPhoto } from './ItemPhoto.js';
 import { MenuImport } from './MenuImport.js';
 import { DialogButtons, Empty, ErrorText, Field, GST_RATES, SectionHeader, Toggle, useCatalog, useSave, type AdminCatalog } from './common.js';
 
 type Item = AdminCatalog['items'][number];
 type Category = AdminCatalog['categories'][number];
 type Group = AdminCatalog['addonGroups'][number];
-type Tab = 'items' | 'categories' | 'addons' | 'import';
+type Tab = 'items' | 'categories' | 'addons' | 'import' | 'photos';
 
 /** Menu: categories, items with options and add-ons (docs/02 menu model). */
 export function MenuSettings() {
@@ -27,6 +30,7 @@ export function MenuSettings() {
             ['categories', `Categories (${catalog.data.categories.length})`],
             ['addons', `Add-on groups (${catalog.data.addonGroups.length})`],
             ['import', 'Bulk upload'],
+            ['photos', `Bulk photos (${catalog.data.items.filter((i) => i.image).length} with photo)`],
           ] as const
         ).map(([k, label]) => (
           <button key={k} role="tab" className="tab" aria-selected={tab === k} onClick={() => setTab(k)}>
@@ -38,6 +42,7 @@ export function MenuSettings() {
       {tab === 'categories' ? <Categories catalog={catalog.data} /> : null}
       {tab === 'addons' ? <AddonGroups catalog={catalog.data} /> : null}
       {tab === 'import' ? <MenuImport catalog={catalog.data} /> : null}
+      {tab === 'photos' ? <BulkPhotos catalog={catalog.data} /> : null}
     </div>
   );
 }
@@ -92,11 +97,12 @@ function Items({ catalog }: { catalog: AdminCatalog }) {
             <tr key={i.id} className={i.active ? '' : 'opacity-50'}>
               <td className="px-3 py-2">
                 <span className="flex items-center gap-2 font-semibold">
+                  <DishPhoto name={i.image} label={i.name} className="h-9 w-9 shrink-0 rounded-md text-base" />
                   <VegMark veg={i.veg} />
                   {i.name}
                   {!i.active ? <span className="text-xs font-normal">(off the menu)</span> : !i.available ? <span className="rounded bg-secondary px-1.5 text-xs font-normal">out today</span> : null}
                 </span>
-                {i.variants.length ? <span className="ml-6 text-xs text-muted-foreground">{i.variants.map((v) => v.name).join(' / ')}</span> : null}
+                {i.variants.length ? <span className="ml-[4.25rem] text-xs text-muted-foreground">{i.variants.map((v) => v.name).join(' / ')}</span> : null}
               </td>
               <td className="px-3 py-2 font-mono text-xs">{i.shortCode}</td>
               <td className="px-3 py-2">{catName(i.categoryId)}</td>
@@ -175,6 +181,11 @@ function ItemDialog({ item, catalog, defaultCategoryId, onClose }: { item: Item 
           submit();
         }}
       >
+        {item ? (
+          <div className="mb-4 border-b border-border pb-4">
+            <ItemPhoto itemId={item.id} name={item.name} image={catalog.items.find((x) => x.id === item.id)?.image ?? null} />
+          </div>
+        ) : null}
         <div className="grid grid-cols-3 gap-3">
           <div className="col-span-2">
             <Field label="Name (printed on KOTs and bills)">

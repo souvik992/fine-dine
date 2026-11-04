@@ -84,10 +84,20 @@ Stock: StockItem, StockMovement, Purchase + PurchaseLine, RecipeLine (see "Stock
 | StockMovement | seq, id, stockItemId, deltaMilli, kind, refType (kot/purchase), refId, reason, unitCostPaise, businessDate, userId, commandId, at | Append-only ledger (triggers) |
 | Purchase | id, supplierName, supplierGstin, invoiceNo, invoiceDate, note, totalPaise, status (posted/void), businessDate | Immutable; void reverses it |
 | PurchaseLine | purchaseId, lineNo, stockItemId, qtyMilli, unitCostPaise, amountPaise | amount = qty × cost / 1000, half up |
-| RecipeLine | ownerKind (item/variant/addon), ownerId, stockItemId, qtyMilli | Per one unit sold; a variant's recipe replaces its item's |
+| RecipeLine | ownerKind (item/variant/addon), ownerId, stockItemId, qtyMilli | Per one unit sold; a variant's recipe replaces its item's. Bulk upload: `ImportRecipes` (CSV in `packages/shared/src/recipe-csv.ts`) |
 
 - Quantities are integer thousandths of the unit (1.5 kg = 1500); costs are integer paise per whole unit.
 - Movement kinds: `opening`, `purchase`, `purchase_void`, `sale` (FireKOT), `wastage`, `count`, `adjust`.
 - Invariant: `stock_item.on_hand_milli` = Σ `stock_movement.delta_milli` for that item (tested).
 - Stock never blocks service: balances may go negative ("Count needed").
 - Sold out (`menu_item.available = 0`) is separate from stock and set by people (`SetItemAvailability`).
+
+## Dish photos (migration 0014)
+| Entity | Key fields | Notes |
+| --- | --- | --- |
+| MenuImage | name (`<sha256>.<webp/jpg/png>`), contentType, bytes, createdAt | Stored once by content, in the database (so backups carry it); at most 600 KB |
+| MenuItemImage | itemId, imageName, setAt, setBy | One photo per dish; a photo no dish uses is removed |
+
+- Photos are resized in the browser (at most 1024 px, WebP) before `SetItemImage`; the server only checks the bytes are
+  a real JPG, PNG or WebP. `GET /v1/menu/images/<name>` serves them (cached for good: a name never changes content).
+- `MenuItem.image` (menu snapshot) names the photo; the online connector uploads photos the hub lacks with each menu publish.

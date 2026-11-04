@@ -103,7 +103,7 @@ export function getMenu(db: Db, q: MenuQuery = {}): MenuSnapshot | MenuUnchanged
   }
 
   const items: MenuItem[] = (
-    db.prepare('SELECT * FROM menu_item WHERE active = 1 ORDER BY sort, name COLLATE NOCASE').all() as ItemRow[]
+    db.prepare('SELECT m.*, mi.image_name FROM menu_item m LEFT JOIN menu_item_image mi ON mi.item_id = m.id WHERE m.active = 1 ORDER BY m.sort, m.name COLLATE NOCASE').all() as Array<ItemRow & { image_name: string | null }>
   ).map((i) => ({
     id: i.id,
     categoryId: i.category_id,
@@ -118,6 +118,7 @@ export function getMenu(db: Db, q: MenuQuery = {}): MenuSnapshot | MenuUnchanged
     sort: i.sort ?? 0,
     variants: variantsByItem.get(i.id) ?? [],
     addonGroupIds: groupsByItem.get(i.id) ?? [],
+    ...(i.image_name ? { image: i.image_name } : {}),
   }));
 
   return { menuVersion, ...(q.areaId ? { areaId: q.areaId, pricingMode } : {}), stations, categories, addonGroups, items };

@@ -41,6 +41,9 @@ quantity instead of adding a second line (lines already sent to the kitchen are 
 + / − are decided on the latest order when their turn in the queue comes, so quick repeated taps add up.
 - Left rail: categories. Middle: item grid (name, price, veg/non-veg dot, out-of-stock greyed) + search box
   with short codes (`pt2` = Paneer Tikka ×2). Right: cart.
+- Menu view switch next to the search box: **List** (the compact tiles, default) or **Photos** (each tile with the
+  dish's photo, or its initial). Remembered per terminal. Photos are set in Settings › Menu (in each item, or Bulk
+  photos: many at once, matched by file name or short code); recipes in bulk in Stock › Recipes › Bulk upload.
 - Cart sections: Held (editable) and Fired (grouped by KOT, read-only; actions via context menu).
 - Item tap → modifier sheet: required variation, add-on groups with min/max, quick-note chips, free note,
   course selector.

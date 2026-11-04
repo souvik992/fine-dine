@@ -14,7 +14,7 @@ export const CSP = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
+  "img-src 'self' data: blob:", // blob: dish photos, fetched from the outlet server with this terminal's token
   "font-src 'self'",
   'connect-src http: https: ws: wss:',
   "object-src 'none'",

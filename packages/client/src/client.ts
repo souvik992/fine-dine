@@ -72,6 +72,19 @@ export class ApiClient {
     return this.request<T>(path, { method: 'GET' });
   }
 
+  /** A file (a dish photo) with this device's credentials, for showing as an object URL. */
+  async getBlob(path: string): Promise<Blob> {
+    const device = this.opts.getDeviceToken?.();
+    let res: Response;
+    try {
+      res = await this.fetchImpl(`${this.baseUrl}${path}`, { headers: device ? { authorization: `Device ${device}` } : {} });
+    } catch {
+      throw new ApiError('NETWORK', 'Cannot reach the outlet server.');
+    }
+    if (!res.ok) throw new ApiError(res.status === 404 ? 'NOT_FOUND' : 'INTERNAL', `Could not load ${path} (HTTP ${res.status}).`);
+    return res.blob();
+  }
+
   /** POST/DELETE outside the command envelope (sign-in, sign-out). */
   send<T>(method: 'POST' | 'DELETE', path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
     return this.request<T>(path, {

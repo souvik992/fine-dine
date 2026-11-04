@@ -1,4 +1,4 @@
-import { isIsoDate, localDate, ulidSchema, type CaptainSection, type CaptainSections } from '@dinepos/shared';
+import { isIsoDate, localDate, MENU_PHOTO_NAME, ulidSchema, type CaptainSection, type CaptainSections } from '@dinepos/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { lanAddresses } from '../banner.js';
@@ -95,6 +95,15 @@ export function queryRoutes(app: FastifyInstance, deps: QueryDeps): void {
 
   app.get('/v1/printers', (_req, reply) => {
     void reply.header('cache-control', 'no-store').send({ printers: getPrinters(deps.db, deps.printerStatus, deps.now()) });
+    return reply;
+  });
+
+  /** A dish photo. Named by its content (SHA-256), so it never changes: cached for a year. */
+  app.get<{ Params: { name: string } }>('/v1/menu/images/:name', (req, reply) => {
+    if (!MENU_PHOTO_NAME.test(req.params.name)) throw new PosError('NOT_FOUND', 'No such photo.');
+    const img = deps.db.prepare('SELECT content_type, bytes FROM menu_image WHERE name = ?').get(req.params.name) as { content_type: string; bytes: Buffer } | undefined;
+    if (!img) throw new PosError('NOT_FOUND', 'No such photo.');
+    void reply.header('content-type', img.content_type).header('cache-control', 'private, max-age=31536000, immutable').header('x-content-type-options', 'nosniff').send(img.bytes);
     return reply;
   });
 

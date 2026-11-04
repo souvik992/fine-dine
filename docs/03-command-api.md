@@ -247,6 +247,9 @@ Quantities are integer thousandths of the material's unit (`qtyMilli`), costs in
 | `RecordPurchase` | id, supplierName, supplierGstin?, invoiceNo?, invoiceDate?, note?, lines[{stockItemId, qtyMilli, unitCostPaise}] | stock.manage | Adds stock, sets last cost; result `{ purchaseId, totalPaise }`; same id twice → `INVALID_STATE` |
 | `VoidPurchase` | purchaseId, reason | stock.manage | Reverses every line; last cost falls back to the latest posted purchase, else the opening cost |
 | `SetRecipe` | ownerKind (item/variant/addon), ownerId, lines[{stockItemId, qtyMilli}] | stock.manage | Replaces the recipe; `[]` removes it |
+| `ImportRecipes` | importId, recipes[{ownerKind, ownerId, lines[{stockItemId, qtyMilli}]}] (≤ 2000) | stock.manage | Recipe bulk upload: all or none; each recipe named is replaced (audited `recipe.set`, reason "bulk upload"), the others stay |
+| `SetItemImage` | itemId, dataBase64 (JPG/PNG/WebP, ≤ 600 KB) | admin | Dish photo, stored once by its SHA-256; replaces the dish's photo |
+| `RemoveItemImage` | itemId | admin | Removes the dish's photo |
 | `SetItemAvailability` | itemId, available | menu.stock | Sold out / back on; `menu.changed`; no-op when unchanged |
 | `ImportMenu` | importId, items[{name, category, pricePaise, taxRateBp, shortCode, veg, hsnSac}] (≤ 1000) | admin | All or nothing: name or code already on the menu / repeated → `VALIDATION` with `details.problems[{item, message}]`; categories matched ignoring case and spaces, missing ones created |
 

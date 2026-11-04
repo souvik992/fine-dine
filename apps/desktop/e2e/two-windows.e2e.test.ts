@@ -520,6 +520,50 @@ describe('desktop app', () => {
     await page!.getByRole('button', { name: 'Floor', exact: true }).click();
   });
 
+  it('Recipes bulk upload, dish photos in bulk, and the billing screen in Photos view', async () => {
+    const [page] = app.windows();
+    // 1. Stock › Recipes › Bulk upload: a CSV checked against the menu and materials, then saved in one go
+    await page!.getByRole('button', { name: /^Stock/ }).click();
+    await page!.getByRole('tab', { name: /Recipes/ }).click();
+    await page!.getByRole('button', { name: 'Bulk upload' }).click();
+    const dlg = page!.getByRole('dialog', { name: 'Recipes: bulk upload' });
+    await dlg.getByLabel('Choose a recipe file').setInputFiles({ name: 'bad.csv', mimeType: 'text/csv', buffer: Buffer.from('dish,size,addon,material,quantity\r\nButter Naan,,,Saffron,0.01\r\n') });
+    await dlg.getByRole('list', { name: 'Problems' }).getByText(/line 2:.*"Saffron" is not a material/).waitFor();
+    await dlg.getByLabel('Choose a recipe file').setInputFiles({ name: 'recipes.csv', mimeType: 'text/csv', buffer: Buffer.from('dish,size,addon,material,quantity\r\nbutter naan,,,Paneer,0.05\r\n') });
+    await dlg.getByRole('list', { name: 'Recipes to save' }).getByText('Butter Naan').waitFor();
+    await dlg.getByRole('button', { name: 'Save 1 recipe' }).click();
+    await dlg.getByRole('status').getByText(/1 recipe saved/).waitFor();
+    const menu = await get<{ items: Array<{ id: string; name: string; image?: string }> }>('/v1/menu');
+    const naan = menu.items.find((i) => i.name === 'Butter Naan')!;
+    const recipes = await get<{ lines: Array<{ ownerId: string; qtyMilli: number }> }>('/v1/recipes');
+    expect(recipes.lines.filter((l) => l.ownerId === naan.id).map((l) => l.qtyMilli)).toEqual([50]);
+    await dlg.getByRole('button', { name: 'Done' }).click();
+    await page!.getByRole('button', { name: 'Floor', exact: true }).click();
+
+    // 2. Settings › Menu › Bulk photos: matched by file name, resized, uploaded
+    const settings = await openSettings('Menu');
+    await settings.getByRole('tab', { name: /Bulk photos/ }).click();
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+    await settings.getByLabel('Choose photos').setInputFiles([{ name: 'Butter_Naan.png', mimeType: 'image/png', buffer: png }]);
+    await settings.getByText('matched by name').waitFor();
+    await settings.getByRole('button', { name: 'Upload 1 photo' }).click();
+    await settings.getByRole('status').getByText(/1 photo saved/).waitFor({ timeout: 15_000 });
+    const image = (await get<{ items: Array<{ id: string; image?: string }> }>('/v1/menu')).items.find((i) => i.id === naan.id)!.image;
+    expect(image).toMatch(/^[0-9a-f]{64}\.webp$/); // resized and re-encoded here before upload
+    await settings.getByRole('button', { name: 'Floor', exact: true }).click();
+
+    // 3. Billing: Photos view shows the photo (fetched with this terminal's token); List view is the compact tile
+    await page!.locator('[data-table="T6"]').click();
+    await page!.getByLabel('Add item').fill('Butter Naan');
+    await page!.getByRole('radio', { name: 'Photos' }).click();
+    const tile = page!.getByRole('button', { name: /Butter Naan/ });
+    await tile.locator('img[src^="blob:"]').waitFor({ timeout: 10_000 });
+    await page!.getByRole('radio', { name: 'List' }).click();
+    await expect.poll(() => tile.locator('img').count()).toBe(0);
+    await page!.getByLabel('Add item').fill('');
+    await page!.getByRole('button', { name: 'Floor', exact: true }).click();
+  });
+
   it('Billing: right-click marks an item sold out for everyone, and again puts it back', async () => {
     const [page] = app.windows();
     await page!.locator('[data-table="T6"]').click();

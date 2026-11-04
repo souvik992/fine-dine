@@ -92,6 +92,11 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria �
 - [x] **P2-12 Bill design** (added 2026-11-02, from TiffinPOS; `06-printing-kds.md` "Bill design") — Accept: defaults
   print the standard bill unchanged; each display option tested; logo prints as GS v 0 raster; live preview of
   unsaved settings; sample bill marked and unnumbered; legal fields cannot be hidden.
+- [x] **P2-13 Dish photos + Photos view** (added 2026-11-04 at the product owner's request, from TiffinPOS) — Accept:
+  photo per dish (resized to WebP in the app, real image bytes only, stored once, in backups); bulk photos matched by
+  file name or code; billing screen List / Photos view per terminal; photos go to the order hub with the menu.
+- [x] **P2-14 Recipe bulk upload** (added 2026-11-04) — Accept: CSV `dish,size,addon,material,quantity` checked line by
+  line against menu and materials; all or none; download current recipes in the same format; KOTs then use them.
 
 ## Phase 3 — Captain app
 

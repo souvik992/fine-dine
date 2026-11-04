@@ -36,6 +36,8 @@ export interface AdminCatalog {
     sort: number;
     variants: Array<{ id: string; name: string; pricePaise: number; sort: number }>;
     addonGroupIds: string[];
+    /** The dish's photo name, or null. */
+    image: string | null;
   }>;
 }
 
@@ -121,7 +123,8 @@ export function getAdminCatalog(db: Db): AdminCatalog {
       }),
     ),
     items: (
-      db.prepare('SELECT * FROM menu_item ORDER BY sort, name COLLATE NOCASE').all() as Array<{
+      db.prepare('SELECT m.*, mi.image_name FROM menu_item m LEFT JOIN menu_item_image mi ON mi.item_id = m.id ORDER BY m.sort, m.name COLLATE NOCASE').all() as Array<{
+        image_name: string | null;
         id: string;
         category_id: string;
         name: string;
@@ -150,6 +153,7 @@ export function getAdminCatalog(db: Db): AdminCatalog {
       sort: i.sort ?? 0,
       variants: (variants.get(i.id) ?? []).map((v) => ({ id: v.id, name: v.name, pricePaise: v.price_paise, sort: v.sort ?? 0 })),
       addonGroupIds: (itemGroups.get(i.id) ?? []).map((l) => l.group_id),
+      image: i.image_name,
     })),
   };
 }

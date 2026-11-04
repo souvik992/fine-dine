@@ -21,6 +21,7 @@ class FakeHub {
   statuses: Array<{ accepting: boolean }> = [];
   actions: Array<{ orderId: string; action: string; key: string; body: unknown }> = [];
   refuse = new Set<string>(); // "orderId/action" answered 409
+  photos = new Map<string, Buffer>();
   private streams: ServerResponse[] = [];
   lastEventIds: string[] = [];
   private seq = 0;
@@ -51,6 +52,12 @@ class FakeHub {
     if (req.headers.authorization !== 'Bearer dk_secret_123456') return this.json(res, 401, { error: { message: 'unknown device' } });
     if (url === '/v1/pos/menu') return this.json(res, 200, { version: this.menus.push((await this.body(req)) as never) });
     if (url === '/v1/pos/status') return this.json(res, 200, { ok: this.statuses.push((await this.body(req)) as never) });
+    if (url === '/v1/pos/images') return this.json(res, 200, { names: [...this.photos.keys()] });
+    const photo = /^\/v1\/pos\/images\/([^/]+)$/.exec(url);
+    if (photo && req.method === 'PUT') {
+      this.photos.set(decodeURIComponent(photo[1]!), Buffer.from(((await this.body(req)) as { dataBase64: string }).dataBase64, 'base64'));
+      return this.json(res, 200, { ok: true });
+    }
     if (url === '/v1/pos/events') {
       this.lastEventIds.push(String(req.headers['last-event-id'] ?? ''));
       res.writeHead(200, { 'content-type': 'text/event-stream' });
@@ -167,6 +174,21 @@ describe('online connector', () => {
     await expect(down.flush()).resolves.toBeUndefined();
     expect(down.status()).toMatchObject({ paired: true, lastError: 'fetch failed' });
     await down.stop();
+  });
+
+  it('dish photos go to the hub with the menu, each once; a hub that lost them gets them again', async () => {
+    const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const send = async (type: string, payload: unknown) =>
+      (await app.inject({ method: 'POST', url: '/v1/commands', headers: { 'x-user-session': owner }, payload: { commandId: newId(), type, payload, createdAt: new Date().toISOString() } })).json<{ ok: boolean; result: { image: string } }>();
+    const { image } = (await send('SetItemImage', { itemId: seedId('item:DM'), dataBase64: PNG })).result;
+    await app.inject({ method: 'POST', url: '/v1/online/pair', headers: { 'x-user-session': owner }, payload: { link: `${hub.url}/connect/ABCD-EFGH` } });
+    await until(() => hub.menus.length > 0, 20_000); // generous: the full suite runs many servers at once
+    expect(hub.photos.get(image)?.equals(Buffer.from(PNG, 'base64'))).toBe(true);
+    const dal = (hub.menus.at(-1) as unknown as { items: Array<{ id: string; image: string | null }> }).items.find((i) => i.id === seedId('item:DM'))!;
+    expect(dal.image).toBe(image);
+    hub.photos.clear(); // the hub was rebuilt
+    await send('SetItemImage', { itemId: seedId('item:PT'), dataBase64: PNG }); // the menu changes: published again
+    await until(() => hub.photos.has(image), 20_000);
   });
 
   it('a price that changed is left for staff (noted), never accepted automatically', async () => {

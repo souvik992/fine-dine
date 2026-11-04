@@ -40,6 +40,7 @@ export interface AdminCatalog {
     sort: number;
     variants: Array<{ id: string; name: string; pricePaise: number; sort: number }>;
     addonGroupIds: string[];
+    image: string | null;
   }>;
 }
 
