@@ -115,6 +115,13 @@ describe('kitchen display', () => {
       { orderId: opened.order!.id, expectedVersion: opened.order!.version },
     );
     const fired = await send('FireKOT', { all: true }, { orderId: opened.order!.id, expectedVersion: added.order!.version });
+    // the floor shows what the kitchen screen says about T2's food
+    const t2Kitchen = async () => (await get<{ tables: Array<{ label: string; kitchen?: { cooking: number; ready: number } }> }>('/v1/floor')).tables.find((t) => t.label === 'T2')!.kitchen;
+    expect(await t2Kitchen()).toBeUndefined(); // Kitchen is not marked for a screen and nothing was bumped there yet
+    // the owner marks Kitchen as a screen station (Settings › Kitchen & printers): its tickets count from now on
+    const kitchen = (await get<{ stations: Array<{ id: string; name: string; printerIds: string[] }> }>('/v1/admin/catalog')).stations.find((x) => x.id === kitchenId)!;
+    expect((await send('UpsertStation', { id: kitchen.id, name: kitchen.name, hasKds: true, printerIds: kitchen.printerIds })).ok).toBe(true);
+    expect(await t2Kitchen()).toMatchObject({ cooking: 1, ready: 0 });
 
     // Live, no refresh: the ticket with its table, guests, note and courses; the all-day count.
     const fresh = page.getByRole('region', { name: 'New' }).locator('[data-kot]');
@@ -141,12 +148,15 @@ describe('kitchen display', () => {
     const board = await get<{ tickets: Array<{ readyAt?: string }> }>(`/v1/kds/tickets?stationId=${kitchenId}`);
     expect(board.tickets.map((t) => Boolean(t.readyAt))).toEqual([true, true]); // the ticket and its slip
     expect(await page.locator('[data-all-day]').count()).toBe(0); // nothing left to cook
+    expect(await t2Kitchen()).toMatchObject({ cooking: 0, ready: 1 }); // ready at the pass: the floor says so
 
     await ready.first().getByRole('button', { name: 'Served' }).click();
     await page.getByRole('status').getByText(/KOT \d{4} served\./).waitFor();
     await expect.poll(() => ready.count()).toBe(0);
+    expect(await t2Kitchen()).toBeUndefined(); // served: nothing waiting
     await page.getByRole('button', { name: 'Undo' }).click();
     await fresh.first().waitFor({ timeout: 5_000 }); // back to New after a mistaken Served
+    expect(await t2Kitchen()).toMatchObject({ cooking: 1, ready: 0 });
     expect((await get<{ tickets: unknown[] }>(`/v1/kds/tickets?stationId=${kitchenId}`)).tickets).toHaveLength(2);
   });
 

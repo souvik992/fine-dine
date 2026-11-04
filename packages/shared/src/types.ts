@@ -160,6 +160,28 @@ export interface FloorTable {
   elapsedMin?: number;
   /** Running total of the open order. */
   amountPaise?: number;
+  /** What the kitchen screens say about this table's food (stations with a screen only); absent when nothing is there. */
+  kitchen?: TableKitchen;
+}
+
+export interface TableKitchen {
+  /** Tickets sent and not yet bumped ready. */
+  cooking: number;
+  /** Tickets bumped ready, not yet served: food waiting at the pass. */
+  ready: number;
+  /** When the oldest cooking ticket was sent (screens count the wait on from it); null when none is cooking. */
+  cookingSince: string | null;
+  /** Minutes it has waited, when the floor was read (null when none is cooking). */
+  waitingMin: number | null;
+  /** That wait against the kitchen screen's own limits (`kds.amberMin` / `kds.redMin`). */
+  level: 'ok' | 'amber' | 'red';
+  amberMin: number;
+  redMin: number;
+}
+
+/** A kitchen wait against its limits (the floor's tile and the server use the same rule). */
+export function kitchenLevel(waitingMin: number | null, limits: { amberMin: number; redMin: number }): TableKitchen['level'] {
+  return waitingMin === null ? 'ok' : waitingMin >= limits.redMin ? 'red' : waitingMin >= limits.amberMin ? 'amber' : 'ok';
 }
 
 export interface FloorSnapshot {

@@ -1,6 +1,6 @@
 import { formatINR, type FloorSnapshot, type FloorTable } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Clock, Lock, Minus, Plus, ReceiptText, TriangleAlert, Users, WifiOff } from 'lucide-react';
+import { BellRing, ChefHat, Clock, Lock, Minus, Plus, ReceiptText, TriangleAlert, Users, WifiOff } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../app-context.js';
 import { Sheet } from '../components/Sheet.js';
@@ -124,6 +124,20 @@ export function TablesScreen() {
                       </span>
                     ) : null}
                   </span>
+                  {t.kitchen ? (
+                    <span className="flex flex-wrap gap-1" data-testid="kitchen-status">
+                      {t.kitchen.ready ? (
+                        <span className="flex items-center gap-1 rounded bg-ok px-1.5 text-xs font-bold text-white" data-testid="kitchen-ready">
+                          <BellRing className="h-3 w-3" /> Ready {t.kitchen.ready}
+                        </span>
+                      ) : null}
+                      {t.kitchen.cooking ? (
+                        <span className={`flex items-center gap-1 rounded px-1.5 text-xs font-bold ${t.kitchen.level === 'red' ? 'bg-danger text-white' : t.kitchen.level === 'amber' ? 'bg-warn text-black' : 'bg-black/10'}`}>
+                          <ChefHat className="h-3 w-3" /> Cooking {t.kitchen.cooking}
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null}
                   {t.billRequest ? (
                     <span className="flex items-center gap-1 text-xs font-bold" data-testid="bill-asked">
                       <ReceiptText className="h-3 w-3" /> Bill asked

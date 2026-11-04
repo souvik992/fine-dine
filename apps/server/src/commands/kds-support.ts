@@ -26,5 +26,5 @@ export const kotLabel = (kot: KotRow) => `KOT ${String(kot.kot_no).padStart(4, '
 /** Audits the change and tells the kitchen screens, the order's viewers and the floor. */
 export function kotStatusChanged(ctx: CommandContext, kot: KotRow, status: KotStatus, action: string, before: Record<string, unknown>): void {
   ctx.audit({ entity: 'kot', entityId: kot.id, action, before, after: { status, kotNo: kot.kot_no, at: ctx.nowIso } });
-  ctx.emit([`station:${kot.station_id}`, `order:${kot.order_id}`, 'kds'], 'kot.status', { kotId: kot.id, orderId: kot.order_id, stationId: kot.station_id, status });
+  ctx.emit([`station:${kot.station_id}`, `order:${kot.order_id}`, 'kds', 'floor'], 'kot.status', { kotId: kot.id, orderId: kot.order_id, stationId: kot.station_id, status });
 }

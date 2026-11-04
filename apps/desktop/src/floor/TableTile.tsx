@@ -1,6 +1,6 @@
 import { initials } from '@dinepos/client';
-import { formatINR, type FloorTable } from '@dinepos/shared';
-import { Ban, CalendarClock, Circle, Flame, ReceiptText, Users } from 'lucide-react';
+import { formatINR, kitchenLevel, type FloorTable } from '@dinepos/shared';
+import { Ban, BellRing, CalendarClock, ChefHat, Circle, Flame, ReceiptText, Users } from 'lucide-react';
 import { bookingTime } from './SeatDialog.js';
 import { forwardRef, type ComponentType, type CSSProperties } from 'react';
 import { formatElapsed, elapsedMinutes, STATE_META, type StateMeta } from './floor-model.js';
@@ -29,7 +29,12 @@ export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile
   const Icon = ICONS[meta.icon];
   const elapsed = formatElapsed(elapsedMinutes(table.since, now));
   const amount = table.amountPaise ? formatINR(table.amountPaise) : '';
-  const label = [table.label, meta.label, table.covers ? `${table.covers} covers` : '', elapsed, amount, table.captainName ? `captain ${table.captainName}` : '', table.billRequest ? 'bill asked' : '', table.booking ? `booked ${bookingTime(table.booking.startsAt)} for ${table.booking.guestName}` : ''].filter(Boolean).join(', ');
+  // the kitchen screens' view of this table's food: the wait counts on here, like the table's own time
+  const k = table.kitchen;
+  const waiting = k?.cookingSince ? elapsedMinutes(k.cookingSince, now) : null;
+  const level = k ? kitchenLevel(waiting, k) : 'ok';
+  const kitchenText = k ? [k.cooking ? `${k.cooking} cooking${waiting !== null ? ` for ${waiting} min` : ''}` : '', k.ready ? `${k.ready} ready to serve` : ''].filter(Boolean).join(', ') : '';
+  const label = [table.label, meta.label, table.covers ? `${table.covers} covers` : '', elapsed, amount, table.captainName ? `captain ${table.captainName}` : '', table.billRequest ? 'bill asked' : '', kitchenText, table.booking ? `booked ${bookingTime(table.booking.startsAt)} for ${table.booking.guestName}` : ''].filter(Boolean).join(', ');
 
   return (
     <button
@@ -68,6 +73,25 @@ export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile
         {table.billRequest ? (
           <div className="flex w-fit items-center gap-1 rounded bg-[var(--bill)] px-1.5 text-xs font-bold text-[var(--bill-ink)]" data-testid="bill-asked">
             <ReceiptText className="h-3.5 w-3.5" aria-hidden /> Bill asked
+          </div>
+        ) : null}
+        {k ? (
+          <div className="flex flex-wrap items-center gap-1" data-testid="kitchen-status">
+            {k.cooking ? (
+              <span
+                className={`flex items-center gap-1 rounded px-1.5 text-xs font-bold ${level === 'red' ? 'bg-danger text-white' : level === 'amber' ? 'bg-warn text-black' : 'bg-black/10'}`}
+                title={`Kitchen: ${k.cooking} ticket${k.cooking === 1 ? '' : 's'} cooking${waiting !== null ? `, oldest ${waiting} min` : ''}`}
+                data-testid="kitchen-cooking"
+              >
+                <ChefHat className="h-3.5 w-3.5" aria-hidden /> Cooking {k.cooking}
+                {waiting !== null ? <span className="tabular-nums">· {waiting}m</span> : null}
+              </span>
+            ) : null}
+            {k.ready ? (
+              <span className="flex items-center gap-1 rounded bg-ok px-1.5 text-xs font-bold text-white" title="Food is ready at the pass: serve it" data-testid="kitchen-ready">
+                <BellRing className="h-3.5 w-3.5" aria-hidden /> Ready {k.ready}
+              </span>
+            ) : null}
           </div>
         ) : null}
         {table.orderId ? (
