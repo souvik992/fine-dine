@@ -48,7 +48,8 @@
 
 @layer components {
   .btn { @apply inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-base font-semibold active:bg-secondary; }
-  .btn-primary { @apply border-transparent bg-primary text-primary-foreground; }
+  /* keeps its own colour while pressed (.btn's active colour is more specific than .btn-primary alone) */
+  .btn-primary { @apply border-transparent bg-primary text-primary-foreground active:bg-primary active:opacity-90; }
   .input { @apply h-12 w-full rounded-lg border border-border bg-card px-3 text-base outline-none focus:border-ring; }
   .tab { @apply h-10 shrink-0 rounded-full px-4 text-sm font-semibold text-muted-foreground; }
   .tab[aria-selected="true"] { @apply bg-foreground text-background; }
