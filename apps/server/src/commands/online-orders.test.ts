@@ -114,6 +114,42 @@ describe('online orders', () => {
     expect(outbox(o.id).map((x) => x.action)).toEqual(['received', 'accept', 'state', 'state', 'state']);
   });
 
+  it('cash on delivery: the payment is taken when delivered or collected (UPI, card, split, cash with change); due or free is refused', () => {
+    const lines = [{ itemId: S.dalMakhani, name: 'Dal Makhani', qtyMilli: 1000, unitPrice: 28_000, modifiers: [], note: null, lineTotal: 0 }];
+    const payments = (billId: string) => h.db.prepare('SELECT mode, amount_paise AS amount, ref FROM payment WHERE bill_id = ? ORDER BY mode').all(billId);
+
+    // pickup, paid by UPI at the counter
+    const a = receive(hubOrder({ lines, fulfilment: 'PICKUP', payment: 'COD', paid: false }));
+    h.run('AcceptOnlineOrder', { onlineOrderId: a.id, prepMinutes: 10 });
+    h.run('AdvanceOnlineOrder', { onlineOrderId: a.id, to: 'READY' });
+    const totalA = h.db.prepare('SELECT total_paise FROM bill WHERE id = ?').pluck().get(row(a.id).bill_id) as number;
+    expect(h.fail('AdvanceOnlineOrder', { onlineOrderId: a.id, to: 'PICKED_UP', tenders: [{ mode: 'due', amountPaise: totalA }] }, 'VALIDATION').message).toMatch(/cancel the order/);
+    expect(h.fail('AdvanceOnlineOrder', { onlineOrderId: a.id, to: 'PICKED_UP', tenders: [{ mode: 'upi', amountPaise: totalA - 100 }] }, 'INVALID_STATE').message).toMatch(/still to be paid/);
+    expect(h.fail('AdvanceOnlineOrder', { onlineOrderId: a.id, to: 'PICKED_UP', tenders: [{ mode: 'card', amountPaise: totalA + 100 }] }, 'VALIDATION').message).toMatch(/Only cash can give change/);
+    expect(row(a.id).state).toBe('READY'); // nothing happened
+    h.run('AdvanceOnlineOrder', { onlineOrderId: a.id, to: 'PICKED_UP', tenders: [{ mode: 'upi', amountPaise: totalA, ref: 'UPI 4411' }] });
+    expect(payments(row(a.id).bill_id!)).toEqual([{ mode: 'upi', amount: totalA, ref: 'UPI 4411' }]);
+    expect(row(a.id).state).toBe('PICKED_UP');
+
+    // delivery, part card part cash, the cash with change
+    const b = receive(hubOrder({ lines, fulfilment: 'DELIVERY', payment: 'COD', paid: false, distanceKm: 2.4, address: { line1: '1 Lake Rd', line2: null, landmark: null, city: 'Kolkata', pincode: '700029' } }));
+    h.run('AcceptOnlineOrder', { onlineOrderId: b.id, prepMinutes: 20 });
+    h.run('AdvanceOnlineOrder', { onlineOrderId: b.id, to: 'READY' });
+    h.fail('AdvanceOnlineOrder', { onlineOrderId: b.id, to: 'OUT_FOR_DELIVERY', rider: { name: 'Raju' }, tenders: [{ mode: 'cash', amountPaise: 100 }] }, 'VALIDATION'); // only when finishing
+    h.run('AdvanceOnlineOrder', { onlineOrderId: b.id, to: 'OUT_FOR_DELIVERY', rider: { name: 'Raju' } });
+    const totalB = h.db.prepare('SELECT total_paise FROM bill WHERE id = ?').pluck().get(row(b.id).bill_id) as number;
+    const res = h.run('AdvanceOnlineOrder', { onlineOrderId: b.id, to: 'DELIVERED', tenders: [{ mode: 'card', amountPaise: 10_000 }, { mode: 'cash', amountPaise: totalB - 10_000 + 5_000 }] });
+    expect(res.result).toEqual({ state: 'DELIVERED', changePaise: 5_000 });
+    expect(payments(row(b.id).bill_id!)).toEqual([{ mode: 'card', amount: 10_000, ref: null }, { mode: 'cash', amount: totalB - 10_000, ref: null }]);
+  });
+
+  it('an order paid online takes no payment when delivered', () => {
+    const o = receive(hubOrder({ fulfilment: 'PICKUP' }));
+    h.run('AcceptOnlineOrder', { onlineOrderId: o.id, prepMinutes: 10 });
+    h.run('AdvanceOnlineOrder', { onlineOrderId: o.id, to: 'READY' });
+    h.fail('AdvanceOnlineOrder', { onlineOrderId: o.id, to: 'PICKED_UP', tenders: [{ mode: 'cash', amountPaise: 100 }] }, 'VALIDATION');
+  });
+
   it('a total the customer was not shown is refused unless staff accept the DinePOS price (then flagged)', () => {
     const o = receive(hubOrder({ total: 100_000 }));
     const err = h.fail('AcceptOnlineOrder', { onlineOrderId: o.id }, 'INVALID_STATE');

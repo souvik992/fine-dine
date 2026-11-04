@@ -163,6 +163,16 @@ describe.skipIf(!hubThere)('online orders through the real order hub', () => {
     expect(view.posTotalPaise).toBe(view.order.total); // DinePOS bills what the customer was shown
     await card.getByRole('button', { name: 'Ready' }).click();
     await card.getByRole('button', { name: 'Collected' }).click();
+    // pay at pickup: how the customer paid (UPI here, with its reference); Due and Comp are not offered
+    const pay = page.getByRole('dialog', { name: /How did the customer pay/ });
+    await pay.getByRole('radio', { name: /UPI/ }).click();
+    expect(await pay.getByRole('radio', { name: /Due|Comp/ }).count()).toBe(0);
+    await pay.getByLabel('Reference 1').fill('UPI 7781');
+    await pay.getByRole('button', { name: /Settle/ }).click();
+    await page.getByText(new RegExp(`${order.number}: collected, paid`)).waitFor();
+    const local = (await get<{ orders: Array<{ number: string; localOrderId: string | null }> }>('/v1/online/orders')).orders.find((o) => o.number === order.number)!.localOrderId;
+    const bill = (await get<{ bills: Array<{ orderId: string; state: string; payments: Array<{ mode: string }> }> }>('/v1/bills')).bills.find((x) => x.orderId === local)!;
+    expect(bill).toMatchObject({ state: 'settled', payments: [expect.objectContaining({ mode: 'upi' })] });
 
     // The customer's view on the hub follows (the outbox delivered every step).
     await until(async () => {

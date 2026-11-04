@@ -4,12 +4,17 @@ import { useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { Modal } from '../components/Modal.js';
 import { paiseToInput, rupeesToPaise } from './money-input.js';
-import type { OrderSession } from './order-session.js';
 
 interface Line {
   mode: TenderMode;
   amount: string;
   ref: string;
+}
+
+export interface Tender {
+  mode: TenderMode;
+  amountPaise: number;
+  ref: string | null;
 }
 
 const MODES: Array<{ mode: TenderMode; label: string; key: string }> = [
@@ -24,23 +29,29 @@ const MODES: Array<{ mode: TenderMode; label: string; key: string }> = [
 /**
  * Settle (F10, docs/09 §3). Type the amount received; letter keys switch the focused line's mode
  * (c cash, k card, u UPI, d due, m complimentary, o other); + adds a line; Enter settles once covered.
- * Remaining and change are shown for the cashier; the server checks and records the payment.
+ * Remaining and change are shown for the cashier; the server checks and records the payment. Also used for a
+ * cash-on-delivery online order when it is delivered or collected (fewer modes, its own command).
  */
 export function SettleDialog({
-  billId,
   billNo,
   totalPaise,
-  session,
+  settle,
+  modes = MODES.map((m) => m.mode),
+  title,
   onDone,
   onClose,
 }: {
-  billId: string;
   billNo: string;
   totalPaise: number;
-  session: OrderSession;
+  /** Sends the payment; resolves with the change to return. */
+  settle: (tenders: Tender[]) => Promise<number>;
+  /** The modes offered (default: all). */
+  modes?: readonly TenderMode[];
+  title?: string;
   onDone: (changePaise: number) => void;
   onClose: () => void;
 }) {
+  const offered = MODES.filter((m) => modes.includes(m.mode));
   const [lines, setLines] = useState<Line[]>([{ mode: 'cash', amount: '', ref: '' }]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +68,7 @@ export function SettleDialog({
 
   const update = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const addLine = () => {
-    setLines((ls) => [...ls, { mode: 'card', amount: remaining ? paiseToInput(remaining) : '', ref: '' }]);
+    setLines((ls) => [...ls, { mode: offered.find((m) => m.mode !== 'cash')?.mode ?? 'cash', amount: remaining ? paiseToInput(remaining) : '', ref: '' }]);
     setTimeout(() => amountRefs.current[lines.length]?.focus(), 0);
   };
 
@@ -67,8 +78,7 @@ export function SettleDialog({
     setError(null);
     try {
       const tenders = lines.map((l, i) => ({ mode: l.mode, amountPaise: amounts[i]!, ref: l.ref.trim() || null })).filter((t) => t.amountPaise > 0);
-      const res = await session.run<{ changePaise: number }>('Settle', { billId, tenders });
-      onDone(res.result.changePaise);
+      onDone(await settle(tenders));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not settle the bill.');
       setBusy(false);
@@ -76,7 +86,7 @@ export function SettleDialog({
   };
 
   return (
-    <Modal title={`Settle ${billNo}`} onClose={onClose}>
+    <Modal title={title ?? `Settle ${billNo}`} onClose={onClose}>
       <div className="mb-4 flex items-baseline justify-between">
         <span className="text-sm text-muted-foreground">Amount due</span>
         <span className="text-3xl font-bold tabular-nums" data-testid="settle-total">
@@ -93,7 +103,7 @@ export function SettleDialog({
           {lines.map((l, i) => (
             <li key={i} className="rounded-lg border border-border p-2">
               <div className="mb-2 flex flex-wrap gap-1" role="radiogroup" aria-label={`Payment ${i + 1} mode`}>
-                {MODES.map((m) => (
+                {offered.map((m) => (
                   <button key={m.mode} type="button" role="radio" aria-checked={l.mode === m.mode} onClick={() => update(i, { mode: m.mode })} className={`h-8 rounded-md px-2.5 text-xs font-bold ${l.mode === m.mode ? 'bg-foreground text-background' : 'bg-secondary'}`}>
                     {m.label} <span className="opacity-60">{m.key}</span>
                   </button>
@@ -112,7 +122,7 @@ export function SettleDialog({
                   value={l.amount}
                   onChange={(e) => update(i, { amount: e.target.value })}
                   onKeyDown={(e) => {
-                    const m = MODES.find((x) => x.key === e.key.toLowerCase());
+                    const m = offered.find((x) => x.key === e.key.toLowerCase());
                     if (m && !e.ctrlKey && !e.altKey) {
                       e.preventDefault();
                       update(i, { mode: m.mode });

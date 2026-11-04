@@ -1,6 +1,7 @@
 // Online orders through the order hub (P4-06). The hub's contract v1 lives in pos-backend/contract; these are the
 // parts DinePOS uses, copied as they are there (field names, states, paise, ms since epoch). Never rename: v1 only adds.
 import { z } from 'zod';
+import { tendersSchema } from './schemas/commands/tenders.js';
 
 export const HUB_ORDER_STATES = [
   'PLACED', 'PAYMENT_PENDING', 'PAYMENT_FAILED', 'SENT_TO_STORE', 'RECEIVED',
@@ -176,6 +177,8 @@ export const advanceOnlineOrderSchema = z
     onlineOrderId,
     to: z.enum(['PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'PICKED_UP']),
     rider: z.object({ name: z.string().trim().min(1).max(60), phone: z.string().trim().max(20).nullable().default(null) }).strict().nullable().default(null),
+    /** A cash-on-delivery order's payment, given with Delivered / Collected (cash, card, UPI, other; split allowed). Absent: all cash. */
+    tenders: tendersSchema.nullable().default(null),
   })
   .strict();
 /** Staff: cancel after accepting — the bill is voided (bill.void, with a manager PIN when the role needs one). */

@@ -32,14 +32,26 @@ export const advanceOnlineOrder = defineCommand({
     }
     if (p.to === 'OUT_FOR_DELIVERY' && !p.rider) throw new PosError('VALIDATION', 'Enter the rider’s name.', { field: 'rider' });
 
-    if ((p.to === 'DELIVERED' || p.to === 'PICKED_UP') && order.payment === 'COD' && oo.local_order_id && oo.bill_id) {
+    const finishing = p.to === 'DELIVERED' || p.to === 'PICKED_UP';
+    if (p.tenders && !(finishing && order.payment === 'COD')) {
+      throw new PosError('VALIDATION', 'A payment is taken only when a cash-on-delivery order is delivered or collected.', { field: 'tenders' });
+    }
+    if (p.tenders?.some((t) => t.mode === 'due' || t.mode === 'complimentary')) {
+      throw new PosError('VALIDATION', 'Take the payment as cash, card, UPI or other. If the customer did not pay, cancel the order instead.', { field: 'tenders' });
+    }
+    // COD: the bill is settled with what the customer paid (as Settle checks it: covered in full, change only from cash);
+    // given no payment, all in cash
+    let changePaise = 0;
+    if (finishing && order.payment === 'COD' && oo.local_order_id && oo.bill_id) {
       const local = loadOrderRow(ctx.db, oo.local_order_id);
       const bill = ctx.db.prepare('SELECT state, total_paise FROM bill WHERE id = ?').get(oo.bill_id) as { state: string; total_paise: number } | undefined;
-      if (local && bill?.state === 'printed') settleBill(ctx, local, oo.bill_id, [{ mode: 'cash', amountPaise: bill.total_paise, ref: null }]);
+      if (local && bill?.state === 'printed') {
+        changePaise = settleBill(ctx, local, oo.bill_id, p.tenders ?? [{ mode: 'cash', amountPaise: bill.total_paise, ref: null }]).changePaise;
+      }
     }
     setOnlineState(ctx, oo.id, p.to, { ...(p.rider ? { rider: p.rider } : {}) });
     enqueueHubAction(ctx, oo.id, 'state', { to: p.to, ...(p.rider ? { rider: p.rider } : {}) }, `st-${oo.id}-${p.to}`);
     ctx.audit({ entity: 'online_order', entityId: oo.id, action: 'online.state', before: { state: oo.state }, after: { state: p.to, rider: p.rider } });
-    return { result: { state: p.to } };
+    return { result: { state: p.to, changePaise } };
   },
 });

@@ -189,7 +189,7 @@ describe('online connector', () => {
     hub.photos.clear(); // the hub was rebuilt
     await send('SetItemImage', { itemId: seedId('item:PT'), dataBase64: PNG }); // the menu changes: published again
     await until(() => hub.photos.has(image), 20_000);
-  });
+  }, 30_000); // a full test run on a busy PC can take longer than the usual 5 s
 
   it('a price that changed is left for staff (noted), never accepted automatically', async () => {
     await app.inject({ method: 'POST', url: '/v1/online/pair', headers: { 'x-user-session': owner }, payload: { link: `${hub.url}/connect/ABCD-EFGH` } });

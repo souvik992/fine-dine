@@ -70,7 +70,7 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 | `SetCaptainSection` | userId, areaIds[], tableIds[] | staff.sections | | replaces the captain's section, `floor.changed` | |
 | `AcceptOnlineOrder` | onlineOrderId, prepMinutes?, acceptPriceChange? | online.orders | | order (type online, no table), KOT, bill, Online payment when paid online; outbox `accept` | |
 | `RejectOnlineOrder` | onlineOrderId, reason (contract REJECT_REASONS), reasonText? | online.orders | | state REJECTED; outbox `reject` | |
-| `AdvanceOnlineOrder` | onlineOrderId, to: PREPARING \| READY \| OUT_FOR_DELIVERY (rider) \| DELIVERED \| PICKED_UP | online.orders | | state; cash settles a COD bill on delivered/picked up; outbox `state` | |
+| `AdvanceOnlineOrder` | onlineOrderId, to: PREPARING \| READY \| OUT_FOR_DELIVERY (rider) \| DELIVERED \| PICKED_UP, tenders? (COD only, with DELIVERED / PICKED_UP: cash, card, UPI, other; split; as Settle checks them) | online.orders | | state; a COD bill is settled on delivered/picked up with the tenders given (none: all cash), `changePaise` in the result; due / complimentary refused; outbox `state` | |
 | `CancelOnlineOrder` | onlineOrderId, reason | bill.void | per role | voids the bill; outbox `state` CANCELLED | |
 | `UnlinkOnlineHub` | — | admin | | forgets the hub link (refused while orders are open) | |
 | `InstallLicence` | key | admin | | licence row; opens a business day when none is open (P2-09) | |

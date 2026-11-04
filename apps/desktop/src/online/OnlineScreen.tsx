@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { Modal } from '../components/Modal.js';
+import { SettleDialog } from '../billing/SettleDialog.js';
 import { board, nextSteps, REJECT_LABEL, STATE_LABEL, timeLeft, type Column } from './online-model.js';
 
 const COLUMNS: Array<[Column, string]> = [
@@ -27,7 +28,7 @@ export function OnlineScreen({ onBack, onOpenOrder }: { onBack: () => void; onOp
   const status = useQuery({ queryKey: ['online'], queryFn: () => api.get<OnlineStatus>('/v1/online'), refetchInterval: 15_000 });
   const [now, setNow] = useState(() => Date.now());
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
-  const [dialog, setDialog] = useState<{ kind: 'reject' | 'rider' | 'cancel'; order: OnlineOrderView } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: 'reject' | 'rider' | 'cancel' | 'payment'; order: OnlineOrderView; to?: 'DELIVERED' | 'PICKED_UP' } | null>(null);
   const [priceOk, setPriceOk] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
@@ -147,7 +148,13 @@ export function OnlineScreen({ onBack, onOpenOrder }: { onBack: () => void; onOp
                 key={to}
                 className="btn h-10"
                 disabled={busy === o.id}
-                onClick={() => (to === 'OUT_FOR_DELIVERY' ? setDialog({ kind: 'rider', order: o }) : void run(o.id, 'AdvanceOnlineOrder', { onlineOrderId: o.id, to }, `${o.number}: ${STEP_LABEL[to].toLowerCase()}.`))}
+                onClick={() =>
+                  to === 'OUT_FOR_DELIVERY'
+                    ? setDialog({ kind: 'rider', order: o })
+                    : (to === 'DELIVERED' || to === 'PICKED_UP') && o.order.payment === 'COD' && o.posTotalPaise !== null
+                      ? setDialog({ kind: 'payment', order: o, to }) // how the customer paid: cash, card, UPI, split
+                      : void run(o.id, 'AdvanceOnlineOrder', { onlineOrderId: o.id, to }, `${o.number}: ${STEP_LABEL[to].toLowerCase()}.`)
+                }
               >
                 {STEP_LABEL[to]}
               </button>
@@ -211,6 +218,24 @@ export function OnlineScreen({ onBack, onOpenOrder }: { onBack: () => void; onOp
 
       {dialog?.kind === 'reject' ? <RejectDialog order={dialog.order} onClose={() => setDialog(null)} onReject={(reason, text) => void run(dialog.order.id, 'RejectOnlineOrder', { onlineOrderId: dialog.order.id, reason, reasonText: text }, `${dialog.order.number} rejected.`).then(() => setDialog(null))} /> : null}
       {dialog?.kind === 'rider' ? <RiderDialog order={dialog.order} onClose={() => setDialog(null)} onSend={(name, phone) => void run(dialog.order.id, 'AdvanceOnlineOrder', { onlineOrderId: dialog.order.id, to: 'OUT_FOR_DELIVERY', rider: { name, phone } }, `${dialog.order.number} is out for delivery.`).then(() => setDialog(null))} /> : null}
+      {dialog?.kind === 'payment' && dialog.to ? (
+        <SettleDialog
+          title={`${dialog.order.number}: ${dialog.order.order.fulfilment === 'PICKUP' ? 'collected' : 'delivered'}. How did the customer pay?`}
+          billNo={dialog.order.billNo ?? dialog.order.number}
+          totalPaise={dialog.order.posTotalPaise!}
+          modes={['cash', 'upi', 'card', 'other']}
+          settle={async (tenders) => {
+            const res = await api.command<{ changePaise: number }>('AdvanceOnlineOrder', { onlineOrderId: dialog.order.id, to: dialog.to, tenders });
+            await Promise.all(['online-orders', 'online', 'floor'].map((k) => qc.invalidateQueries({ queryKey: [k] })));
+            return res.result.changePaise;
+          }}
+          onClose={() => setDialog(null)}
+          onDone={(change) => {
+            setMessage({ text: `${dialog.order.number}: ${STEP_LABEL[dialog.to!].toLowerCase()}, paid.${change ? ` Give back ${formatINR(change)} change.` : ''}` });
+            setDialog(null);
+          }}
+        />
+      ) : null}
       {dialog?.kind === 'cancel' ? <CancelDialog order={dialog.order} onClose={() => setDialog(null)} onCancel={(reason) => void run(dialog.order.id, 'CancelOnlineOrder', { onlineOrderId: dialog.order.id, reason }, `${dialog.order.number} cancelled; its bill is void.`).then(() => setDialog(null))} /> : null}
     </div>
   );

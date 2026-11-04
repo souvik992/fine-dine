@@ -46,3 +46,4 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-04 Installer: Chromium's built-in text in English only (electronLanguages en-US): installed size 453 MB to 405 MB, installer 141 MB to 132 MB
 - 2026-11-04 P2-13 Dish photos: SetItemImage / RemoveItemImage (migration 0014 menu_image, menu_item_image; resized to WebP in the app), Settings › Menu photo per item and Bulk photos matched by file name, billing screen List / Photos view per terminal, photos sent to the order hub with the menu
 - 2026-11-04 P2-14 Recipe bulk upload: ImportRecipes (all or none) from a CSV checked line by line, download of current recipes in the same format, Stock › Recipes › Bulk upload
+- 2026-11-04 Online orders: cash-on-delivery payment taken on Delivered / Collected (cash, UPI, card, other; split; change), with the Settle dialog; AdvanceOnlineOrder takes tenders (none: all cash, as before)

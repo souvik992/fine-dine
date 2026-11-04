@@ -438,10 +438,9 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
       {changing ? <FiredItemDialog item={changing} onClose={() => setChanging(null)} run={run} /> : null}
       {dialog === 'settle' && printedBill ? (
         <SettleDialog
-          billId={printedBill.id}
           billNo={`${printedBill.billNoText ?? 'bill'}${parts.length > 1 ? ` (part ${parts.indexOf(printedBill) + 1} of ${parts.length})` : ''}`}
           totalPaise={printedBill.totalPaise}
-          session={session}
+          settle={async (tenders) => (await session.run<{ changePaise: number }>('Settle', { billId: printedBill.id, tenders })).result.changePaise}
           onClose={() => setDialog(null)}
           onDone={(change) => {
             setDialog(null);

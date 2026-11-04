@@ -5,6 +5,7 @@ import { gstinProblem } from '../../gstin.js';
 import { BILL_PREFIX_RE } from '../../numbering.js';
 import { billDisplaySchema, billLogoSchema } from '../../bill-display.js';
 import { ulidSchema } from '../envelope.js';
+import { tendersSchema } from './tenders.js';
 
 const paise = z.number().int().min(0).max(100_000_000_000);
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -45,27 +46,12 @@ export const printBillSchema = z
   })
   .strict();
 
-export const TENDER_MODES = ['cash', 'card', 'upi', 'due', 'complimentary', 'other'] as const;
-export type TenderMode = (typeof TENDER_MODES)[number];
-/** Every payment mode stored: what a cashier can take, plus 'online' (paid on the website or app, P4-06). */
-export type PaymentMode = TenderMode | 'online';
+export { TENDER_MODES, tendersSchema, type PaymentMode, type TenderMode } from './tenders.js';
 
 export const settleSchema = z
   .object({
     billId: ulidSchema,
-    tenders: z
-      .array(
-        z
-          .object({
-            mode: z.enum(TENDER_MODES),
-            amountPaise: paise.refine((n) => n > 0, 'amount must be more than zero'),
-            /** Card slip / UPI reference, or the reason for a complimentary bill. */
-            ref: text(60).nullable().default(null),
-          })
-          .strict(),
-      )
-      .min(1)
-      .max(10),
+    tenders: tendersSchema,
   })
   .strict()
   .refine((s) => s.tenders.every((t) => t.mode !== 'complimentary' || t.ref !== null), {
