@@ -1,0 +1,49 @@
+@import "tailwindcss";
+@source "./";
+
+:root {
+  --background: oklch(96.5% .008 80);
+  --foreground: oklch(26% .03 50);
+  --card: oklch(99.8% .003 80);
+  --primary: oklch(62% .19 42);
+  --primary-foreground: oklch(99% .01 80);
+  --secondary: oklch(94.5% .015 75);
+  --muted-foreground: oklch(52% .03 55);
+  --border: oklch(90% .015 70);
+  --danger: oklch(55% .22 27);
+  --ok: oklch(58% .14 150);
+  --warn: oklch(72% .16 75);
+  --veg: oklch(55% .15 145);
+  --nonveg: oklch(52% .19 27);
+}
+
+@theme inline {
+  --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-veg: var(--veg);
+  --color-nonveg: var(--nonveg);
+}
+
+@layer base {
+  html, body, #root { min-height: 100%; }
+  body { margin: 0; background: var(--background); color: var(--foreground); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+}
+
+@layer components {
+  .btn { @apply inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold active:bg-secondary; }
+  .btn-primary { @apply border-transparent bg-primary text-primary-foreground active:opacity-90; }
+  .chip { @apply h-9 shrink-0 rounded-full border border-border bg-card px-4 text-sm font-semibold; }
+  .chip[aria-pressed="true"] { @apply border-transparent bg-foreground text-background; }
+}

@@ -13,6 +13,7 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   VERSION_CONFLICT: 409,
   INVALID_STATE: 422,
   DAY_CLOSED: 423,
+  RATE_LIMITED: 429,
   INTERNAL: 500,
 };
 

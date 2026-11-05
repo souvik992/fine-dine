@@ -1,4 +1,4 @@
-import { deriveTableState, isoInZone, type FloorSnapshot, type FloorTable } from '@dinepos/shared';
+import { deriveTableState, isoInZone, type FloorSnapshot, type FloorTable, type TableBadge } from '@dinepos/shared';
 import type { Db } from '../db/connection.js';
 import { getConfig } from '../core/outlet-config.js';
 import { sectionCaptains } from '../commands/captain-support.js';
@@ -29,7 +29,7 @@ const opt = <T>(v: T | null): T | undefined => (v === null ? undefined : v);
 const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
 
 /** Areas and tables with derived state (docs/02 deriveTableState), elapsed time and running amount. */
-export function getFloor(db: Db, now: Date, timeZone: string): FloorSnapshot {
+export function getFloor(db: Db, now: Date, timeZone: string, badges?: () => Map<string, TableBadge[]>): FloorSnapshot {
   const areas = db.prepare('SELECT id, name, sort FROM area ORDER BY sort, name COLLATE NOCASE').all() as FloorSnapshot['areas'];
   const areaOrder = new Map(areas.map((a, i) => [a.id, i]));
 
@@ -85,6 +85,12 @@ export function getFloor(db: Db, now: Date, timeZone: string): FloorSnapshot {
     return table;
   });
 
+  // P5-01: add-ons' marks (e.g. "QR order")
+  const marks = badges?.();
+  if (marks?.size) for (const t of tables) {
+    const b = marks.get(t.id);
+    if (b?.length) t.badges = b;
+  }
   tables.sort(
     (a, b) => (areaOrder.get(a.areaId) ?? 0) - (areaOrder.get(b.areaId) ?? 0) || collator.compare(a.label, b.label),
   );

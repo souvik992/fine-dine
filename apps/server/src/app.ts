@@ -9,9 +9,16 @@ import fastifyWebsocket from '@fastify/websocket';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import { ulid } from 'ulid';
 import { sessionAuth, type Authenticator } from './auth/authenticate.js';
-import { commandRegistry } from './commands/registry.js';
+import { commandRegistry, coreHandlers } from './commands/registry.js';
+import type { AddonSet } from './addons/loader.js';
+import { addonRoutes } from './routes/addons.js';
+import { getFloor } from './queries/floor.js';
+import { getMenu } from './queries/menu.js';
+import { getOrderSnapshot } from './queries/order-snapshot.js';
+import { getConfig } from './core/outlet-config.js';
+import { lanAddresses } from './banner.js';
 import { DEFAULT_ALLOWED_ORIGINS } from './config.js';
-import type { CommandRegistry } from './core/command-handler.js';
+import { createRegistry, type CommandRegistry } from './core/command-handler.js';
 import type { DeviceKind } from './core/context.js';
 import { unenforcedGate, type LicenceGate } from './licence/gate.js';
 import { PosError } from './core/errors.js';
@@ -67,6 +74,10 @@ export interface AppDeps {
   licence?: LicenceGate;
   /** P4-06 / P4-05: how the connector and the sync agent reach the order hub (tests pass a fake). */
   onlineFetch?: typeof fetch;
+  /** P5-01: the signed add-ons loaded at start (server.ts); absent when none. */
+  addons?: AddonSet;
+  /** The port the server listens on (add-ons print it in links such as table QR codes). */
+  port?: number;
 }
 
 // Secrets never reach the log (docs/07-security-licensing.md).
@@ -106,6 +117,8 @@ export function buildApp(deps: AppDeps): DinePosApp {
       if (req.method === 'OPTIONS' || url === '/v1/health' || url === '/v1/stream' || url.startsWith('/v1/pairing-requests')) return done();
       // The apps' files; their API calls carry a token.
       if (url === '/captain' || url.startsWith('/captain/') || url === '/kds' || url.startsWith('/kds/')) return done();
+      // P5-01: add-ons' guest pages and guest API (public, rate limited) and their signed screens
+      if (url.startsWith('/a/')) return done();
       if (trustLoopback && isLoopback(req.ip)) {
         req.deviceId = MASTER_DEVICE_ID;
         req.deviceKind = 'master';
@@ -168,19 +181,34 @@ export function buildApp(deps: AppDeps): DinePosApp {
   const licenceGate = deps.licence ?? unenforcedGate();
   healthRoutes(app, { db, timeZone, now, startedAt, backupStatus: deps.backups ? () => deps.backups!.scheduler.status() : undefined, licence: () => licenceGate.status(db, now()) });
   licenceRoutes(app, { db, now, licence: licenceGate });
-  queryRoutes(app, { db, timeZone, now, printerStatus: deps.printQueue ? (id) => deps.printQueue!.status(id) : undefined, printerError: deps.printQueue ? (id) => deps.printQueue!.error?.(id) : undefined });
+  const addons = deps.addons;
+  queryRoutes(app, { db, timeZone, now, badges: addons ? () => addons.badges() : undefined, printerStatus: deps.printQueue ? (id) => deps.printQueue!.status(id) : undefined, printerError: deps.printQueue ? (id) => deps.printQueue!.error?.(id) : undefined });
   const executeDeps: ExecuteDeps = {
       db,
       timeZone,
       now,
-      registry: deps.registry ?? commandRegistry,
+      registry: deps.registry ?? (addons?.commands().length ? createRegistry([...coreHandlers, ...addons.commands()]) : commandRegistry),
       rights: deps.rights ?? roleRights,
       bus,
       printWaker: deps.printWaker ?? noopPrintWaker,
       licence: licenceGate,
       onPostCommitError: (err, stage) => app.log.error({ err, stage }, 'post-commit step failed'),
     };
-  commandRoutes(app, executeDeps, deps.auth ?? sessionAuth(db, now));
+  const auth = deps.auth ?? sessionAuth(db, now);
+  commandRoutes(app, executeDeps, auth);
+  if (addons) {
+    addons.bind({
+      execute: (body, actor) => executeCommand(executeDeps, body, actor),
+      floor: () => getFloor(db, now(), timeZone, () => addons.badges()),
+      menu: () => getMenu(db),
+      order: (orderId) => getOrderSnapshot(db, orderId) ?? null,
+      config: () => getConfig(db),
+      network: () => ({ addresses: lanAddresses(), port: deps.port ?? 0 }),
+      newId,
+    });
+    addonRoutes(app, { db, addons, auth, rights: executeDeps.rights });
+    app.addHook('onClose', async () => addons.stop());
+  }
 
   // P4-06: online orders through the order hub. Started by the server (server.ts); idle unless switched on and paired.
   const execute: Execute = (type, payload, actor = SYSTEM_ACTOR) =>

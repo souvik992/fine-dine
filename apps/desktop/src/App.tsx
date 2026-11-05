@@ -18,13 +18,18 @@ import { FloorScreen } from './floor/FloorScreen.js';
 import { SettingsScreen } from './settings/SettingsScreen.js';
 import { ReportsScreen } from './reports/ReportsScreen.js';
 import { StockScreen } from './stock/StockScreen.js';
+import { AddonView, useAddonLoader, useAddonRegistrations } from './addons/runtime.js';
 
-type Screen = { kind: 'floor' } | { kind: 'settings'; section?: string } | { kind: 'stock' } | { kind: 'reports' } | { kind: 'bookings' } | { kind: 'online' } | { kind: 'order'; orderId: string };
+type Screen = { kind: 'floor' } | { kind: 'settings'; section?: string } | { kind: 'stock' } | { kind: 'reports' } | { kind: 'bookings' } | { kind: 'online' } | { kind: 'order'; orderId: string } | { kind: 'addon'; id: string };
 
 export function App() {
   const { api, session, needsPairing, can } = useApp();
   const [screen, setScreen] = useState<Screen>({ kind: 'floor' });
   const toFloor = () => setScreen({ kind: 'floor' });
+  // P5-01: add-on screens (loaded after sign-in, signature checked by this terminal)
+  useAddonLoader();
+  const addonRegs = useAddonRegistrations();
+  const addonNav = { openOrder: (orderId: string) => setScreen({ kind: 'order', orderId }), back: toFloor };
   // Public: first-run setup or the staff list. Refetched whenever nobody is signed in.
   const setup = useQuery({ queryKey: ['setup-state'], queryFn: () => api.get<SetupState>('/v1/setup-state'), enabled: !session, retry: 1 });
 
@@ -69,7 +74,9 @@ export function App() {
 
   return (
     <>
-      {screen.kind === 'order' ? (
+      {screen.kind === 'addon' && addonRegs.find(([id]) => id === screen.id)?.[1].nav ? (
+        <AddonView id={screen.id} reg={addonRegs.find(([id]) => id === screen.id)![1]} Comp={addonRegs.find(([id]) => id === screen.id)![1].nav!.Screen} nav={addonNav} />
+      ) : screen.kind === 'order' ? (
         <BillingScreen key={screen.orderId} orderId={screen.orderId} onBack={toFloor} />
       ) : screen.kind === 'stock' ? (
         <StockScreen onBack={toFloor} />
@@ -80,8 +87,9 @@ export function App() {
       ) : screen.kind === 'bookings' ? (
         <BookingsScreen onBack={toFloor} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} />
       ) : (
-        <FloorScreen onSettings={() => setScreen({ kind: 'settings' })} onStock={() => setScreen({ kind: 'stock' })} onReports={() => setScreen({ kind: 'reports' })} onBookings={() => setScreen({ kind: 'bookings' })} onOnline={() => setScreen({ kind: 'online' })} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} />
+        <FloorScreen onSettings={() => setScreen({ kind: 'settings' })} onStock={() => setScreen({ kind: 'stock' })} onReports={() => setScreen({ kind: 'reports' })} onBookings={() => setScreen({ kind: 'bookings' })} onOnline={() => setScreen({ kind: 'online' })} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} addonNav={addonRegs.flatMap(([id, r]) => (r.nav && (!r.nav.right || can(r.nav.right)) ? [{ id, label: r.nav.label, title: r.nav.title, open: () => setScreen({ kind: 'addon', id }) }] : []))} />
       )}
+      {addonRegs.map(([id, r]) => (r.overlay ? <AddonView key={id} id={id} reg={r} Comp={r.overlay} nav={addonNav} /> : null))}
       <OnlineAlerts onOpen={() => setScreen({ kind: 'online' })} hidden={screen.kind === 'online'} />
       <BillRequests onOpen={(orderId) => setScreen({ kind: 'order', orderId })} hiddenOrderId={screen.kind === 'order' ? screen.orderId : undefined} compact={screen.kind !== 'floor'} />
       <LicenceBanner onOpen={can('admin') ? () => setScreen({ kind: 'settings', section: 'licence' }) : undefined} />

@@ -1,0 +1,33 @@
+{
+  "name": "@dinepos/addon-tableqr",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Table QR add-on for DinePOS: guests scan the code on their table to see the menu, order, call a waiter, ask for the bill and pay by UPI.",
+  "type": "module",
+  "dinepos": {
+    "id": "tableqr",
+    "name": "Table QR",
+    "commandPrefix": "TableQr",
+    "minPosVersion": "0.1.0",
+    "rights": ["order.create", "order.edit", "kot.fire"]
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "installer": "node scripts/build.mjs && node scripts/installer.mjs",
+    "test": "vitest run --root ../.. addons/tableqr/"
+  },
+  "dependencies": {
+    "@dinepos/shared": "0.1.0",
+    "qrcode-generator": "1.4.4",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "tailwindcss": "^4.3.3"
+  }
+}

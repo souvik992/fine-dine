@@ -24,7 +24,7 @@ export interface RightsPolicy {
  * PC can too, so a screen opened on the master itself works. Audited with the device, no user. `system` (the server's
  * hub connector, P4-06) auto-accepts online orders when the outlet chose automatic accepting.
  */
-export const DEVICE_RIGHTS: Record<DeviceKind, readonly Right[]> = { kds: ['kds.bump'], master: ['kds.bump'], terminal: [], captain: [], system: ['online.orders'] };
+export const DEVICE_RIGHTS: Record<DeviceKind, readonly Right[]> = { kds: ['kds.bump'], master: ['kds.bump'], terminal: [], captain: [], system: ['online.orders'], addon: [] };
 
 /** Grants every right. Tests and tools only; the server uses `roleRights`. */
 export const allowAllRights: RightsPolicy = {
@@ -38,6 +38,11 @@ export const allowAllRights: RightsPolicy = {
 export const roleRights: RightsPolicy = {
   check({ db, actor, right }) {
     if (!actor.userId) {
+      // P5-01: an add-on's own actor may use the rights its signed manifest lists, nothing else
+      if (actor.deviceKind === 'addon') {
+        if (actor.addonRights?.includes(right)) return undefined;
+        throw forbidden(right);
+      }
       if (actor.deviceKind && DEVICE_RIGHTS[actor.deviceKind].includes(right)) return undefined;
       throw new PosError('UNAUTHENTICATED', 'Please sign in.');
     }

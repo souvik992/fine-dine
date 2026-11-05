@@ -18,6 +18,8 @@ import { applyPendingRestore } from './backup/backups.js';
 import { BackupScheduler } from './backup/scheduler.js';
 import { getConfig } from './core/outlet-config.js';
 import { SERVER_VERSION } from './version.js';
+import { loadAddons } from './addons/loader.js';
+import { coreHandlers } from './commands/registry.js';
 
 export interface RunningServer {
   app: FastifyInstance;
@@ -45,6 +47,9 @@ export interface StartOptions {
   /** Override printer transports (tests). Defaults: fake → data/prints, tcp, Windows spooler. */
   transports?: PrintQueueOptions['transports'];
   printBackoffMs?: number[];
+  /** P5-01: where add-ons are installed (default <dataDir>/addons, or DINEPOS_ADDONS_DIR) and the keys trusted (tests). */
+  addonsDir?: string;
+  addonTrustKeys?: Readonly<Record<string, string>>;
   /** Print the start-up banner (addresses, data folder) to the console: the server window. */
   banner?: boolean;
   /** Called when a restore was staged: the caller stops this server and starts it again (index.ts). */
@@ -105,7 +110,20 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
       intervalMs: opts.backupIntervalMs,
       log: (level, msg, data) => logSink.log?.(level, msg, data),
     });
+    // P5-01: signed add-ons, checked before any of their code runs; a failing one is switched off, DinePOS starts anyway
+    const addons = loadAddons({
+      db,
+      dir: opts.addonsDir ?? process.env.DINEPOS_ADDONS_DIR ?? path.join(config.dataDir, 'addons'),
+      dataDir: config.dataDir,
+      posVersion: SERVER_VERSION,
+      timeZone: config.timeZone,
+      now,
+      reservedTypes: new Set(coreHandlers.map((h) => h.type)),
+      ...(opts.addonTrustKeys ? { trustKeys: opts.addonTrustKeys } : {}),
+    });
     const app = buildApp({
+      addons,
+      port: config.port,
       db,
       timeZone: config.timeZone,
       now,
@@ -120,6 +138,10 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
       licence,
     });
     logSink.log = (level, msg, data) => app.log[level](data ?? {}, msg);
+    for (const a of addons.infos()) {
+      if (a.status === 'on') app.log.info({ addon: a.id, version: a.version }, 'add-on loaded');
+      else app.log.warn({ addon: a.id, reason: a.error }, 'add-on switched off');
+    }
     const url = await app.listen({ host: config.host, port: config.port });
     printQueue.start();
     printQueue.startMonitor(); // printer status between tickets: a printer switched off shows red without a failed print

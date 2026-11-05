@@ -1,6 +1,6 @@
 import type { FloorSnapshot, FloorTable } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Banknote, ChartColumn, MoonStar, ReceiptText, RefreshCw, Search, Settings, ShoppingBag } from 'lucide-react';
+import { Banknote, ChartColumn, MoonStar, Puzzle, ReceiptText, RefreshCw, Search, Settings, ShoppingBag } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
@@ -38,6 +38,7 @@ export function FloorScreen({
   onReports,
   onBookings,
   onOnline,
+  addonNav = [],
   onOpenOrder,
 }: {
   onSettings: () => void;
@@ -45,6 +46,8 @@ export function FloorScreen({
   onReports: () => void;
   onBookings: () => void;
   onOnline: () => void;
+  /** P5-01: add-on screens, as buttons in the top bar. */
+  addonNav?: Array<{ id: string; label: string; title?: string; open: () => void }>;
   onOpenOrder: (orderId: string) => void;
 }) {
   const { api, pinRequest, can } = useApp();
@@ -201,6 +204,11 @@ export function FloorScreen({
             <ShoppingBag className="h-4 w-4" /> Online
           </button>
         ) : null}
+        {addonNav.map((a) => (
+          <button key={a.id} className="btn h-10" onClick={a.open} title={a.title ?? a.label} data-addon-nav={a.id}>
+            <Puzzle className="h-4 w-4" /> {a.label}
+          </button>
+        ))}
         {can('bill.settle') ? (
           <button className="btn h-10" onClick={() => setPanel('bills')} title="Today's bills: reprint or void">
             <ReceiptText className="h-4 w-4" /> Bills

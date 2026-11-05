@@ -36,7 +36,7 @@ export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile
   const waiting = k?.cookingSince ? elapsedMinutes(k.cookingSince, now) : null;
   const level = k ? kitchenLevel(waiting, k) : 'ok';
   const kitchenText = k ? [k.cooking ? `${k.cooking} cooking${waiting !== null ? ` for ${waiting} min` : ''}` : '', k.ready ? `${k.ready} ready to serve` : ''].filter(Boolean).join(', ') : '';
-  const label = [table.label, meta.label, table.covers ? `${table.covers} covers` : '', elapsed, amount, table.captainName ? `captain ${table.captainName}` : '', table.billRequest ? 'bill asked' : '', kitchenText, table.booking ? `booked ${bookingTime(table.booking.startsAt)} for ${table.booking.guestName}` : ''].filter(Boolean).join(', ');
+  const label = [table.label, meta.label, table.covers ? `${table.covers} covers` : '', elapsed, amount, table.captainName ? `captain ${table.captainName}` : '', table.billRequest ? 'bill asked' : '', kitchenText, table.booking ? `booked ${bookingTime(table.booking.startsAt)} for ${table.booking.guestName}` : '', ...(table.badges ?? []).map((b) => b.label)].filter(Boolean).join(', ');
 
   return (
     <button
@@ -75,6 +75,15 @@ export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile
         {table.billRequest ? (
           <div className="flex w-fit items-center gap-1 rounded bg-[var(--bill)] px-1.5 text-xs font-bold text-[var(--bill-ink)]" data-testid="bill-asked">
             <ReceiptText className="h-3.5 w-3.5" aria-hidden /> Bill asked
+          </div>
+        ) : null}
+        {table.badges?.length ? (
+          <div className="flex flex-wrap items-center gap-1" data-testid="table-badges">
+            {table.badges.map((b) => (
+              <span key={`${b.addonId}:${b.key}`} className={`rounded px-1.5 text-xs font-bold ${b.tone === 'alert' ? 'animate-pulse bg-danger text-white' : b.tone === 'warn' ? 'bg-warn text-black' : 'bg-black/10'}`} data-badge={`${b.addonId}:${b.key}`}>
+                {b.label}
+              </span>
+            ))}
           </div>
         ) : null}
         {k ? (

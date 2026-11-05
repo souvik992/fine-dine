@@ -203,3 +203,16 @@ The button shows how many materials are low or need a count. Tabs:
   "Waiting"/"Late" written too, lines by course with add-ons and notes, CHANGED/CANCELLED bands, a big **Ready**
   button), **Ready** (Served, and Back to New), **All day** counts; "Undo" after Served. Settings › Kitchen &
   printers on a terminal shows the address to open and the amber/red minutes.
+
+## Add-ons (P5-01) and Table QR (P5-02 / P5-04)
+- Settings › Add-ons: each installed add-on, On or Off with the reason (not signed, changed, too new, older version…).
+- An add-on may add a floor top-bar button, a Settings section and an always-on overlay (`window.__DINEPOS__.register`);
+  a crashing add-on screen shows a message in its own area only.
+- Table QR (`addons/tableqr`): floor button **Table QR** (requests, newest waiting first, who handled each); corner
+  alerts with a chime on every screen (Accept · send KOT / Reject with a reason / On my way · done / Money received ·
+  settle UPI / Not received); tile marks **QR order**, **Waiter called** (red, pulsing), **Paid? ₹…** (amber), also on the
+  captain app; Settings › Table QR (switch on, accepting, UPI, address in the codes, welcome line, codes per table, New
+  code, Print codes on A4).
+- Guest page (phone, `/a/tableqr/?t=`): menu with photos, search and categories; dish sheet (size, extras, note,
+  quantity); cart with the number of guests when the table is not seated; **My table**: requests and their state, the
+  running bill with tax, Call waiter, Ask for bill, and once printed Pay with a UPI app / I have paid.

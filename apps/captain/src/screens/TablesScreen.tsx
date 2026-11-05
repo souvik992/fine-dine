@@ -124,6 +124,15 @@ export function TablesScreen() {
                       </span>
                     ) : null}
                   </span>
+                  {t.badges?.length ? (
+                    <span className="flex flex-wrap gap-1" data-testid="table-badges">
+                      {t.badges.map((b) => (
+                        <span key={`${b.addonId}:${b.key}`} className={`rounded px-1.5 text-xs font-bold ${b.tone === 'alert' ? 'animate-pulse bg-danger text-white' : b.tone === 'warn' ? 'bg-warn text-black' : 'bg-black/10'}`} data-badge={`${b.addonId}:${b.key}`}>
+                          {b.label}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
                   {t.kitchen ? (
                     <span className="flex flex-wrap gap-1" data-testid="kitchen-status">
                       {t.kitchen.ready ? (

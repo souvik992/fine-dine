@@ -1,5 +1,5 @@
 import type { Right } from '@dinepos/shared';
-import { ArrowLeft, ChefHat, CloudUpload, DatabaseBackup, KeyRound, LayoutGrid, MapPinned, MonitorSmartphone, ShoppingBag, ReceiptText, Store, Users, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, ChefHat, CloudUpload, DatabaseBackup, KeyRound, LayoutGrid, MapPinned, MonitorSmartphone, Puzzle, ShoppingBag, ReceiptText, Store, Users, UtensilsCrossed } from 'lucide-react';
 import { useState, type ComponentType } from 'react';
 import { useApp } from '../app-context.js';
 import { UserBadge } from '../components/UserBadge.js';
@@ -16,8 +16,10 @@ import { LicenceSettings } from './LicenceSettings.js';
 import { OnlineSettings } from './OnlineSettings.js';
 import { StaffSettings } from './StaffSettings.js';
 import { TerminalSettings } from './TerminalSettings.js';
+import { AddonsSettings } from './AddonsSettings.js';
+import { AddonView, useAddonRegistrations } from '../addons/runtime.js';
 
-type SectionKey = 'outlet' | 'bill' | 'backups' | 'devices' | 'floor' | 'menu' | 'kitchen' | 'staff' | 'sections' | 'licence' | 'online' | 'sync' | 'terminal';
+type SectionKey = 'outlet' | 'bill' | 'backups' | 'devices' | 'floor' | 'menu' | 'kitchen' | 'staff' | 'sections' | 'licence' | 'online' | 'sync' | 'addons' | 'terminal' | `addon:${string}`;
 
 const SECTIONS: Array<{ key: SectionKey; label: string; hint: string; icon: ComponentType<{ className?: string }>; right: Right | null }> = [
   { key: 'outlet', label: 'Outlet & bills', hint: 'Name, GSTIN, bill number, round-off, UPI', icon: Store, right: 'admin' },
@@ -32,13 +34,18 @@ const SECTIONS: Array<{ key: SectionKey; label: string; hint: string; icon: Comp
   { key: 'online', label: 'Online orders', hint: 'Order hub, delivery, charges, hours', icon: ShoppingBag, right: 'admin' },
   { key: 'sync', label: 'Cloud sync', hint: 'Sales sent to the hub; licence renewals', icon: CloudUpload, right: 'admin' },
   { key: 'licence', label: 'Licence', hint: 'Key, end date, seats; this PC’s hardware id', icon: KeyRound, right: 'admin' },
+  { key: 'addons', label: 'Add-ons', hint: 'Installed add-ons and whether each is on', icon: Puzzle, right: 'admin' },
   { key: 'terminal', label: 'This terminal', hint: 'Outlet server address', icon: MonitorSmartphone, right: null },
 ];
 
 /** Settings (like Tiffin POS): one section at a time, each shown only to roles that may change it. */
 export function SettingsScreen({ onBack, initial }: { onBack: () => void; initial?: string }) {
   const { session, can } = useApp();
-  const visible = SECTIONS.filter((s) => s.right === null || (session && can(s.right)));
+  // P5-01: add-ons' own settings sections, after DinePOS's
+  const addonRegs = useAddonRegistrations();
+  const addonSections = addonRegs.flatMap(([id, r]) => (r.settings ? [{ key: `addon:${id}` as SectionKey, label: r.settings.label, hint: r.settings.hint ?? 'Add-on', icon: Puzzle, right: r.settings.right ?? 'admin' }] : []));
+  const all = [...SECTIONS.slice(0, -1), ...addonSections, SECTIONS[SECTIONS.length - 1]!];
+  const visible = all.filter((s) => s.right === null || (session && can(s.right)));
   const [active, setActive] = useState<SectionKey>(visible.find((s) => s.key === initial)?.key ?? visible[0]!.key);
   const current = visible.find((s) => s.key === active) ?? visible[0]!;
 
@@ -83,6 +90,12 @@ export function SettingsScreen({ onBack, initial }: { onBack: () => void; initia
           {current.key === 'licence' ? <LicenceSettings /> : null}
           {current.key === 'online' ? <OnlineSettings /> : null}
           {current.key === 'sync' ? <CloudSyncSettings /> : null}
+          {current.key === 'addons' ? <AddonsSettings /> : null}
+          {current.key.startsWith('addon:')
+            ? addonRegs
+                .filter(([id, r]) => `addon:${id}` === current.key && r.settings)
+                .map(([id, r]) => <AddonView key={id} id={id} reg={r} Comp={r.settings!.Screen} nav={{ openOrder: () => onBack(), back: onBack }} />)
+            : null}
           {current.key === 'terminal' ? <TerminalSettings onSaved={onBack} /> : null}
         </main>
       </div>

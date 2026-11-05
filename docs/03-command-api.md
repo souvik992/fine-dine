@@ -46,6 +46,7 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 | `VERSION_CONFLICT` | 409 | expectedVersion behind; current snapshot returned |
 | `INVALID_STATE` | 422 | e.g. firing on a settled order, moving to an occupied table |
 | `DAY_CLOSED` | 423 | business date closed |
+| `RATE_LIMITED` | 429 | too many requests from one address (P5-01: add-on guest API) |
 | `LICENSE` | 402 | licence expired beyond grace / seat limit |
 | `DUPLICATE` | 200 | replay of an already processed commandId; the original success body with `"duplicate": true` (the order snapshot is the one from the first run; refetch for current state). Replays work even after the day closed. Reusing a commandId for a different type/order/payload is `VALIDATION` |
 | `INTERNAL` | 500 | unexpected server fault; message is generic, details only in the server log |
@@ -159,6 +160,7 @@ table close with the last part (result `unpaidParts`).
 | `/v1/waitlist` | P4-04: guests still waiting, first come first, with `waitedMin` and `quotedMin` |
 | `/v1/kds/tickets?stationId=` | P4-02: `KdsBoard` — station, `amberMin`/`redMin`, today's unserved tickets of the station as printed (docs/06 KDS) |
 | `/v1/network` | P4-02: `{ urls }` — `http://<lan-ip>:<port>` addresses phones and kitchen screens can open |
+| `/v1/addons` | P5-01: the add-ons found and whether each is on (`AddonInfo[]`). An add-on's staff routes are under `/v1/addons/<id>/…` (signed in, with the route's right); its guest pages and API under `/a/<id>/…` (public, rate limited); its signed screens at `/a/<id>/_pkg/…` (ADR-0004) |
 | `/v1/reports/:name?from=&to=` | P4-03 (`apps/server/src/reports/catalog.ts`, right `reports.view`): a `ReportTable` (columns, rows, totals, summary; money in paise) over business dates, default today, at most a year. `GET /v1/reports` lists them: daily, items, categories, areas, tables, gst, payments, cash, discounts, voids, kot-changes, kitchen (P4-02: kitchen speed per station, with served and time at the pass), kitchen-hours, kitchen-dishes, kitchen-tickets (kitchen by hour, dish prep times, ticket log), captains (P3-05: per captain of the order — tables served, guests, net sales, per cover, average bill, dishes sent, average stay, changes after the KOT; settled orders only, orders without a captain last) |
 | `/v1/audit?from=&to=&leakage=1&card=&before=&limit=` | P4-01 (`reports.view`): `{ entries: [{ seq, at, label, ref, amountPaise, reason, leakage, by, approvedBy, device }], next }`, newest first; `card` narrows to one leakage card; dates are the outlet's calendar days |
 | `/v1/leakage?from=&to=` | P4-01 (`reports.view`): `{ cards: [{ key, label, hint, count, amountPaise, actions }], unbilled: { orders, items, amountPaise } }` |

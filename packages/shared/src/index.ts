@@ -1,4 +1,5 @@
 // Shared types, schemas and pure helpers used by the server and every client.
+export * from './addons.js';
 export * from './bill-calc.js';
 export * from './bill-display.js';
 export * from './gstin.js';

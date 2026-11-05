@@ -1,4 +1,4 @@
-import { isIsoDate, localDate, MENU_PHOTO_NAME, ulidSchema, type CaptainSection, type CaptainSections } from '@dinepos/shared';
+import { isIsoDate, localDate, MENU_PHOTO_NAME, ulidSchema, type CaptainSection, type CaptainSections, type TableBadge } from '@dinepos/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { lanAddresses } from '../banner.js';
@@ -19,6 +19,8 @@ export interface QueryDeps {
   now: () => Date;
   printerStatus?: (printerId: string) => PrinterStatus | undefined;
   printerError?: (printerId: string) => string | undefined;
+  /** P5-01: add-ons' marks on floor tiles. */
+  badges?: () => Map<string, TableBadge[]>;
 }
 
 const menuQuery = z
@@ -27,7 +29,7 @@ const menuQuery = z
 
 export function queryRoutes(app: FastifyInstance, deps: QueryDeps): void {
   app.get('/v1/floor', (_req, reply) => {
-    void reply.header('cache-control', 'no-store').send(getFloor(deps.db, deps.now(), deps.timeZone));
+    void reply.header('cache-control', 'no-store').send(getFloor(deps.db, deps.now(), deps.timeZone, deps.badges));
     return reply;
   });
 

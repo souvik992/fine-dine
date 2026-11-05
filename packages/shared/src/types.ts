@@ -1,4 +1,5 @@
 // Wire types shared by the server and every client (docs/03-command-api.md).
+import type { TableBadge } from './addons.js';
 import type { Right } from './rights.js';
 import type { TableState } from './table-state.js';
 import type { PricingMode } from './tax.js';
@@ -14,6 +15,7 @@ export const ERROR_CODES = [
   'VERSION_CONFLICT',
   'INVALID_STATE',
   'DAY_CLOSED',
+  'RATE_LIMITED',
   'INTERNAL',
 ] as const;
 
@@ -162,6 +164,8 @@ export interface FloorTable {
   amountPaise?: number;
   /** What the kitchen screens say about this table's food (stations with a screen only); absent when nothing is there. */
   kitchen?: TableKitchen;
+  /** P5-01: marks put on the tile by add-ons (e.g. "QR order"); absent when none. */
+  badges?: TableBadge[];
 }
 
 export interface TableKitchen {

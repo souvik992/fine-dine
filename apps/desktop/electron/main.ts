@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, Menu, protocol, session, shell, type MenuItemConstructorOptions } from 'electron';
 import { CSP, isAppUrl, resolveAppFile, SCHEME, START_URL } from './protocol.js';
+import { ADDON_FILES, loadAddonFile, parseAddonUrl } from './addons.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const RENDERER_DIR = path.join(here, '..', 'dist-renderer');
@@ -56,6 +57,17 @@ function createWindow(): BrowserWindow {
 }
 
 async function serveApp(request: Request): Promise<Response> {
+  // P5-01: an add-on's screens, fetched from the outlet server and run only once this terminal checked the signature
+  const addon = isAppUrl(request.url) ? parseAddonUrl(request.url) : null;
+  if (addon) {
+    try {
+      const bytes = await loadAddonFile(addon);
+      return new Response(bytes, { headers: { 'content-type': ADDON_FILES[addon.file], 'x-content-type-options': 'nosniff', 'cache-control': 'no-cache' } });
+    } catch (e) {
+      console.warn(`add-on ${addon.id} screens refused: ${e instanceof Error ? e.message : String(e)}`);
+      return new Response('Refused', { status: 403 });
+    }
+  }
   const hit = resolveAppFile(request.url, RENDERER_DIR);
   if (!hit) return new Response('Not found', { status: 404 });
   try {

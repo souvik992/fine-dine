@@ -54,3 +54,5 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-05 Kitchen screen header: Served today, average to ready and late count for the station's day; Reports › Kitchen: Kitchen speed adds served and time at the pass, new Kitchen by hour, Dish prep times and Kitchen ticket log
 - 2026-11-05 DinePOS Kitchen: Ctrl+Shift+M minimizes the kitchen screen (full screen again when restored)
 - 2026-11-05 Printer status checked every 30 s between tickets (network: connect only; USB: Windows queue state), so a printer off or unplugged shows red with the reason before the next ticket fails
+- 2026-11-05 P5-01 Signed add-ons (ADR-0004): loader (signature, folder, version, fingerprints, anti-rollback), own tables and commands, staff and guest routes, floor tile badges, terminal screens checked by the terminal itself, Settings › Add-ons
+- 2026-11-05 P5-02 / P5-04 / P5-05 Table QR add-on (addons/tableqr): codes per table and a print sheet, guest menu and ordering, staff or automatic accepting, call waiter, ask for bill, running bill, UPI payment confirmed by the cashier; alerts and tile marks; DinePOS-TableQR-Setup installer

@@ -1,0 +1,34 @@
+/* Table QR screens in the terminal. Utilities carry the qr: prefix, so they never collide with (or outrank) the
+   terminal's own classes; colours come from the terminal's tokens (its :root variables). */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme) prefix(qr);
+@import "tailwindcss/utilities.css" layer(utilities) prefix(qr);
+@source "./";
+
+@theme inline {
+  --font-display: "Fraunces", Georgia, serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+}
+
+/* The printable sheet of table codes: hidden on screen, the only thing printed. */
+.tableqr-print { display: none; }
+@media print {
+  @page { margin: 10mm; }
+  body * { visibility: hidden !important; }
+  .tableqr-print, .tableqr-print * { visibility: visible !important; }
+  .tableqr-print { display: grid !important; position: absolute; left: 0; top: 0; width: 100%; grid-template-columns: repeat(2, 1fr); gap: 8mm; background: #fff; color: #000; }
+  .tableqr-card { break-inside: avoid; border: 1px dashed #999; border-radius: 4mm; padding: 6mm; text-align: center; font-family: system-ui, sans-serif; }
+  .tableqr-card img { width: 55mm; height: 55mm; image-rendering: pixelated; }
+  .tableqr-outlet { font-size: 14pt; font-weight: 700; margin: 0 0 2mm; }
+  .tableqr-table { font-size: 22pt; font-weight: 800; margin: 2mm 0 1mm; }
+  .tableqr-hint { font-size: 9pt; margin: 0; }
+}

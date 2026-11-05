@@ -115,3 +115,23 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria �
 - [x] **P4-04 Reservations + waitlist (blocks tables)**
 - [x] **P4-05 Cloud sync agent (outbox up, menu/licence down)**
 - [x] **P4-06 Online orders relay (own website first)**
+
+## Phase 5 — Add-ons
+
+- [x] **P5-01 Signed add-on platform** (ADR-0004): loader with Ed25519 signature, folder = id, minPosVersion, file
+  fingerprints, anti-rollback; add-on database steps on its own tables only; add-on commands through the pipeline
+  (`internal` for its own code); staff routes `/v1/addons/<id>`, guest pages and API `/a/<id>` (rate limited); floor tile
+  badges; the add-on's own actor limited to its signed rights; terminal screens loaded only after the terminal checks the
+  signature itself (nav, settings, overlay); Settings › Add-ons. Accept: a tampered, unsigned, too new, older or failing
+  add-on is switched off with a reason and DinePOS starts; its writes are audited commands.
+- [x] **P5-02 Table QR add-on (outlet Wi-Fi)** (`addons/tableqr`): a code per table (renewable) and a printable sheet;
+  guest menu, cart and order; accepting by staff (default) or straight to the kitchen; call waiter; ask for the bill; the
+  running bill; alerts with a chime on every terminal screen; marks on the floor tiles (desktop and captain). Accept: an
+  accepted order is seated, added and fired once (retries never repeat food); prices always from the server.
+- [ ] **P5-03 Table QR through the order hub**: the same guest page served by the hub, so phones on mobile data can order;
+  requests relayed over the existing hub connection (the outlet still accepts no incoming internet connections).
+- [x] **P5-04 Guest UPI payment (staff confirms)**: once the bill is printed the guest's UPI app opens with the outlet's UPI
+  id and the exact amount; "I have paid" marks the table; a cashier with `bill.settle` confirms and the bill is settled as
+  UPI ("Table QR").
+- [x] **P5-05 Add-on installer**: `DinePOS-TableQR-Setup-<version>.exe` (NSIS, administrator) copies the signed package to
+  `C:\ProgramData\DinePOS\addons\tableqr`; uninstall keeps its data.

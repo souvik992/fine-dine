@@ -68,6 +68,14 @@ POST /v1/commands
   → 200 { ok: true, order: snapshot, version }
 ```
 
+## Add-ons (P5-01, ADR-0004)
+Separately installed, signed modules in `<dataDir>/addons/<id>/` (first: Table QR). The server checks each one at start
+(signature, folder, version, every file) and runs it inside itself: own `<id>_` tables, own commands through the same
+pipeline, staff routes under `/v1/addons/<id>`, public guest pages and API under `/a/<id>`, marks on floor tiles. A
+failing add-on is switched off with a reason; DinePOS always starts. Terminals load an add-on's screens only after
+checking the same signature themselves. Code: `apps/server/src/addons/`, `apps/desktop/electron/addons.ts`,
+`apps/desktop/src/addons/runtime.tsx`, `addons/<id>/`.
+
 ## Ports and discovery
 - Server listens on `0.0.0.0:7420` (configurable). Static IP recommended for the master.
 - mDNS advertisement `_dinepos._tcp` as a convenience; clients also accept a typed IP.

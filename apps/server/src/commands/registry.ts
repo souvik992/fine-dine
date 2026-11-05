@@ -1,5 +1,5 @@
 // type → handler. One handler per file in this folder; add each new command here (see /add-command).
-import { createRegistry, type CommandRegistry } from '../core/command-handler.js';
+import { createRegistry, type CommandHandler, type CommandRegistry } from '../core/command-handler.js';
 import { acceptOnlineOrder } from './accept-online-order.js';
 import { advanceOnlineOrder } from './advance-online-order.js';
 import { applyHubEvent } from './apply-hub-event.js';
@@ -75,7 +75,7 @@ import { upsertTable } from './upsert-table.js';
 import { voidBill } from './void-bill.js';
 import { voidPurchase } from './void-purchase.js';
 
-const handlers = [
+export const coreHandlers: readonly CommandHandler<unknown, unknown>[] = [
   // admin
   upsertArea,
   upsertTable,
@@ -165,4 +165,4 @@ const handlers = [
   dayEnd,
 ];
 
-export const commandRegistry: CommandRegistry = createRegistry(handlers);
+export const commandRegistry: CommandRegistry = createRegistry(coreHandlers);

@@ -5,14 +5,14 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/dist-*/**', '**/.tsbuild/**', '**/release/**', '**/.stage/**', '**/build-cache/**', '**/out/**', '**/coverage/**', '**/node_modules/**', '**/data/**'],
+    ignores: ['**/dist/**', '**/dist-*/**', '**/.tsbuild/**', '**/release/**', '**/.stage/**', '**/build-cache/**', '**/out/**', '**/coverage/**', '**/node_modules/**', '**/data/**', '**/.build/**', 'addons/*/scripts/*.d.mts'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
     languageOptions: {
       parserOptions: {
-        projectService: { allowDefaultProject: ['*.js', '*.ts', 'apps/*/scripts/*.mjs', 'apps/*/*.config.ts'] },
+        projectService: { allowDefaultProject: ['*.js', '*.ts', 'apps/*/scripts/*.mjs', 'addons/*/scripts/*.mjs', 'apps/*/*.config.ts'] },
         tsconfigRootDir: import.meta.dirname,
       },
       globals: { ...globals.node },

@@ -7,7 +7,7 @@ import type { Db } from '../db/connection.js';
  * P4-02: what kind of device sent the request; `master` = the master PC itself (loopback). `system` = the server's own
  * order-hub connector (P4-06): never set from an HTTP request.
  */
-export type DeviceKind = 'terminal' | 'captain' | 'kds' | 'master' | 'system';
+export type DeviceKind = 'terminal' | 'captain' | 'kds' | 'master' | 'system' | 'addon';
 
 export interface Actor {
   deviceId: string | null;
@@ -19,6 +19,9 @@ export interface Actor {
   managerPin?: string | null;
   /** Identifies the session for the wrong-manager-PIN limiter (a hash, not the token). */
   sessionKey?: string | null;
+  /** P5-01: an add-on's own actor (made by the server, never sent by a client) and the rights its signed manifest lists. */
+  addonId?: string;
+  addonRights?: readonly Right[];
 }
 
 /** What a manager's PIN must cover (see auth/approval.ts). */

@@ -138,3 +138,17 @@ records the device and no user. Terminals and phones always need a staff sign-in
 `online_link` on the master (not in `/v1/config`, never sent to a terminal). Plain `http://` is refused except to a hub on
 the same PC. The connector acts as device `system`, whose only right is `online.orders` (automatic accepting); no HTTP
 request can carry that kind.
+
+## Add-ons (P5-01, ADR-0004)
+- Only packages signed with a key in `ADDON_TRUST_KEYS` (`packages/shared/src/addons.ts`) load; every file's SHA-256 is
+  checked and only the checked bytes run; an older version than one already run is refused. The terminal checks the
+  signature of an add-on's screens itself before running them (the server cannot make it run unsigned code).
+- Signing key: `%USERPROFILE%\.dinepos\addon-signing\private.pem` (created 2026-11-05). Never in the repository; back it
+  up offline. Leaked: remove it from `ADDON_TRUST_KEYS` and release DinePOS. Lost: no trusted updates until a release adds
+  a new key.
+- A signed add-on is fully trusted inside the server (no sandbox). Safety nets: database steps only on `<id>_` tables;
+  read-only database access outside its commands; its own actor limited to the rights in its signed manifest; staff
+  routes signed in with the route's right; guest routes public, rate limited (`RATE_LIMITED`), strict CSP.
+- Table QR: table codes are 18 random bytes, renewable per table (the old printed code stops at once); guests are never
+  signed in; at most 5 requests waiting per table; prices always from the server; a UPI payment settles only when a
+  cashier with `bill.settle` confirms it.
