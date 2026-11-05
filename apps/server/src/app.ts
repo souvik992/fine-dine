@@ -47,7 +47,7 @@ export interface AppDeps {
   bus?: EventBus;
   printWaker?: PrintWaker;
   /** Live printer status for GET /v1/printers. */
-  printQueue?: { status(printerId: string): PrinterStatus | undefined };
+  printQueue?: { status(printerId: string): PrinterStatus | undefined; error?(printerId: string): string | undefined };
   /** Browser origins allowed for CORS and the stream. */
   allowedOrigins?: readonly string[];
   hub?: HubOptions;
@@ -168,7 +168,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
   const licenceGate = deps.licence ?? unenforcedGate();
   healthRoutes(app, { db, timeZone, now, startedAt, backupStatus: deps.backups ? () => deps.backups!.scheduler.status() : undefined, licence: () => licenceGate.status(db, now()) });
   licenceRoutes(app, { db, now, licence: licenceGate });
-  queryRoutes(app, { db, timeZone, now, printerStatus: deps.printQueue ? (id) => deps.printQueue!.status(id) : undefined });
+  queryRoutes(app, { db, timeZone, now, printerStatus: deps.printQueue ? (id) => deps.printQueue!.status(id) : undefined, printerError: deps.printQueue ? (id) => deps.printQueue!.error?.(id) : undefined });
   const executeDeps: ExecuteDeps = {
       db,
       timeZone,

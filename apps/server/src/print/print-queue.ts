@@ -48,6 +48,8 @@ class PrinterWorker {
   private timer: NodeJS.Timeout | null = null;
   private wakeAgain = false;
   status: PrinterStatus = 'ok';
+  /** Why the printer is not ok (the last failed job or status check); null when ok. */
+  error: string | null = null;
 
   constructor(
     private readonly q: PrintQueue,
@@ -123,6 +125,8 @@ export class PrintQueue implements PrintWaker {
   private readonly workers = new Map<string, PrinterWorker>();
   private idleWaiters: Array<() => void> = [];
   private readonly now: () => Date;
+  private monitor: NodeJS.Timeout | null = null;
+  private checking: Promise<void> | null = null;
 
   constructor(private readonly opts: PrintQueueOptions) {
     this.backoffMs = opts.backoffMs ?? [2_000, 5_000, 15_000];
@@ -136,21 +140,76 @@ export class PrintQueue implements PrintWaker {
   }
 
   wake(printerIds: readonly string[]): void {
-    for (const id of new Set(printerIds)) {
-      let w = this.workers.get(id);
-      if (!w) {
-        w = new PrinterWorker(this, id);
-        this.workers.set(id, w);
-      }
-      w.kick();
-    }
+    for (const id of new Set(printerIds)) this.worker(id).kick();
   }
 
   /** Stops new sends, cancels backoff timers and waits for tickets being sent right now. */
   async stop(): Promise<void> {
     this.stopped = true;
+    if (this.monitor) clearInterval(this.monitor);
+    this.monitor = null;
     for (const w of this.workers.values()) w.cancelTimer();
-    await Promise.all([...this.workers.values()].map((w) => w.waitCurrent()));
+    await Promise.all([...[...this.workers.values()].map((w) => w.waitCurrent()), this.checking]);
+  }
+
+  /** Checks every printer now and then every `intervalMs`, so a printer switched off shows before the next ticket. */
+  startMonitor(intervalMs = 30_000): void {
+    if (this.monitor || this.stopped) return;
+    void this.checkPrinters();
+    this.monitor = setInterval(() => void this.checkPrinters(), intervalMs);
+    this.monitor.unref();
+  }
+
+  /**
+   * The status check between jobs (docs/06 "Printer status"): asks each printer whose transport can be checked
+   * whether it is there, without printing. A printer with jobs waiting is left to the worker (its sends say it).
+   * A change (down, or back) is a `print.status` event like one from a job. Never rejects.
+   */
+  checkPrinters(): Promise<void> {
+    this.checking ??= this.runChecks().finally(() => (this.checking = null));
+    return this.checking;
+  }
+
+  private async runChecks(): Promise<void> {
+    const printers = this.opts.db.prepare('SELECT * FROM printer').all() as PrinterRow[];
+    const waiting = new Set(this.opts.db.prepare(`SELECT DISTINCT printer_id FROM print_job WHERE state IN ('queued', 'retry')`).pluck().all() as string[]);
+    await Promise.all(
+      printers.map(async (p) => {
+        const transport = this.transportFor(p);
+        if (!transport?.probe || waiting.has(p.id) || this.workers.get(p.id)?.busy) return;
+        let error: string | null = null;
+        try {
+          await transport.probe(target(p));
+        } catch (err) {
+          error = err instanceof Error ? err.message : String(err);
+        }
+        if (this.stopped) return;
+        const w = this.worker(p.id);
+        if (w.busy) return; // a ticket started meanwhile: its result is the truth
+        const status: PrinterStatus = error ? 'offline' : 'ok';
+        if (status === w.status && error === w.error) return;
+        const changed = status !== w.status;
+        w.status = status;
+        w.error = error;
+        if (!changed) return;
+        if (error) this.opts.log?.('warn', 'printer not answering the status check', { printerId: p.id, error });
+        else this.opts.log?.('info', 'printer answering again', { printerId: p.id });
+        try {
+          this.publish(this.tx(() => [this.statusEvent(p.id, status, error, this.now())]));
+        } catch (err) {
+          this.opts.log?.('error', 'printer status not recorded', { printerId: p.id, err: String(err) });
+        }
+      }),
+    ).catch((err: unknown) => this.opts.log?.('error', 'printer status check failed', { err: String(err) }));
+  }
+
+  private worker(id: string): PrinterWorker {
+    let w = this.workers.get(id);
+    if (!w) {
+      w = new PrinterWorker(this, id);
+      this.workers.set(id, w);
+    }
+    return w;
   }
 
   /** Resolves when no printer is sending or waiting to retry (tests, graceful shutdown). */
@@ -162,6 +221,11 @@ export class PrintQueue implements PrintWaker {
   /** Live status of a printer this run has used; undefined when it has not printed since start. */
   status(printerId: string): PrinterStatus | undefined {
     return this.workers.get(printerId)?.status;
+  }
+
+  /** Why the printer is not ok, as this run last saw it (failed job or status check). */
+  error(printerId: string): string | undefined {
+    return this.workers.get(printerId)?.error ?? undefined;
   }
 
   // ---- used by workers ----
@@ -199,6 +263,7 @@ export class PrintQueue implements PrintWaker {
       return w.status === 'ok' ? [] : [this.statusEvent(job.printer_id, 'ok', null, at)];
     });
     w.status = 'ok';
+    w.error = null;
     this.publish(events);
   }
 
@@ -210,6 +275,7 @@ export class PrintQueue implements PrintWaker {
     });
     if (w.status === 'ok') this.opts.log?.('warn', 'printer not responding; will retry', { printerId: job.printer_id, jobId: job.id, error });
     w.status = w.status === 'offline' ? 'offline' : 'retrying';
+    w.error = error;
     this.publish(events);
   }
 
@@ -237,6 +303,7 @@ export class PrintQueue implements PrintWaker {
       return out;
     });
     w.status = 'offline';
+    w.error = error;
     this.opts.log?.('error', 'print job failed', { printerId: job.printer_id, jobId: job.id, error, reroutedTo: backupId });
     this.publish(events);
     if (backupId) this.wake([backupId]);

@@ -11,7 +11,7 @@ version.
 - The window may show only that server's pages and this app's setup page; other links and new windows are refused,
   and every permission request (camera, microphone, location) is denied.
 - Server not there (main PC starting, network down): the setup page says why and tries again every 10 s.
-- Keys: Ctrl+Shift+S setup page · F5 reload · Ctrl+Shift+Q close.
+- Keys: Ctrl+Shift+S setup page · F5 reload · Ctrl+Shift+M minimize (to the taskbar; full screen again when restored) · Ctrl+Shift+Q close.
 
 ## Commands
 - `npm run start -w @dinepos/kitchen` — run from source (a normal window).

@@ -203,6 +203,19 @@ export function KdsScreen({ stationId, onChangeStation }: { stationId: string; o
         <span className="text-sm text-muted-foreground">
           {fresh.length} to cook · {ready.length} ready
         </span>
+        {data?.today ? (
+          <span className="flex items-center gap-3 rounded-full border border-border px-3 py-1 text-sm" aria-label={`Today: ${data.today.served} served${data.today.avgReadySec !== null ? `, average ${ageText(data.today.avgReadySec)} to ready` : ''}`}>
+            <span className="flex items-center gap-1 font-bold" data-testid="served-today">
+              <UtensilsCrossed className="h-4 w-4" /> Served today {data.today.served}
+            </span>
+            {data.today.avgReadySec !== null ? (
+              <span className="text-muted-foreground" data-testid="avg-ready">
+                Avg to ready <span className="font-mono font-bold tabular-nums text-foreground">{ageText(data.today.avgReadySec)}</span>
+              </span>
+            ) : null}
+            {data.today.late ? <span className="font-bold text-warn">{data.today.late} late</span> : null}
+          </span>
+        ) : null}
         {stream !== 'live' ? (
           <span role="status" className="flex items-center gap-1 rounded-full bg-warn px-3 py-1 text-sm font-bold text-black">
             <WifiOff className="h-4 w-4" /> Offline: new tickets may be missing

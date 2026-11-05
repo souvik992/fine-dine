@@ -1,5 +1,5 @@
 import net from 'node:net';
-import type { PrintRequest, Transport } from './types.js';
+import type { PrinterTarget, PrintRequest, Transport } from './types.js';
 
 export interface TcpOptions {
   /** Limit for connecting and flushing every byte (docs/06: 5 s). */
@@ -20,6 +20,10 @@ export class TcpTransport implements Transport {
   constructor(opts: TcpOptions = {}) {
     this.timeoutMs = opts.timeoutMs ?? 5_000;
     this.settleMs = opts.settleMs ?? 1_500;
+  }
+
+  probe(printer: PrinterTarget): Promise<void> {
+    return probeTcp(printer, Math.min(this.timeoutMs, 3_000));
   }
 
   send({ printer, bytes }: PrintRequest): Promise<void> {
@@ -59,6 +63,28 @@ export class TcpTransport implements Transport {
       });
     });
   }
+}
+
+/** Opens a connection to the printer and closes it at once: nothing is sent, nothing prints. */
+export function probeTcp(printer: PrinterTarget, timeoutMs: number): Promise<void> {
+  const host = printer.host?.trim();
+  const port = printer.port ?? 9100;
+  if (!host) return Promise.reject(new Error(`Printer "${printer.name}" has no network address. Set it in Settings, Printers.`));
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const socket = net.connect({ host, port });
+    const done = (err?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      socket.destroy();
+      if (err) reject(err);
+      else resolve();
+    };
+    const timer = setTimeout(() => done(new Error(`Printer "${printer.name}" (${host}:${port}) is not answering. Check that it is on and connected.`)), timeoutMs);
+    socket.once('connect', () => done());
+    socket.once('error', (e: NodeJS.ErrnoException) => done(new Error(describe(printer.name, host, port, e))));
+  });
 }
 
 function describe(name: string, host: string, port: number, e: NodeJS.ErrnoException): string {

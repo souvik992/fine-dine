@@ -1,6 +1,6 @@
 // The kitchen screen's board (P4-02, docs/06 "KDS"): one station's tickets of the business day that are not served
 // yet, oldest first, exactly as printed (kot_document) plus their timings.
-import { isoInZone, type KdsBoard, type KdsTicket } from '@dinepos/shared';
+import { isoInZone, type KdsBoard, type KdsTicket, type KdsToday } from '@dinepos/shared';
 import { currentBusinessDate } from '../core/business-day.js';
 import { PosError } from '../core/errors.js';
 import { getConfig } from '../core/outlet-config.js';
@@ -53,5 +53,20 @@ export function getKdsBoard(db: Db, stationId: string, now: Date, timeZone: stri
     };
   });
   const amberMin = config['kds.amberMin'];
-  return { serverTime: isoInZone(now, timeZone), station, amberMin, redMin: Math.max(config['kds.redMin'], amberMin + 1), tickets };
+  const today = day ? stationDay(db, station.id, day, amberMin) : { served: 0, bumped: 0, avgReadySec: null, late: 0 };
+  return { serverTime: isoInZone(now, timeZone), station, amberMin, redMin: Math.max(config['kds.redMin'], amberMin + 1), tickets, today };
+}
+
+/** The station's tickets of the business day (change slips and move notices left out): served, bumped, speed. */
+function stationDay(db: Db, stationId: string, day: string, amberMin: number): KdsToday {
+  const r = db
+    .prepare(
+      `SELECT sum(CASE WHEN served_at IS NOT NULL THEN 1 ELSE 0 END) AS served,
+              sum(CASE WHEN ready_at IS NOT NULL THEN 1 ELSE 0 END) AS bumped,
+              avg(CASE WHEN ready_at IS NOT NULL THEN (julianday(ready_at) - julianday(fired_at)) * 86400 END) AS avgSec,
+              sum(CASE WHEN ready_at IS NOT NULL AND round((julianday(ready_at) - julianday(fired_at)) * 86400) > ? * 60 THEN 1 ELSE 0 END) AS late
+       FROM kot WHERE station_id = ? AND business_date = ? AND kind = 'new'`,
+    )
+    .get(amberMin, stationId, day) as { served: number | null; bumped: number | null; avgSec: number | null; late: number | null };
+  return { served: r.served ?? 0, bumped: r.bumped ?? 0, avgReadySec: r.avgSec === null ? null : Math.round(r.avgSec), late: r.late ?? 0 };
 }

@@ -430,7 +430,7 @@ describe('reports (P4-03)', () => {
     const cashier = (await login(ids.cashier, '1111')).body.token;
     expect((await app.inject({ method: 'GET', url: '/v1/reports', headers: { 'x-user-session': cashier } })).statusCode).toBe(403);
     const list = (await app.inject({ method: 'GET', url: '/v1/reports', headers: { 'x-user-session': manager } })).json<{ reports: unknown[]; businessDate: string }>();
-    expect(list.reports).toHaveLength(13);
+    expect(list.reports).toHaveLength(16);
     const daily = await app.inject({ method: 'GET', url: '/v1/reports/daily?from=2026-11-01&to=2026-11-02', headers: { 'x-user-session': manager } });
     expect(daily.json()).toMatchObject({ key: 'daily', from: '2026-11-01', to: '2026-11-02', rows: [] });
     expect((await app.inject({ method: 'GET', url: '/v1/reports/daily?from=x', headers: { 'x-user-session': manager } })).statusCode).toBe(400);

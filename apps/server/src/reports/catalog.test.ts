@@ -48,8 +48,8 @@ describe('reports v1', () => {
   const settled = () => bills.filter((b) => b.state === 'settled');
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
-  it('lists 13 reports', () => {
-    expect(REPORTS.map((r) => r.key)).toEqual(['daily', 'items', 'categories', 'areas', 'tables', 'gst', 'payments', 'cash', 'discounts', 'voids', 'kot-changes', 'captains', 'kitchen']);
+  it('lists 16 reports', () => {
+    expect(REPORTS.map((r) => r.key)).toEqual(['daily', 'items', 'categories', 'areas', 'tables', 'gst', 'payments', 'cash', 'discounts', 'voids', 'kot-changes', 'captains', 'kitchen', 'kitchen-hours', 'kitchen-dishes', 'kitchen-tickets']);
   });
 
   it('daily sales: settled bills only; the void is counted apart', () => {

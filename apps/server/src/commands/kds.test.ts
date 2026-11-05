@@ -89,10 +89,63 @@ describe('kitchen display', () => {
     h.db.prepare('UPDATE kot SET fired_at = ? WHERE id = ?').run(new Date(TEST_NOW().getTime() - 750_000).toISOString(), kotId);
     const r = runReport(h.db, 'kitchen', '2026-11-02', '2026-11-02', 'Asia/Kolkata');
     expect(r.rows).toEqual([
-      { station: 'Kitchen', tickets: 1, avg: '12 min 30 s', slowest: '12 min 30 s', late: 1, onTime: '0%', notBumped: 0 },
-      { station: 'Tandoor', tickets: 0, avg: '', slowest: '', late: 0, onTime: '', notBumped: 1 },
+      { station: 'Kitchen', tickets: 1, avg: '12 min 30 s', slowest: '12 min 30 s', late: 1, onTime: '0%', served: 0, atPass: '', notBumped: 0 },
+      { station: 'Tandoor', tickets: 0, avg: '', slowest: '', late: 0, onTime: '', served: 0, atPass: '', notBumped: 1 },
     ]);
     expect(r.columns.find((c) => c.key === 'late')!.label).toBe('Over 10 min');
     expect(r.totals).toMatchObject({ tickets: 1, late: 1, notBumped: 1, avg: '12 min 30 s' });
+  });
+
+  const at = (msAgo: number) => new Date(TEST_NOW().getTime() - msAgo).toISOString();
+  const times = (id: string, fired: number, ready: number | null, served: number | null) =>
+    h.db.prepare('UPDATE kot SET fired_at = ?, ready_at = ?, served_at = ? WHERE id = ?').run(at(fired), ready === null ? null : at(ready), served === null ? null : at(served), id);
+  const tandoorKot = () => h.db.prepare('SELECT id FROM kot WHERE order_id = ? AND station_id = ?').pluck().get(orderId, S.tandoor) as string;
+
+  it('the board counts the station’s day: served, bumped, average to ready and late', () => {
+    expect(board().today).toEqual({ served: 0, bumped: 0, avgReadySec: null, late: 0 });
+    h.run('MarkKotReady', { kotId });
+    h.run('MarkKotServed', { kotId });
+    times(kotId, 900_000, 300_000, 60_000); // 10 min to ready (not over 10), 4 min at the pass
+    expect(board().today).toEqual({ served: 1, bumped: 1, avgReadySec: 600, late: 0 });
+    times(kotId, 960_000, 300_000, 60_000); // 11 min: late
+    expect(board().today).toMatchObject({ late: 1, avgReadySec: 660 });
+    expect(board(S.tandoor).today).toEqual({ served: 0, bumped: 0, avgReadySec: null, late: 0 }); // per station
+  });
+
+  it('kitchen speed: served and the average wait at the pass (a ticket served without a first bump has none)', () => {
+    h.run('MarkKotServed', { kotId });
+    h.run('MarkKotServed', { kotId: tandoorKot() });
+    times(kotId, 600_000, 300_000, 60_000);
+    const r = runReport(h.db, 'kitchen', '2026-11-02', '2026-11-02', 'Asia/Kolkata');
+    expect(r.rows.map((x) => [x.station, x.served, x.atPass])).toEqual([
+      ['Kitchen', 1, '4 min 00 s'],
+      ['Tandoor', 1, ''],
+    ]);
+    expect(r.totals).toMatchObject({ served: 2, atPass: '4 min 00 s' });
+  });
+
+  it('kitchen by hour, dish prep times and the ticket log', () => {
+    h.run('MarkKotServed', { kotId });
+    times(kotId, 720_000, 300_000, 60_000); // 7 min to ready, 4 min at the pass, 11 min sent to served
+    const hours = runReport(h.db, 'kitchen-hours', '2026-11-02', '2026-11-02', 'Asia/Kolkata');
+    expect(hours.rows).toHaveLength(1);
+    expect(hours.rows[0]).toMatchObject({ sent: 2, bumped: 1, served: 1, avg: '7 min 00 s', late: 0 });
+    expect(String(hours.rows[0]!.hour)).toMatch(/^\d\d:00–\d\d:00$/);
+
+    const dishes = runReport(h.db, 'kitchen-dishes', '2026-11-02', '2026-11-02', 'Asia/Kolkata');
+    expect(dishes.rows).toEqual([
+      { dish: 'Dal Makhani', station: 'Kitchen', qty: 2, tickets: 1, avg: '7 min 00 s', slowest: '7 min 00 s', late: 0 },
+      { dish: 'Butter Naan', station: 'Tandoor', qty: 1, tickets: 0, avg: '', slowest: '', late: 0 },
+    ]);
+
+    const log = runReport(h.db, 'kitchen-tickets', '2026-11-02', '2026-11-02', 'Asia/Kolkata');
+    const kitchenRow = log.rows.find((x) => x.station === 'Kitchen')!;
+    expect(kitchenRow).toMatchObject({ table: 'T1', dishes: '2 × Dal Makhani', qty: 2, toReady: '7 min 00 s', atPass: '4 min 00 s', total: '11 min 00 s', status: 'Served' });
+    expect(log.rows.find((x) => x.station === 'Tandoor')).toMatchObject({ status: 'Never bumped', toReady: '' });
+    expect(log.summary).toEqual([
+      { label: 'Tickets', value: 2, type: 'int' },
+      { label: 'Served', value: 1, type: 'int' },
+      { label: 'Never bumped', value: 1, type: 'int' },
+    ]);
   });
 });

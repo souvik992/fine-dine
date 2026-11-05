@@ -7,7 +7,7 @@
 // never prints after half a ticket. "Success" means the spooler accepted every byte, not that paper came out.
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-import type { PrintRequest, Transport } from './types.js';
+import type { PrinterTarget, PrintRequest, Transport } from './types.js';
 
 export interface SpoolRequest {
   printerName: string;
@@ -75,14 +75,47 @@ $data = [Convert]::FromBase64String([Console]::In.ReadToEnd().Trim())
 [Console]::Out.Write([DinePosRawPrint]::Send($env:DINEPOS_SPOOL_PRINTER, $data, $env:DINEPOS_SPOOL_DOC))
 `;
 
+/**
+ * The status check (no printing): what Windows knows about the queue. The printer name comes in an environment
+ * variable. Prints "MISSING", or "STATE <offline> <status> <extended> <error> <present>" (numbers; present = the
+ * queue's device is plugged in, 1 when Windows does not say).
+ */
+export const PROBE_SCRIPT = `$ErrorActionPreference = 'Stop'
+$n = $env:DINEPOS_SPOOL_PRINTER
+$p = Get-CimInstance Win32_Printer | Where-Object { $_.Name -eq $n } | Select-Object -First 1
+if (-not $p) { [Console]::Out.Write('MISSING'); exit 0 }
+$present = 1
+try {
+  $q = Get-PnpDevice -Class PrintQueue -ErrorAction Stop | Where-Object { $_.FriendlyName -eq $n } | Select-Object -First 1
+  if ($q -and -not $q.Present) { $present = 0 }
+} catch { }
+[Console]::Out.Write(('STATE {0} {1} {2} {3} {4}' -f [int][bool]$p.WorkOffline, [int]$p.PrinterStatus, [int]$p.ExtendedPrinterStatus, [int]$p.DetectedErrorState, $present))
+`;
+
+/** Win32_Printer DetectedErrorState values that stop printing (no paper, door open, jammed, offline). */
+const BLOCKING_ERRORS: Record<number, string> = { 4: 'is out of paper', 7: 'has its cover open', 8: 'is jammed', 9: 'is offline' };
+
+/** Reads the status check's answer: null when the printer can print, else the reason (plain language). */
+export function parseProbe(out: string, name: string): string | null {
+  const s = out.trim();
+  if (s === 'MISSING') return `Printer "${name}" was not found in Windows. Check the printer name in Settings, Printers.`;
+  const m = /^STATE (\d+) (\d+) (\d+) (\d+) (\d+)$/.exec(s);
+  if (!m) return null; // the check itself could not run: say nothing rather than a false alarm
+  const [offline, status, extended, error, present] = m.slice(1).map(Number) as [number, number, number, number, number];
+  if (present === 0) return `Printer "${name}" is not connected. Check its USB cable and power.`;
+  if (offline === 1 || status === 7 || extended === 7) return `Printer "${name}" is offline. Check that it is on and connected.`;
+  const blocking = BLOCKING_ERRORS[error];
+  return blocking ? `Printer "${name}" ${blocking}.` : null;
+}
+
 /** Full path, so a powershell.exe planted in the working directory or on PATH is never used. */
 export function powershellPath(env: NodeJS.ProcessEnv = process.env): string {
   const root = env.SystemRoot ?? env.windir ?? 'C:\\Windows';
   return path.win32.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
 }
 
-export function powershellRunner(timeoutMs = 30_000): SpoolRunner {
-  const encoded = Buffer.from(SPOOLER_SCRIPT, 'utf16le').toString('base64');
+export function powershellRunner(timeoutMs = 30_000, script = SPOOLER_SCRIPT): SpoolRunner {
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
   return (r) =>
     new Promise((resolve) => {
       const child = spawn(powershellPath(), ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {
@@ -127,12 +160,26 @@ const WIN32_HINTS: Record<number, string> = {
 export class WindowsSpoolerTransport implements Transport {
   private readonly platform: NodeJS.Platform;
   private run: SpoolRunner | null;
+  private check: SpoolRunner | null;
   private readonly timeoutMs: number;
 
-  constructor(opts: { platform?: NodeJS.Platform; run?: SpoolRunner; timeoutMs?: number } = {}) {
+  constructor(opts: { platform?: NodeJS.Platform; run?: SpoolRunner; check?: SpoolRunner; timeoutMs?: number } = {}) {
     this.platform = opts.platform ?? process.platform;
     this.run = opts.run ?? null;
+    this.check = opts.check ?? null;
     this.timeoutMs = opts.timeoutMs ?? 30_000;
+  }
+
+  /** Asks Windows whether the queue's printer is plugged in, online and ready (prints nothing). */
+  async probe(printer: PrinterTarget): Promise<void> {
+    if (this.platform !== 'win32') return;
+    const name = printer.windowsName?.trim();
+    if (!name) throw new Error(`Printer "${printer.name}" needs its Windows printer name. Set it in Settings, Printers.`);
+    this.check ??= powershellRunner(20_000, PROBE_SCRIPT);
+    const res = await this.check({ printerName: name, docName: 'status', bytes: new Uint8Array() });
+    if (res.timedOut || res.code !== 0) return; // the check could not run: no false alarm
+    const problem = parseProbe(res.stdout, name);
+    if (problem) throw new Error(problem);
   }
 
   async send({ printer, bytes }: PrintRequest): Promise<void> {

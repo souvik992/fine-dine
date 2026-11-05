@@ -85,7 +85,12 @@ Sales by mode, by area, by category; discounts; voids; cancelled-after-fire coun
    `print.reroute`); a rerouted job is never rerouted again.
 4. On server start: resume `queued`/`retry` jobs. On stop: cancel backoff timers, finish the ticket being sent.
    `GET /v1/printers` shows each printer's status, queued count and last error.
-5. Optional status poll (DLE EOT 4) for paper-end where supported.
+5. Printer status between tickets (`PrintQueue.startMonitor`, every 30 s): a printer with no jobs waiting is checked
+   without printing (`Transport.probe`). Network: a TCP connection opened and closed (nothing sent). USB: Windows'
+   view of the queue (`PROBE_SCRIPT`: queue missing, device unplugged, offline, out of paper, cover open, jammed).
+   A change (down with the reason, or back) is a `print.status` event like a job's, so the top bar turns red
+   without waiting for a failed print. When the check itself cannot run, nothing is reported (no false alarm).
+   Optional later: ESC/POS status poll (DLE EOT 4) for paper-end on network printers.
 
 ## Fake printer (dev)
 `transport: fake` writes a rendered text preview to `data/prints/<printerId>/<jobId>.txt` and logs it. Tests
@@ -115,7 +120,13 @@ Built in P4-02 (`apps/kds`, served at `/kds`; shell shared with the captain app 
   version, so the kitchen never conflicts with a captain or a terminal. Audited `kot.ready` / `kot.served` /
   `kot.recall`; `kot.status` on `station:<id>`, `order:<id>` and `kds`.
 - Report **Kitchen speed** (Reports › Kitchen): per station, tickets bumped, average and slowest KOT → ready, how
-  many took longer than the amber time, on-time share, tickets never bumped.
+  many took longer than the amber time, on-time share, tickets served, average wait at the pass (ready → served),
+  tickets never bumped. Also in Reports › Kitchen: **Kitchen by hour** (tickets sent / bumped / served, average and
+  slowest to ready, late, per hour the KOT was sent), **Dish prep times** (per dish and station: quantity, tickets,
+  average and slowest to ready of the tickets it was on, late; slowest first) and **Kitchen ticket log** (every KOT:
+  sent, station, table, dishes, to ready, at the pass, sent to served, status).
+- The screen's header shows the station's day: **Served today n**, average KOT → ready, and how many were late
+  (`KdsBoard.today`).
 
 ### DinePOS Kitchen (Windows app for a kitchen PC, `apps/kitchen`)
 - An installer (`npm run dist -w @dinepos/kitchen` → `apps/kitchen/release/DinePOS-Kitchen-Setup-<version>.exe`) that
@@ -123,5 +134,5 @@ Built in P4-02 (`apps/kds`, served at `/kds`; shell shared with the captain app 
 - Asks for the main PC's address once (checked with `GET /v1/health`), starts with Windows (can be switched off), keeps
   the screen awake, plays the chime without a tap, and retries every 10 s while the server is not reachable.
 - The window shows only that server's pages and its own setup page; other sites and new windows are refused, all
-  permission requests denied. Keys: Ctrl+Shift+S setup · F5 reload · Ctrl+Shift+Q close.
+  permission requests denied. Keys: Ctrl+Shift+S setup · F5 reload · Ctrl+Shift+M minimize (full screen again when restored) · Ctrl+Shift+Q close.
 - Pairing and station choice are the display's own (as in a browser): approve the code in Settings › Devices.

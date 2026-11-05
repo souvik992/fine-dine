@@ -122,6 +122,7 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
     logSink.log = (level, msg, data) => app.log[level](data ?? {}, msg);
     const url = await app.listen({ host: config.host, port: config.port });
     printQueue.start();
+    printQueue.startMonitor(); // printer status between tickets: a printer switched off shows red without a failed print
     backups.start();
     app.online.start(); // P4-06: idle unless online orders are on and the outlet is paired with a hub
     app.sync.start(); // P4-05: sends the outbox to the same hub; idle unless paired

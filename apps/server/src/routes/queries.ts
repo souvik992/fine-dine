@@ -18,6 +18,7 @@ export interface QueryDeps {
   timeZone: string;
   now: () => Date;
   printerStatus?: (printerId: string) => PrinterStatus | undefined;
+  printerError?: (printerId: string) => string | undefined;
 }
 
 const menuQuery = z
@@ -94,7 +95,7 @@ export function queryRoutes(app: FastifyInstance, deps: QueryDeps): void {
   });
 
   app.get('/v1/printers', (_req, reply) => {
-    void reply.header('cache-control', 'no-store').send({ printers: getPrinters(deps.db, deps.printerStatus, deps.now()) });
+    void reply.header('cache-control', 'no-store').send({ printers: getPrinters(deps.db, deps.printerStatus, deps.now(), deps.printerError) });
     return reply;
   });
 

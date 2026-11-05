@@ -465,6 +465,17 @@ export interface KdsBoard {
   amberMin: number;
   redMin: number;
   tickets: KdsTicket[];
+  /** The station's business day so far (tickets, not change slips): served, bumped ready, average KOT → ready, late. */
+  today: KdsToday;
+}
+
+export interface KdsToday {
+  served: number;
+  bumped: number;
+  /** Average seconds from KOT to ready of the tickets bumped; null before the first bump. */
+  avgReadySec: number | null;
+  /** Bumped ready later than the amber time. */
+  late: number;
 }
 
 // ---------- bookings and waitlist (P4-04) ----------

@@ -1,6 +1,7 @@
 import net from 'node:net';
 import { describe, expect, it } from 'vitest';
 import { TcpTransport } from './tcp.js';
+import { parseProbe } from './usb-windows.js';
 import type { PrinterTarget } from './types.js';
 import { powershellPath, WindowsSpoolerTransport, type SpoolRunner } from './usb-windows.js';
 
@@ -70,5 +71,40 @@ describe('WindowsSpoolerTransport', () => {
 
   it('uses the System32 PowerShell, not one on PATH', () => {
     expect(powershellPath({ SystemRoot: 'C:\\Windows' })).toBe('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
+  });
+});
+
+describe('printer status check (no printing)', () => {
+  it('TCP: answers when something listens, without sending a byte; a closed port is down', async () => {
+    let got = 0;
+    const srv = net.createServer((s) => s.on('data', (d: Buffer) => (got += d.length)));
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r));
+    const port = (srv.address() as net.AddressInfo).port;
+    await new TcpTransport().probe(tcp(port));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(got).toBe(0);
+    await new Promise<void>((r) => srv.close(() => r()));
+    await expect(new TcpTransport().probe(tcp(port))).rejects.toThrow(/refused the connection/);
+    await expect(new TcpTransport().probe({ ...tcp(port), host: '' })).rejects.toThrow(/no network address/);
+  });
+
+  it('USB: what Windows says about the queue, in plain words', () => {
+    expect(parseProbe('STATE 0 3 2 0 1', 'POS-80')).toBeNull();
+    expect(parseProbe('STATE 0 3 2 2 1', 'POS-80')).toBeNull(); // "no error"
+    expect(parseProbe('STATE 0 3 2 0 0', 'POS-80')).toMatch(/not connected. Check its USB cable/);
+    expect(parseProbe('STATE 1 3 2 0 1', 'POS-80')).toMatch(/is offline/);
+    expect(parseProbe('STATE 0 7 2 0 1', 'POS-80')).toMatch(/is offline/);
+    expect(parseProbe('STATE 0 3 2 4 1', 'POS-80')).toMatch(/out of paper/);
+    expect(parseProbe('STATE 0 3 2 7 1', 'POS-80')).toMatch(/cover open/);
+    expect(parseProbe('MISSING', 'POS-80')).toMatch(/not found in Windows/);
+    expect(parseProbe('something odd', 'POS-80')).toBeNull(); // no false alarm
+  });
+
+  it('USB: the check runs only on Windows and reports through the transport', async () => {
+    const answer = (stdout: string): SpoolRunner => () => Promise.resolve({ code: 0, stdout, stderr: '' });
+    await new WindowsSpoolerTransport({ platform: 'win32', check: answer('STATE 0 3 2 0 1') }).probe(usb);
+    await expect(new WindowsSpoolerTransport({ platform: 'win32', check: answer('STATE 0 3 2 0 0') }).probe(usb)).rejects.toThrow(/not connected/);
+    await new WindowsSpoolerTransport({ platform: 'win32', check: () => Promise.resolve({ code: null, stdout: '', stderr: '', timedOut: true }) }).probe(usb); // could not check: quiet
+    await new WindowsSpoolerTransport({ platform: 'linux', check: answer('MISSING') }).probe(usb);
   });
 });

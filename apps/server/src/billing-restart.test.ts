@@ -72,5 +72,5 @@ describe('bill numbering across restart', () => {
     expect(await billTable(3)).toBe('B/26-27/000003');
     const numbers = srv.db.prepare('SELECT bill_no FROM bill ORDER BY bill_no').pluck().all();
     expect(numbers).toEqual([1, 2, 3]);
-  });
+  }, 20_000); // starts the real server twice: slow when the whole suite runs at once
 });

@@ -154,8 +154,11 @@ describe('kitchen display', () => {
     await page.getByRole('status').getByText(/KOT \d{4} served\./).waitFor();
     await expect.poll(() => ready.count()).toBe(0);
     expect(await t2Kitchen()).toBeUndefined(); // served: nothing waiting
+    await page.getByTestId('served-today').getByText('Served today 1').waitFor({ timeout: 5_000 }); // the header counts it
+    await page.screenshot({ path: path.join(tmpdir(), 'dinepos-kds-served.png') });
     await page.getByRole('button', { name: 'Undo' }).click();
     await fresh.first().waitFor({ timeout: 5_000 }); // back to New after a mistaken Served
+    await page.getByTestId('served-today').getByText('Served today 0').waitFor({ timeout: 5_000 });
     expect(await t2Kitchen()).toMatchObject({ cooking: 1, ready: 0 });
     expect((await get<{ tickets: unknown[] }>(`/v1/kds/tickets?stationId=${kitchenId}`)).tickets).toHaveLength(2);
   });

@@ -469,14 +469,16 @@ const captains: Def = {
 // ---------------------------------------------------------------- kitchen
 
 /** "7 min 05 s". */
-const duration = (seconds: number | null) => (seconds === null ? '' : `${Math.floor(seconds / 60)} min ${String(Math.round(seconds) % 60).padStart(2, '0')} s`);
+const duration = (seconds: number | null) => (seconds === null ? '' : `${Math.floor(Math.round(seconds) / 60)} min ${String(Math.round(seconds) % 60).padStart(2, '0')} s`);
+/** Seconds a ticket waited at the pass (ready to served); a ticket served without a first bump has ready = served. */
+const PASS_SEC = `CASE WHEN k.served_at IS NOT NULL AND k.ready_at IS NOT NULL AND k.ready_at <> k.served_at THEN (julianday(k.served_at) - julianday(k.ready_at)) * 86400 END`;
 
 const kitchen: Def = {
   key: 'kitchen',
   title: 'Kitchen speed',
   group: 'Kitchen',
   description:
-    'Per station, from the kitchen screen bumps (P4-02): tickets, average and slowest time from KOT to ready, how many took longer than the amber time, and tickets never bumped.',
+    'Per station, from the kitchen screen bumps (P4-02): tickets, average and slowest time from KOT to ready, how many took longer than the amber time, tickets served and how long food waited at the pass (ready to served), and tickets never bumped.',
   build(c) {
     const amberMin = getConfig(c.db)['kds.amberMin'];
     const raw = all(
@@ -485,7 +487,10 @@ const kitchen: Def = {
               sum(CASE WHEN k.ready_at IS NOT NULL THEN 1 ELSE 0 END) AS tickets,
               avg(CASE WHEN k.ready_at IS NOT NULL THEN (julianday(k.ready_at) - julianday(k.fired_at)) * 86400 END) AS avgSec,
               max(CASE WHEN k.ready_at IS NOT NULL THEN (julianday(k.ready_at) - julianday(k.fired_at)) * 86400 END) AS maxSec,
-              sum(CASE WHEN k.ready_at IS NOT NULL AND (julianday(k.ready_at) - julianday(k.fired_at)) * 1440 > @amber THEN 1 ELSE 0 END) AS late,
+              sum(CASE WHEN k.ready_at IS NOT NULL AND round((julianday(k.ready_at) - julianday(k.fired_at)) * 86400) > @amber * 60 THEN 1 ELSE 0 END) AS late,
+              sum(CASE WHEN k.served_at IS NOT NULL THEN 1 ELSE 0 END) AS served,
+              avg(${PASS_SEC}) AS passSec,
+              count(${PASS_SEC}) AS passN,
               sum(CASE WHEN k.ready_at IS NULL THEN 1 ELSE 0 END) AS notBumped
        FROM kot k JOIN station s ON s.id = k.station_id
        WHERE k.business_date BETWEEN @from AND @to AND k.kind = 'new'
@@ -499,6 +504,8 @@ const kitchen: Def = {
       slowest: duration(r.maxSec === null ? null : n(r.maxSec)),
       late: n(r.late),
       onTime: n(r.tickets) ? `${Math.round(((n(r.tickets) - n(r.late)) * 100) / n(r.tickets))}%` : '',
+      served: n(r.served),
+      atPass: duration(r.passSec === null ? null : n(r.passSec)),
       notBumped: n(r.notBumped),
     }));
     const columns = [
@@ -508,6 +515,8 @@ const kitchen: Def = {
       col('slowest', 'Slowest'),
       col('late', `Over ${amberMin} min`, 'int'),
       col('onTime', 'On time'),
+      col('served', 'Served', 'int'),
+      col('atPass', 'Average at the pass'),
       col('notBumped', 'Never bumped', 'int'),
     ];
     const totals = totalsOf(columns, rows);
@@ -515,6 +524,8 @@ const kitchen: Def = {
     const totalSec = raw.reduce((s, r) => s + n(r.avgSec) * n(r.tickets), 0);
     totals.avg = bumped ? duration(totalSec / bumped) : '';
     totals.onTime = bumped ? `${Math.round(((bumped - n(totals.late)) * 100) / bumped)}%` : '';
+    const passN = raw.reduce((s, r) => s + n(r.passN), 0);
+    totals.atPass = passN ? duration(raw.reduce((s, r) => s + n(r.passSec) * n(r.passN), 0) / passN) : '';
     return {
       columns,
       rows,
@@ -523,12 +534,202 @@ const kitchen: Def = {
         { label: 'Average to ready', value: String(totals.avg || '—'), type: 'text' },
         { label: 'On time', value: String(totals.onTime || '—'), type: 'text' },
         { label: `Over ${amberMin} min`, value: n(totals.late), type: 'int' },
+        { label: 'Served', value: n(totals.served), type: 'int' },
       ],
     };
   },
 };
 
-const DEFS: Def[] = [daily, items, categories, areas, tables, gst, payments, cash, discounts, voids, kotChanges, captains, kitchen];
+interface KotTimes {
+  fired_at: string;
+  ready_at: string | null;
+  served_at: string | null;
+}
+const seconds = (from: string, to: string | null) => (to ? Math.max(0, (Date.parse(to) - Date.parse(from)) / 1000) : null);
+/** Ready to served; a ticket served without a first bump (ready = served) did not wait at the pass that we know of. */
+const passSeconds = (k: KotTimes) => (k.served_at && k.ready_at && k.ready_at !== k.served_at ? seconds(k.ready_at, k.served_at) : null);
+const isLate = (sec: number | null, amberMin: number) => sec !== null && sec > amberMin * 60;
+
+const kitchenHours: Def = {
+  key: 'kitchen-hours',
+  title: 'Kitchen by hour',
+  group: 'Kitchen',
+  description: 'Hour by hour (when the KOT was sent, all stations): tickets sent, bumped ready and served, average and slowest time to ready, and how many were late. Shows the rush hours.',
+  build(c) {
+    const amberMin = getConfig(c.db)['kds.amberMin'];
+    const kots = all(c, `SELECT k.fired_at, k.ready_at, k.served_at FROM kot k WHERE k.business_date BETWEEN @from AND @to AND k.kind = 'new'`, params(c)) as unknown as KotTimes[];
+    const hours = new Map<number, { sent: number; bumped: number; served: number; sum: number; max: number; late: number }>();
+    for (const k of kots) {
+      const hour = Number(isoInZone(new Date(k.fired_at), c.timeZone).slice(11, 13));
+      const h = hours.get(hour) ?? { sent: 0, bumped: 0, served: 0, sum: 0, max: 0, late: 0 };
+      const sec = seconds(k.fired_at, k.ready_at);
+      h.sent++;
+      if (k.served_at) h.served++;
+      if (sec !== null) {
+        h.bumped++;
+        h.sum += sec;
+        h.max = Math.max(h.max, sec);
+        if (isLate(sec, amberMin)) h.late++;
+      }
+      hours.set(hour, h);
+    }
+    const hh = (x: number) => `${String(x % 24).padStart(2, '0')}:00`;
+    const rows = [...hours.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([hour, h]): ReportRow => ({
+        hour: `${hh(hour)}–${hh(hour + 1)}`,
+        sent: h.sent,
+        bumped: h.bumped,
+        served: h.served,
+        avg: h.bumped ? duration(h.sum / h.bumped) : '',
+        slowest: h.bumped ? duration(h.max) : '',
+        late: h.late,
+      }));
+    const columns = [
+      col('hour', 'Hour'),
+      col('sent', 'Tickets sent', 'int'),
+      col('bumped', 'Bumped ready', 'int'),
+      col('served', 'Served', 'int'),
+      col('avg', 'Average to ready'),
+      col('slowest', 'Slowest'),
+      col('late', `Over ${amberMin} min`, 'int'),
+    ];
+    const totals = totalsOf(columns, rows);
+    const bumped = [...hours.values()].reduce((s, h) => s + h.bumped, 0);
+    totals.avg = bumped ? duration([...hours.values()].reduce((s, h) => s + h.sum, 0) / bumped) : '';
+    const busiest = rows.reduce<ReportRow | null>((best, r) => (!best || n(r.sent) > n(best.sent) ? r : best), null);
+    return {
+      columns,
+      rows,
+      totals,
+      summary: [
+        { label: 'Busiest hour', value: busiest ? `${String(busiest.hour)} (${n(busiest.sent)})` : '—', type: 'text' },
+        { label: 'Tickets sent', value: n(totals.sent), type: 'int' },
+        { label: 'Average to ready', value: String(totals.avg || '—'), type: 'text' },
+      ],
+    };
+  },
+};
+
+const kitchenDishes: Def = {
+  key: 'kitchen-dishes',
+  title: 'Dish prep times',
+  group: 'Kitchen',
+  description: 'Per dish and station: quantity sent to the kitchen, tickets bumped, average and slowest time from KOT to ready of the tickets it was on, and how many were late. Slowest dishes first.',
+  build(c) {
+    const amberMin = getConfig(c.db)['kds.amberMin'];
+    const lines = all(
+      c,
+      `SELECT oi.name_snapshot AS dish, s.name AS station, oi.qty, k.id AS kotId, k.fired_at, k.ready_at, k.served_at
+       FROM order_item oi JOIN kot k ON k.id = oi.kot_id JOIN station s ON s.id = k.station_id
+       WHERE k.business_date BETWEEN @from AND @to AND k.kind = 'new' AND oi.status = 'fired'`,
+      params(c),
+    ) as unknown as Array<KotTimes & { dish: string; station: string; qty: number; kotId: string }>;
+    const dishes = new Map<string, { dish: string; station: string; qty: number; tickets: Map<string, number | null> }>();
+    for (const l of lines) {
+      const key = `${l.station}|${l.dish}`;
+      const d = dishes.get(key) ?? { dish: l.dish, station: l.station, qty: 0, tickets: new Map<string, number | null>() };
+      d.qty += l.qty;
+      d.tickets.set(l.kotId, seconds(l.fired_at, l.ready_at));
+      dishes.set(key, d);
+    }
+    const rows = [...dishes.values()]
+      .map((d) => {
+        const times = [...d.tickets.values()].filter((t): t is number => t !== null);
+        const avgSec = times.length ? times.reduce((s, t) => s + t, 0) / times.length : null;
+        return { d, times, avgSec };
+      })
+      .sort((a, b) => (b.avgSec ?? -1) - (a.avgSec ?? -1) || a.d.dish.localeCompare(b.d.dish))
+      .map(({ d, times, avgSec }): ReportRow => ({
+        dish: d.dish,
+        station: d.station,
+        qty: d.qty,
+        tickets: times.length,
+        avg: duration(avgSec),
+        slowest: times.length ? duration(Math.max(...times)) : '',
+        late: times.filter((t) => isLate(t, amberMin)).length,
+      }));
+    const columns = [
+      col('dish', 'Dish'),
+      col('station', 'Station'),
+      col('qty', 'Quantity sent', 'int'),
+      col('tickets', 'Tickets bumped', 'int'),
+      col('avg', 'Average to ready'),
+      col('slowest', 'Slowest'),
+      col('late', `Over ${amberMin} min`, 'int'),
+    ];
+    const slowest = rows.find((r) => r.avg);
+    return {
+      columns,
+      rows,
+      totals: null,
+      summary: [
+        { label: 'Slowest dish', value: slowest ? `${String(slowest.dish)} (${String(slowest.avg)})` : '—', type: 'text' },
+        { label: 'Dishes', value: rows.length, type: 'int' },
+      ],
+    };
+  },
+};
+
+const kitchenTickets: Def = {
+  key: 'kitchen-tickets',
+  title: 'Kitchen ticket log',
+  group: 'Kitchen',
+  description: 'Every KOT sent to the kitchen: when, station, table, dishes, time to ready, time at the pass, sent to served, and whether it was served, left ready, never bumped or cancelled.',
+  build(c) {
+    const amberMin = getConfig(c.db)['kds.amberMin'];
+    const kots = all(
+      c,
+      `SELECT k.kot_no, k.fired_at, k.ready_at, k.served_at, s.name AS station, ${TABLE} AS tableLabel,
+              (SELECT group_concat(oi.qty || ' × ' || oi.name_snapshot, ', ') FROM order_item oi WHERE oi.kot_id = k.id AND oi.status = 'fired') AS dishes,
+              (SELECT coalesce(sum(oi.qty), 0) FROM order_item oi WHERE oi.kot_id = k.id AND oi.status = 'fired') AS qty
+       FROM kot k JOIN station s ON s.id = k.station_id JOIN "order" o ON o.id = k.order_id
+       WHERE k.business_date BETWEEN @from AND @to AND k.kind = 'new'
+       ORDER BY k.fired_at, k.kot_no`,
+      params(c),
+    ) as unknown as Array<KotTimes & { kot_no: number; station: string; tableLabel: string; dishes: string | null; qty: number }>;
+    const rows = kots.map((k): ReportRow => {
+      const toReady = seconds(k.fired_at, k.ready_at);
+      return {
+        sent: local(c, k.fired_at),
+        kot: `KOT ${String(k.kot_no).padStart(4, '0')}`,
+        station: k.station,
+        table: k.tableLabel,
+        dishes: k.dishes ?? '',
+        qty: n(k.qty),
+        toReady: duration(toReady),
+        atPass: duration(passSeconds(k)),
+        total: duration(seconds(k.fired_at, k.served_at)),
+        status: !k.dishes ? 'Cancelled' : k.served_at ? (isLate(toReady, amberMin) ? 'Served (late)' : 'Served') : k.ready_at ? 'Ready, not served' : 'Never bumped',
+      };
+    });
+    const columns = [
+      col('sent', 'Sent'),
+      col('kot', 'KOT'),
+      col('station', 'Station'),
+      col('table', 'Table'),
+      col('dishes', 'Dishes'),
+      col('qty', 'Qty', 'int'),
+      col('toReady', 'To ready'),
+      col('atPass', 'At the pass'),
+      col('total', 'Sent to served'),
+      col('status', 'Status'),
+    ];
+    const count = (s: string) => rows.filter((r) => String(r.status).startsWith(s)).length;
+    return {
+      columns,
+      rows,
+      totals: totalsOf(columns, rows),
+      summary: [
+        { label: 'Tickets', value: rows.length, type: 'int' },
+        { label: 'Served', value: count('Served'), type: 'int' },
+        { label: 'Never bumped', value: count('Never bumped'), type: 'int' },
+      ],
+    };
+  },
+};
+
+const DEFS: Def[] = [daily, items, categories, areas, tables, gst, payments, cash, discounts, voids, kotChanges, captains, kitchen, kitchenHours, kitchenDishes, kitchenTickets];
 
 export const REPORTS: ReportInfo[] = DEFS.map(({ key, title, group, description }) => ({ key, title, group, description }));
 

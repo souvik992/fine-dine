@@ -127,18 +127,33 @@ function createWindow(): void {
     } else if (input.control && input.shift && key === 's') {
       e.preventDefault();
       showSetup();
+    } else if (input.control && input.shift && key === 'm') {
+      e.preventDefault();
+      minimize();
     } else if (input.key === 'F5') {
       e.preventDefault();
       void openDisplay();
     }
   });
+  // back from the taskbar: full screen again (a kiosk window cannot be minimized, so it leaves kiosk first)
+  win.on('restore', () => {
+    if (app.isPackaged && win && !win.isKiosk()) win.setKiosk(true);
+  });
   win.on('closed', () => (win = null));
   void openDisplay();
+}
+
+/** Ctrl+Shift+M: out of the way (to the taskbar) without closing; tickets keep arriving and the chime still plays. */
+function minimize(): void {
+  if (!win) return;
+  if (win.isKiosk()) win.setKiosk(false);
+  win.minimize();
 }
 
 app.on('second-instance', () => {
   if (win) {
     if (win.isMinimized()) win.restore();
+    if (app.isPackaged && !win.isKiosk()) win.setKiosk(true);
     win.focus();
   }
 });

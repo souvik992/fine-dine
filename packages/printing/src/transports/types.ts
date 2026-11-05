@@ -22,4 +22,9 @@ export interface PrintRequest {
  */
 export interface Transport {
   send(req: PrintRequest): Promise<void>;
+  /**
+   * Checks the printer is there without printing anything (the status light between jobs). Resolves when it
+   * answers; rejects with a plain-language message otherwise. Transports without a way to check leave it out.
+   */
+  probe?(printer: PrinterTarget): Promise<void>;
 }

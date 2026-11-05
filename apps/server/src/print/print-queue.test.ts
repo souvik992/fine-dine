@@ -234,4 +234,51 @@ describe('PrintQueue', () => {
     await q.idle();
     expect(jobs()[0]).toMatchObject({ state: 'failed', last_error: 'The printer was removed.' });
   });
+
+  it('status check between tickets: a printer switched off shows offline (with why) without a failed print, and ok again when back', async () => {
+    const printer = await tcpPrinter();
+    h.run('UpsertPrinter', { id: S.kitchenPrinter, name: 'Kitchen printer', transport: 'tcp', host: '127.0.0.1', port: printer.port });
+    const q = makeQueue({});
+    const status = () => getPrinters(h.db, (id) => q.status(id), TEST_NOW(), (id) => q.error(id)).find((p) => p.id === S.kitchenPrinter)!;
+    const statusEvents = () => events.filter((e) => e.event === 'print.status').map((e) => (e.data as { status: string }).status);
+
+    await q.checkPrinters();
+    expect(status()).toMatchObject({ status: 'ok' });
+    expect(status().lastError).toBeUndefined();
+    expect(statusEvents()).toEqual([]); // ok to ok: nothing to say
+    expect(printer.received).toEqual([]); // the check prints nothing
+
+    await printer.close(); // switched off
+    await q.checkPrinters();
+    expect(status()).toMatchObject({ status: 'offline', queued: 0 });
+    expect(status().lastError).toMatch(/refused the connection/);
+    expect(statusEvents()).toEqual(['offline']);
+    await q.checkPrinters();
+    expect(statusEvents()).toEqual(['offline']); // still off: no new event
+
+    const back = await tcpPrinter();
+    h.run('UpsertPrinter', { id: S.kitchenPrinter, name: 'Kitchen printer', transport: 'tcp', host: '127.0.0.1', port: back.port });
+    await q.checkPrinters();
+    expect(status()).toMatchObject({ status: 'ok' });
+    expect(status().lastError).toBeUndefined();
+    expect(statusEvents()).toEqual(['offline', 'ok']);
+    expect(h.count('event_log', "event = 'print.status'")).toBe(2);
+    await back.close();
+  });
+
+  it('status check leaves a printer with tickets waiting to its worker, and skips transports that cannot be checked', async () => {
+    const port = await closedPort();
+    h.run('UpsertPrinter', { id: S.kitchenPrinter, name: 'Kitchen printer', transport: 'tcp', host: '127.0.0.1', port });
+    const probes: string[] = [];
+    const tcp: Transport = { send: () => Promise.reject(new Error('down')), probe: (p) => (probes.push(p.id), Promise.resolve()) };
+    const q = makeQueue({ tcp }, [60_000]);
+    const orderId = o.open(S.t1, 2).order!.id;
+    o.run('AddItems', orderId, { items: [line(S.dalMakhani)] });
+    o.run('FireKOT', orderId, { all: true });
+    q.start(); // the kitchen ticket fails once and waits to retry
+    await expect.poll(() => q.status(S.kitchenPrinter)).toBe('retrying');
+    await q.checkPrinters();
+    expect(probes).toEqual([]); // the waiting ticket says how the printer is; the fake Tandoor printer has no check
+    expect(q.status(S.kitchenPrinter)).toBe('retrying');
+  });
 });

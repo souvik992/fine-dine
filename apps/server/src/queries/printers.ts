@@ -18,7 +18,12 @@ export interface PrinterInfo {
  * Printer list + status for `GET /v1/printers`. Status comes from the live worker when there is one,
  * otherwise from the queue: a job waiting to retry → retrying; last finished job failed → offline.
  */
-export function getPrinters(db: Db, liveStatus?: (printerId: string) => PrinterStatus | undefined, now: Date = new Date()): PrinterInfo[] {
+export function getPrinters(
+  db: Db,
+  liveStatus?: (printerId: string) => PrinterStatus | undefined,
+  now: Date = new Date(),
+  liveError?: (printerId: string) => string | undefined,
+): PrinterInfo[] {
   const rows = db.prepare('SELECT id, name, transport, role, width_mm, backup_printer_id FROM printer ORDER BY name COLLATE NOCASE').all() as Array<{
     id: string;
     name: string;
@@ -36,7 +41,9 @@ export function getPrinters(db: Db, liveStatus?: (printerId: string) => PrinterS
   return rows.map((r) => {
     const lastRow = last.get(r.id) as { state: string; last_error: string | null } | undefined;
     const derived: PrinterStatus = retrying.get(r.id) ? 'retrying' : lastRow?.state === 'failed' ? 'offline' : 'ok';
-    const lastError = lastRow?.state === 'failed' ? lastRow.last_error : null;
+    const live = liveStatus?.(r.id);
+    // the live view (this run's jobs and status checks) wins; before it has one, the queue's history
+    const lastError = live ? (live === 'ok' ? null : (liveError?.(r.id) ?? (lastRow?.state === 'failed' ? lastRow.last_error : null))) : lastRow?.state === 'failed' ? lastRow.last_error : null;
     return {
       id: r.id,
       name: r.name,
@@ -44,7 +51,7 @@ export function getPrinters(db: Db, liveStatus?: (printerId: string) => PrinterS
       role: r.role,
       widthMm: r.width_mm,
       ...(r.backup_printer_id ? { backupPrinterId: r.backup_printer_id } : {}),
-      status: liveStatus?.(r.id) ?? derived,
+      status: live ?? derived,
       queued: pending.get(r.id) as number,
       failedToday: failedToday.get(r.id, dayStart) as number,
       ...(lastError ? { lastError } : {}),
