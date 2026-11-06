@@ -116,6 +116,14 @@ export const upsertMenuItemSchema = z
 
 export type UpsertAreaPayload = z.infer<typeof upsertAreaSchema>;
 export type UpsertTablePayload = z.infer<typeof upsertTableSchema>;
+/** P6-03: a print agent. The terminal makes the key, shows it once and sends only its hash (sha256 of 'agent:' + key). */
+export const createPrintAgentSchema = z
+  .object({ id: ulidSchema, name: z.string().trim().min(1).max(40), keyHash: z.string().regex(/^[0-9a-f]{64}$/, 'must be a SHA-256 hash') })
+  .strict();
+export const revokePrintAgentSchema = z.object({ agentId: ulidSchema }).strict();
+/** Which agent prints this printer's tickets; null: the server prints them itself. */
+export const setPrinterAgentSchema = z.object({ printerId: ulidSchema, agentId: ulidSchema.nullable() }).strict();
+
 export type UpsertPrinterPayload = z.infer<typeof upsertPrinterSchema>;
 export type UpsertStationPayload = z.infer<typeof upsertStationSchema>;
 export type UpsertCategoryPayload = z.infer<typeof upsertCategorySchema>;

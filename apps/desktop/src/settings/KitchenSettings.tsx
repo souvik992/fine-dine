@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useApp } from '../app-context.js';
 import { Modal } from '../components/Modal.js';
 import { DialogButtons, Empty, ErrorText, Field, SectionHeader, Toggle, useCatalog, useSave, type AdminCatalog } from './common.js';
+import { PrintAgents, usePrintAgents } from './PrintAgents.js';
 
 type Station = AdminCatalog['stations'][number];
 type PrinterRow = AdminCatalog['printers'][number];
@@ -14,6 +15,8 @@ interface PrinterStatus {
   status: 'ok' | 'retrying' | 'offline';
   queued: number;
   lastError?: string;
+  /** P6-03: printed by this print agent. */
+  agent?: { id: string; name: string };
 }
 
 /** Kitchen & printers (docs/06): stations receive KOTs; each prints on its printers; bills go to a bill printer. */
@@ -25,6 +28,7 @@ export function KitchenSettings() {
   const [station, setStation] = useState<Station | 'new' | null>(null);
   const [printer, setPrinter] = useState<PrinterRow | 'new' | null>(null);
   const [tested, setTested] = useState<string | null>(null);
+  const agents = usePrintAgents();
   if (!catalog.data) return <p className="text-muted-foreground">Loading…</p>;
   const { stations, printers } = catalog.data;
   const nameOf = (id: string) => printers.find((p) => p.id === id)?.name ?? '?';
@@ -56,6 +60,26 @@ export function KitchenSettings() {
                 {s && s.status !== 'ok' ? <span className="ml-2 rounded bg-danger px-1.5 py-0.5 text-xs font-bold text-white" title={s.lastError}>{s.status === 'offline' ? 'Not printing' : 'Retrying'}</span> : null}
                 {tested === p.id ? <span className="ml-2 text-xs font-semibold text-ok">Test page sent</span> : null}
               </span>
+              {agents.data?.agents.length || s?.agent ? (
+                <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                  Printed by
+                  <select
+                    className="input h-8 w-40 text-xs"
+                    aria-label={`Printed by (${p.name})`}
+                    value={s?.agent?.id ?? ''}
+                    disabled={busy}
+                    onChange={(e) => void save('SetPrinterAgent', { printerId: p.id, agentId: e.target.value || null }).then(() => status.refetch())}
+                  >
+                    <option value="">This server</option>
+                    {agents.data?.agents.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                        {a.online ? '' : ' (offline)'}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               <button className="btn h-8" disabled={busy} onClick={() => void save('PrintTestPage', { printerId: p.id }).then((ok) => ok && setTested(p.id))}>
                 Test print
               </button>
@@ -93,6 +117,8 @@ export function KitchenSettings() {
       </ul>
 
       <KitchenScreens />
+
+      <PrintAgents />
 
       {station ? <StationDialog station={station === 'new' ? null : station} printers={printers} onClose={() => setStation(null)} /> : null}
       {printer ? <PrinterDialog printer={printer === 'new' ? null : printer} printers={printers} onClose={() => setPrinter(null)} /> : null}

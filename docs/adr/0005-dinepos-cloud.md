@@ -1,6 +1,6 @@
 # ADR-0005: DinePOS Cloud
 
-Status: accepted (2026-11-06). P6-01 and P6-02 built; P6-03 and P6-04 planned.
+Status: accepted (2026-11-06). P6-01, P6-02 and P6-03 built; P6-04 planned.
 
 ## Context
 
@@ -42,9 +42,11 @@ and the Table QR relay. The owner wants a cloud service for DinePOS only:
      and devices point at the cloud address. This needs internet at the outlet; there is no offline billing in this
      mode, and the owner chooses it knowing that.
 
-3. **Cloud printing (P6-03):** KOT and bill printers stay on the outlet LAN. A small print agent at the outlet (Windows
-   app) keeps an outgoing connection to the cloud and prints the jobs the hosted server queues. It does the same for
-   relay outlets when the master PC is not on the printers' network.
+3. **Cloud printing (P6-03, built):** KOT and bill printers stay on the outlet LAN. A small print agent at the outlet
+   (`apps/print-agent`, a Windows installer with no Electron) asks the server for the tickets of its printers and prints
+   them. It works for a hosted server and for a relay outlet whose master PC is not on the printers' network. The agent
+   is not a paired device: it has its own key, made on the terminal, of which only the hash is stored. This needs new
+   tables only; the device and printer tables are unchanged.
 
 ## Consequences
 

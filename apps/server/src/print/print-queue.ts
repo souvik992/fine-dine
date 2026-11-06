@@ -3,6 +3,7 @@
 import { EscPos, type PaperWidth, type PrinterTarget, type Transport } from '@dinepos/printing';
 import { isoInZone, newId } from '@dinepos/shared';
 import type { EventBus, PrintWaker, PublishedEvent } from '../core/events.js';
+import type { AgentBroker } from './agent-broker.js';
 import type { Db } from '../db/connection.js';
 
 export type TransportKind = PrinterTarget['transport'];
@@ -17,6 +18,8 @@ export interface PrintQueueOptions {
   backoffMs?: number[];
   now?: () => Date;
   log?: (level: 'info' | 'warn' | 'error', msg: string, data?: Record<string, unknown>) => void;
+  /** P6-03: printers assigned to a print agent are printed by that agent. */
+  agents?: AgentBroker;
 }
 
 interface JobRow {
@@ -251,6 +254,11 @@ export class PrintQueue implements PrintWaker {
   }
 
   transportFor(p: PrinterRow): Transport {
+    // P6-03: a printer assigned to a print agent is printed by that agent (how it reaches the printer: p.transport)
+    const agent = this.opts.agents
+      ? (this.opts.db.prepare('SELECT a.id, a.name FROM printer_agent pa JOIN print_agent a ON a.id = pa.agent_id WHERE pa.printer_id = ? AND a.revoked_at IS NULL').get(p.id) as { id: string; name: string } | undefined)
+      : undefined;
+    if (agent) return this.opts.agents!.transport(agent.id, agent.name);
     return this.opts.transports[p.transport];
   }
 

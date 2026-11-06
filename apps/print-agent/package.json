@@ -1,0 +1,17 @@
+{
+  "name": "@dinepos/print-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DinePOS Print Agent: prints the tickets of the printers assigned to it, for an outlet server that cannot reach them (in DinePOS Cloud, or on another network). Connects out only.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dist": "node scripts/build.mjs && node scripts/installer.mjs"
+  },
+  "dependencies": {
+    "@dinepos/printing": "0.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

@@ -159,7 +159,12 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria �
   offline-safe on the LAN. Each outlet is at `https://<store>.<cloud>` (HTTPS made on demand for known stores only);
   the outlet keeps one outgoing WebSocket (`/v1/pos/tunnel`); Settings › Cloud sync › Devices from anywhere. Accept: a
   device through the cloud is never the trusted master PC (no token: 401); the live stream works for paired devices.
-- [ ] **P6-03 Cloud printing**: a print agent at the outlet prints KOTs and bills queued in the cloud.
+- [x] **P6-03 Cloud printing**: a print agent at the outlet prints KOTs and bills queued in the cloud.
+  `apps/print-agent` (DinePOS-PrintAgent-Setup: Node runtime + agent, runs at Windows start as SYSTEM) long-polls
+  `/v1/print-agent/jobs` with its own key (made on the terminal, only its hash stored); printers are assigned with
+  SetPrinterAgent; the print queue keeps jobs, retries, backup printer and status. Accept: a KOT for an agent's printer
+  prints on the agent's network printer; a refusing printer fails with the agent's reason; an agent gone quiet shows
+  its printers offline; a removed key is refused.
 - [ ] **P6-04 Hosted outlets**: the DinePOS server runs in the cloud, one database per outlet, chosen per outlet; no
   master PC; printing through the agent.
 

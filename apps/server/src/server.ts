@@ -19,6 +19,7 @@ import { BackupScheduler } from './backup/scheduler.js';
 import { getConfig } from './core/outlet-config.js';
 import { SERVER_VERSION } from './version.js';
 import { loadAddons } from './addons/loader.js';
+import { AgentBroker } from './print/agent-broker.js';
 import { coreHandlers } from './commands/registry.js';
 import { hostname } from 'node:os';
 import { localNameUrl } from '@dinepos/shared';
@@ -97,7 +98,9 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
     const bus = new EventBus();
     // The queue is built before the app (the app wakes it), so its logger is attached once the app exists.
     const logSink: { log?: PrintQueueOptions['log'] } = {};
+    const agents = new AgentBroker(); // P6-03: print agents, shared by the queue and their routes
     const printQueue = new PrintQueue({
+      agents,
       db,
       bus,
       timeZone: config.timeZone,
@@ -133,6 +136,7 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
     });
     const app = buildApp({
       addons,
+      agents,
       port: config.port,
       db,
       timeZone: config.timeZone,

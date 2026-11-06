@@ -136,3 +136,17 @@ Built in P4-02 (`apps/kds`, served at `/kds`; shell shared with the captain app 
 - The window shows only that server's pages and its own setup page; other sites and new windows are refused, all
   permission requests denied. Keys: Ctrl+Shift+S setup · F5 reload · Ctrl+Shift+M minimize (full screen again when restored) · Ctrl+Shift+Q close.
 - Pairing and station choice are the display's own (as in a browser): approve the code in Settings › Devices.
+
+### Print agents (P6-03, `apps/print-agent`)
+- A program on a PC on the printers' network prints the tickets of the printers assigned to it, when the server cannot
+  reach them: the server in DinePOS Cloud, or the printers on another network. It only connects out (LAN or the outlet's
+  cloud address) and keeps no tickets.
+- Settings › Kitchen & printers › Print agents › Add print agent: the terminal makes a random key, shows it once and
+  sends only its hash (`CreatePrintAgent`; `print_agent`, migration 0016). Remove: `RevokePrintAgent` (key stops at
+  once, its printers go back to the server). Each printer's **Printed by**: `SetPrinterAgent` (`printer_agent`).
+- The print queue still owns every job. For an agent's printer the transport is the broker (`print/agent-broker.ts`):
+  the job is handed to the agent on its next long poll (`GET /v1/print-agent/jobs?wait=`, `Authorization: Agent <key>`)
+  and finished by its answer (`POST /v1/print-agent/jobs/:id`), so retries, the backup printer, `print.status` and the
+  audit work as for any printer. An agent not heard from for 45 s is offline: the status check shows its printers
+  "Not printing" with the reason before a ticket fails.
+

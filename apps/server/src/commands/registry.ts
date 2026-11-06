@@ -11,6 +11,9 @@ import { rejectOnlineOrder } from './reject-online-order.js';
 import { saveOnlineLink } from './save-online-link.js';
 import { unlinkOnlineHub } from './unlink-online-hub.js';
 import { addItems } from './add-items.js';
+import { createPrintAgent } from './create-print-agent.js';
+import { revokePrintAgent } from './revoke-print-agent.js';
+import { setPrinterAgent } from './set-printer-agent.js';
 import { addToWaitlist } from './add-to-waitlist.js';
 import { assignCaptain } from './assign-captain.js';
 import { adjustStock } from './adjust-stock.js';
@@ -76,6 +79,10 @@ import { voidBill } from './void-bill.js';
 import { voidPurchase } from './void-purchase.js';
 
 export const coreHandlers: readonly CommandHandler<unknown, unknown>[] = [
+  // print agents (P6-03)
+  createPrintAgent,
+  revokePrintAgent,
+  setPrinterAgent,
   // admin
   upsertArea,
   upsertTable,

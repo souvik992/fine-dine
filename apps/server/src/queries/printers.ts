@@ -12,6 +12,8 @@ export interface PrinterInfo {
   queued: number;
   failedToday: number;
   lastError?: string;
+  /** P6-03: printed by this print agent (absent: by the server itself). */
+  agent?: { id: string; name: string };
 }
 
 /**
@@ -35,6 +37,7 @@ export function getPrinters(
   const pending = db.prepare(`SELECT count(*) FROM print_job WHERE printer_id = ? AND state IN ('queued', 'retry')`).pluck();
   const retrying = db.prepare(`SELECT 1 FROM print_job WHERE printer_id = ? AND state = 'retry' LIMIT 1`).pluck();
   const last = db.prepare(`SELECT state, last_error FROM print_job WHERE printer_id = ? AND state IN ('done', 'failed') ORDER BY done_at DESC, rowid DESC LIMIT 1`);
+  const agentOf = db.prepare('SELECT a.id, a.name FROM printer_agent pa JOIN print_agent a ON a.id = pa.agent_id WHERE pa.printer_id = ? AND a.revoked_at IS NULL');
   const failedToday = db.prepare(`SELECT count(*) FROM print_job WHERE printer_id = ? AND state = 'failed' AND created_at >= ?`).pluck();
   const dayStart = new Date(now.getTime() - 24 * 3600_000).toISOString();
 
@@ -55,6 +58,10 @@ export function getPrinters(
       queued: pending.get(r.id) as number,
       failedToday: failedToday.get(r.id, dayStart) as number,
       ...(lastError ? { lastError } : {}),
+      ...((): { agent?: { id: string; name: string } } => {
+        const a = agentOf.get(r.id) as { id: string; name: string } | undefined;
+        return a ? { agent: a } : {};
+      })(),
     };
   });
 }

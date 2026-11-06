@@ -13,6 +13,8 @@ import { commandRegistry, coreHandlers } from './commands/registry.js';
 import type { AddonSet } from './addons/loader.js';
 import { addonRoutes, RELAY_HEADER, relayedAddress } from './routes/addons.js';
 import { CloudTunnel, type TunnelAnswer, type TunnelRequest } from './cloud/tunnel.js';
+import { AgentBroker } from './print/agent-broker.js';
+import { printAgentRoutes } from './routes/print-agent.js';
 import type { WebSocket as WsSocket } from 'ws';
 import { randomBytes } from 'node:crypto';
 import type { GuestAnswer, GuestRequest } from './online/connector.js';
@@ -81,6 +83,8 @@ export interface AppDeps {
   onlineFetch?: typeof fetch;
   /** P5-01: the signed add-ons loaded at start (server.ts); absent when none. */
   addons?: AddonSet;
+  /** P6-03: print agents (shared with the print queue). */
+  agents?: AgentBroker;
   /** The port the server listens on (add-ons print it in links such as table QR codes). */
   port?: number;
 }
@@ -132,6 +136,8 @@ export function buildApp(deps: AppDeps): DinePosApp {
       if (url === '/captain' || url.startsWith('/captain/') || url === '/kds' || url.startsWith('/kds/')) return done();
       // P5-01: add-ons' guest pages and guest API (public, rate limited) and their signed screens
       if (url.startsWith('/a/')) return done();
+      // P6-03: print agents carry their own key (routes/print-agent.ts)
+      if (url.startsWith('/v1/print-agent/')) return done();
       // through the cloud it is a remote device, whatever the replay's own address (P6-02)
       if (trustLoopback && isLoopback(req.ip) && !req.viaCloud) {
         req.deviceId = MASTER_DEVICE_ID;
@@ -275,10 +281,13 @@ export function buildApp(deps: AppDeps): DinePosApp {
     log: { info: (m, d) => app.log.info(d ?? {}, m), warn: (m, d) => app.log.warn(d ?? {}, m) },
   });
   app.get('/v1/cloud', (_req, reply) => reply.header('cache-control', 'no-store').send(cloud.status()));
+  const agents = deps.agents ?? new AgentBroker();
+  printAgentRoutes(app, { db, agents, now });
   app.addHook('onClose', async () => {
     await online.stop();
     await sync.stop();
     await cloud.stop();
+    agents.close();
   });
   onlineRoutes(app, { db, now, connector: online, execute, ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}) });
   syncRoutes(app, { db, now, agent: sync });
