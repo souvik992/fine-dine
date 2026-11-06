@@ -251,7 +251,7 @@ function KitchenScreens() {
   const { api, serverUrl } = useApp();
   const config = useQuery({ queryKey: ['config'], queryFn: () => api.get<OutletConfig>('/v1/config') });
   // The master PC talks to itself on 127.0.0.1; a tablet needs one of its network addresses.
-  const network = useQuery({ queryKey: ['network'], queryFn: () => api.get<{ urls: string[] }>('/v1/network') });
+  const network = useQuery({ queryKey: ['network'], queryFn: () => api.get<{ urls: string[]; nameUrl?: string | null }>('/v1/network') });
   const { save, busy, error, setError } = useSave();
   const [amber, setAmber] = useState<string | null>(null);
   const [red, setRed] = useState<string | null>(null);
@@ -280,6 +280,16 @@ function KitchenScreens() {
             (on the shop network), pair it in Settings › Devices and choose the station. No sign-in is needed on the screen.
           </span>
         </p>
+        {network.data?.nameUrl ? (
+          <p className="mt-2 pl-6 text-sm text-muted-foreground">
+            The number address can change when this PC restarts or wakes up. In a browser, open{' '}
+            <span className="font-mono font-semibold text-foreground" data-testid="kds-name-url">
+              {network.data.nameUrl}/kds
+            </span>{' '}
+            instead: it keeps working (Windows PCs and iPhones; on Android, reserve this PC’s address in the Wi-Fi router). The DinePOS Kitchen app
+            finds this PC by itself.
+          </p>
+        ) : null}
         <form
           className="mt-4 flex flex-wrap items-end gap-3"
           onSubmit={(e) => {

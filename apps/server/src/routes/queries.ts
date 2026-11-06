@@ -1,6 +1,7 @@
-import { isIsoDate, localDate, MENU_PHOTO_NAME, ulidSchema, type CaptainSection, type CaptainSections, type TableBadge } from '@dinepos/shared';
+import { isIsoDate, localDate, localNameUrl, MENU_PHOTO_NAME, ulidSchema, type CaptainSection, type CaptainSections, type TableBadge } from '@dinepos/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { hostname } from 'node:os';
 import { lanAddresses } from '../banner.js';
 import { PosError } from '../core/errors.js';
 import { getConfig } from '../core/outlet-config.js';
@@ -64,9 +65,10 @@ export function queryRoutes(app: FastifyInstance, deps: QueryDeps): void {
   });
 
   // P4-02: the addresses phones and kitchen screens can open (this PC's LAN IPs, on the port this request came in on).
+  // P2-15: and the computer name (`<name>.local`), which stays the same when the router hands out a new IP.
   app.get('/v1/network', (req, reply) => {
     const port = req.socket.localPort ?? 7420;
-    void reply.header('cache-control', 'no-store').send({ urls: lanAddresses().map((ip) => `http://${ip}:${port}`) });
+    void reply.header('cache-control', 'no-store').send({ urls: lanAddresses().map((ip) => `http://${ip}:${port}`), nameUrl: localNameUrl(hostname(), port) });
     return reply;
   });
 

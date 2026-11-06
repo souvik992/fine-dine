@@ -17,8 +17,13 @@
       <p id="retryText" class="muted"></p>
     </div>
 
+    <section id="found" class="found" hidden>
+      <h2>Found on this network</h2>
+      <div id="foundList"></div>
+    </section>
+
     <form id="form" action="connect" method="get">
-      <label for="server">Address of the DinePOS main PC</label>
+      <label for="server">Or type the address of the DinePOS main PC</label>
       <input id="server" name="server" autocomplete="off" spellcheck="false" placeholder="192.168.1.4" required>
       <p class="muted">On the main PC: Settings › Kitchen &amp; printers shows it (for example 192.168.1.4).</p>
       <label class="check"><input id="autostart" type="checkbox" name="autostart" value="1"> Open by itself when Windows starts</label>

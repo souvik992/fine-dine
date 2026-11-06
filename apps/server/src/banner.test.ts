@@ -13,6 +13,12 @@ describe('server banner', () => {
     expect(text).toContain('Close it (or press Ctrl+C) to stop the server safely.');
   });
 
+  it('P2-15: shows the address by computer name, which survives a new IP', () => {
+    const text = formatBanner({ ...base, lan: ['192.168.1.5'], nameUrl: 'http://pos-master.local:7420' });
+    expect(text).toContain('By name:          http://pos-master.local:7420');
+    expect(formatBanner({ ...base, lan: ['192.168.1.5'], nameUrl: null })).not.toContain('By name');
+  });
+
   it('says when other devices cannot connect', () => {
     expect(formatBanner({ ...base, lan: [] })).toContain('no network connection found');
     expect(formatBanner({ ...base, host: '127.0.0.1', lan: ['192.168.1.5'] })).toContain('off (listening on 127.0.0.1 only)');

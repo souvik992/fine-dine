@@ -26,4 +26,31 @@ if (problem) {
     });
   }
 }
-if (!server.value) server.focus();
+// P2-15: DinePOS servers that answered on this network: one press instead of typing an address
+const found = (() => {
+  try {
+    return JSON.parse(q.get('found') || '[]');
+  } catch {
+    return [];
+  }
+})();
+if (Array.isArray(found) && found.length) {
+  const list = document.getElementById('foundList');
+  for (const f of found) {
+    if (!f || typeof f.url !== 'string' || !/^http:\/\/[0-9.]+:\d+$/.test(f.url)) continue;
+    const b = document.createElement('button');
+    b.type = 'button';
+    const title = document.createElement('span');
+    title.textContent = f.name || 'DinePOS server';
+    const where = document.createElement('small');
+    where.textContent = [f.host, f.url.replace(/^http:\/\//, '')].filter(Boolean).join(' · ');
+    b.append(title, where);
+    b.addEventListener('click', () => {
+      const autostart = document.getElementById('autostart').checked ? '1' : '0';
+      location.href = `connect?${new URLSearchParams({ server: f.url, autostart }).toString()}`;
+    });
+    list.append(b);
+  }
+  if (list.childElementCount) document.getElementById('found').hidden = false;
+}
+if (!server.value && document.getElementById('found').hidden) server.focus();

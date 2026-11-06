@@ -2,6 +2,7 @@
 export * from './addons.js';
 export * from './bill-calc.js';
 export * from './bill-display.js';
+export * from './discovery.js';
 export * from './gstin.js';
 export * from './ids.js';
 export * from './menu-csv.js';

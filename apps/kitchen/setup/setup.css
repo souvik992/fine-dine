@@ -19,3 +19,6 @@ button { margin-top: 20px; width: 100%; font: inherit; font-weight: 700; font-si
 .problem p { margin: 0; }
 .problem #problemText { color: var(--danger); font-weight: 600; }
 kbd { border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 13px; }
+.found { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px 24px; margin-bottom: 16px; }
+.found button { margin-top: 10px; text-align: left; display: flex; flex-direction: column; gap: 2px; }
+.found button small { font-weight: 400; font-size: 15px; opacity: 0.8; }

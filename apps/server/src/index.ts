@@ -15,6 +15,8 @@ const SHUTDOWN_TIMEOUT_MS = 10_000;
 async function main(): Promise<void> {
   process.title = 'DinePOS Server';
   const config = loadConfig();
+  // P2-15: kitchen screens find this server by UDP on its own port number (DINEPOS_DISCOVERY=0 turns it off)
+  const discovery = process.env.DINEPOS_DISCOVERY === '0' ? {} : { discoveryPort: config.port };
   // When the server cannot start (a damaged database), a backup can be chosen here instead of in Settings (P2-08):
   //   server.mjs --list-backups      server.mjs --restore <file name>
   const backupDir = path.join(config.dataDir, 'backups');
@@ -36,7 +38,7 @@ async function main(): Promise<void> {
     process.stdout.write('\n  Restoring a backup: restarting the DinePOS server…\n');
     try {
       await server.close();
-      server = await startServer(config, { banner: true, requestRestart: () => void restart() });
+      server = await startServer(config, { banner: true, requestRestart: () => void restart(), ...discovery });
     } catch (err) {
       console.error('\n  DinePOS server could not restart:', err);
       process.exit(1);
@@ -44,7 +46,7 @@ async function main(): Promise<void> {
       restarting = false;
     }
   };
-  let server = await startServer(config, { banner: true, requestRestart: () => void restart() });
+  let server = await startServer(config, { banner: true, requestRestart: () => void restart(), ...discovery });
 
   // A stray failure in a background task (a call to the order hub, a printer) must never stop the outlet: it is
   // logged and the server carries on. A real crash is written to the log at once and kept on screen.

@@ -77,8 +77,24 @@ checking the same signature themselves. Code: `apps/server/src/addons/`, `apps/d
 `apps/desktop/src/addons/runtime.tsx`, `addons/<id>/`.
 
 ## Ports and discovery
-- Server listens on `0.0.0.0:7420` (configurable). Static IP recommended for the master.
-- mDNS advertisement `_dinepos._tcp` as a convenience; clients also accept a typed IP.
+- Server listens on `0.0.0.0:7420` (configurable). A fixed address for the master is still recommended (a DHCP
+  reservation in the router, and Windows' "Random hardware addresses" off for the shop Wi-Fi).
+- **When the master's IP changes (P2-15, 2026-11-06).** Changed from the planned mDNS `_dinepos._tcp` advertisement
+  (never built) to a plain UDP probe, which needs no extra library and gets through the Windows firewall as the reply
+  to the client's own question:
+  - Every server has a **server id** (ULID, `config` key `server.id`, made at first start, not a setting; it travels
+    with the database, so a restore on a replacement PC keeps it). `GET /v1/health` returns it.
+  - The server answers the datagram `DINEPOS-DISCOVER 1` on **UDP 7420** (same number as TCP; `DINEPOS_DISCOVERY=0`
+    turns it off) with JSON `{service, v, serverId, name, host, port}`, sent to the asker only. Format and checks:
+    `packages/shared/src/discovery.ts`. The installer opens UDP 7420 on private/domain networks.
+  - **DinePOS Kitchen** saves the server id and a copy of the display's pairing and station. When its saved address
+    stops answering (at start, or twice in a row while running) it broadcasts the probe, follows the server with the
+    same id, and puts the pairing into the new address's browser storage, so the screen is not paired again. A
+    different outlet's server never gets that pairing.
+  - **Browsers (captain phones, KDS in a browser)** keep pairing per address (browser storage belongs to one origin),
+    so they should open the master by computer name: the banner and Settings › Kitchen & printers show
+    `http://<computer-name>.local:7420` (`GET /v1/network` → `nameUrl`). Windows answers `.local` names itself; Windows
+    PCs and iPhones resolve them, many Android phones do not, so for Android phones the router reservation is the fix.
 - Captain and KDS PWAs are served at `/captain` and `/kds`.
 
 ## Data directory (master)

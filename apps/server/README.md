@@ -81,10 +81,11 @@ DUPLICATE replay, INVALID_STATE.
 | `LOG_LEVEL` | `info` | JSON logs (pino); auth headers are redacted |
 | `DINEPOS_LOG_TO_FILE` | `1` in production | `1`: JSON logs to `<DATA_DIR>/logs/server-<date>.log`, console shows the banner |
 | `DINEPOS_ALLOWED_ORIGINS` | `app://dinepos,http://localhost:5173,http://127.0.0.1:5173` | browser origins for CORS and `/v1/stream` |
+| `DINEPOS_DISCOVERY` | on | `0` stops answering discovery probes on UDP `DINEPOS_PORT` (P2-15, `src/discovery/`) |
 
 Startup: data dir → `dinepos.lock` (refuses a second server; a lock from a crashed pid is taken over; a lock
 from another host means the DB is on a shared folder and is refused) → open DB (pragmas read back) → migrate →
-open business date → listen. SIGINT/SIGTERM close HTTP, checkpoint the WAL and release the lock (10 s limit).
+open business date → server id (P2-15, `core/server-id.ts`) → listen → discovery responder. SIGINT/SIGTERM close HTTP, checkpoint the WAL and release the lock (10 s limit).
 
 Migration 0003 adds `bill_document` (printed bill revisions) and triggers: bills never deleted, settled bills
 frozen (except → void), bill numbers never change, payments append-only.

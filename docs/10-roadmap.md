@@ -97,6 +97,11 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria �
   file name or code; billing screen List / Photos view per terminal; photos go to the order hub with the menu.
 - [x] **P2-14 Recipe bulk upload** (added 2026-11-04) — Accept: CSV `dish,size,addon,material,quantity` checked line by
   line against menu and materials; all or none; download current recipes in the same format; KOTs then use them.
+- [x] **P2-15 Master gets a new IP: screens stay paired** (added 2026-11-06 at the product owner's request;
+  `01-architecture.md` "Ports and discovery") — Accept: server id made once and kept across restarts, shown in health;
+  a UDP probe gets id, outlet name, computer name and port, anything else is ignored, a taken port does not stop the
+  server; DinePOS Kitchen follows only its own server id to a new address and keeps its pairing and station (another
+  outlet starts fresh); setup page lists servers found on the network; banner and Settings show the `.local` address.
 
 ## Phase 3 — Captain app
 

@@ -20,6 +20,10 @@ import { getConfig } from './core/outlet-config.js';
 import { SERVER_VERSION } from './version.js';
 import { loadAddons } from './addons/loader.js';
 import { coreHandlers } from './commands/registry.js';
+import { hostname } from 'node:os';
+import { localNameUrl } from '@dinepos/shared';
+import { ensureServerId } from './core/server-id.js';
+import { startDiscoveryResponder, type DiscoveryResponder } from './discovery/responder.js';
 
 export interface RunningServer {
   app: FastifyInstance;
@@ -58,6 +62,11 @@ export interface StartOptions {
   backupIntervalMs?: number;
   /** P2-09: the licence check (default: licenceGateFor(), enforced in the installed server). */
   licence?: LicenceGate;
+  /**
+   * P2-15: answer discovery probes on this UDP port (the server's own port number in production, index.ts) so
+   * kitchen screens find the server after its IP changes. Off when absent (tests).
+   */
+  discoveryPort?: number;
 }
 
 /** Startup order: data dir → lock → open DB → migrate → open business day → listen → resume print queue. */
@@ -73,6 +82,7 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
     const restored = applyPendingRestore(config.dataDir, config.dbFile, now());
     db = openDatabase(dbPath);
     const migrations = migrate(db, undefined, now);
+    const serverId = ensureServerId(db); // P2-15: before anyone can ask
     // P2-09: a new business date opens only with a valid licence (a date already open carries on).
     const licence = opts.licence ?? licenceGateFor();
     const openedForLicence = db;
@@ -143,6 +153,16 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
       else app.log.warn({ addon: a.id, reason: a.error }, 'add-on switched off');
     }
     const url = await app.listen({ host: config.host, port: config.port });
+    const tcpPort = Number(new URL(url).port) || config.port;
+    let discovery: DiscoveryResponder | null = null;
+    if (opts.discoveryPort !== undefined) {
+      const outletDb = db;
+      discovery = await startDiscoveryResponder(
+        { serverId, name: () => getConfig(outletDb)['outlet.name'], host: hostname().toLowerCase(), port: tcpPort },
+        // on the same addresses as HTTP (a server for this PC only answers this PC only)
+        { port: opts.discoveryPort, host: config.host === '::' ? '0.0.0.0' : config.host, log: (level, msg, data) => app.log[level](data ?? {}, msg) },
+      );
+    }
     printQueue.start();
     printQueue.startMonitor(); // printer status between tickets: a printer switched off shows red without a failed print
     backups.start();
@@ -151,8 +171,9 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
     if (restored) app.log.warn(restored, 'restored a backup; the previous database was kept aside');
     if (!businessDate) app.log.warn({ licence: licence.status(db, now()).state }, 'no business day open: the licence does not allow a new one');
     if (opts.banner) {
-      const port = Number(new URL(url).port) || config.port;
-      process.stdout.write(formatBanner({ version: SERVER_VERSION, host: config.host, port, dataDir: config.dataDir, businessDate, logFile, lan: lanAddresses() }));
+      process.stdout.write(
+        formatBanner({ version: SERVER_VERSION, host: config.host, port: tcpPort, dataDir: config.dataDir, businessDate, logFile, lan: lanAddresses(), nameUrl: localNameUrl(hostname(), tcpPort) }),
+      );
     }
     app.log.info(
       { dbPath, schemaVersion: migrations.schemaVersion, appliedNow: migrations.applied, businessDate },
@@ -164,6 +185,7 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
     const close = () =>
       (closing ??= (async () => {
         try {
+          await discovery?.close();
           await app.close();
           await printQueue.stop();
           await backups.stop();

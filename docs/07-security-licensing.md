@@ -4,7 +4,7 @@ Threat model: staff misuse (voids, reprints, discounts), guests or neighbours on
 phones, disk failure. Not: nation-state attackers.
 
 ## Device pairing
-1. New device opens the app → enters master IP (or mDNS) → requests pairing → gets a 6-digit code.
+1. New device opens the app → enters master IP (or picks the server found on the network, P2-15) → requests pairing → gets a 6-digit code.
 2. Manager approves in Settings › Devices on the master/desktop (PIN required).
 3. Server issues a 256-bit random device token, stores SHA-256 hash, device name, kind (terminal/captain/kds).
 4. Every HTTP/WS call carries the token. Revoke = delete row → immediate 401.

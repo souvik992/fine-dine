@@ -81,7 +81,7 @@
     ${If} $DinePosAutostart == "1"
       ${NSD_Check} $DinePosAutostartCheckbox
     ${EndIf}
-    ${NSD_CreateLabel} 0 78u 100% 48u "The server runs in its own window (keep it open while the restaurant works) and stores data in %ProgramData%\DinePOS. Port 7420 is opened on private networks only. Untick 'master' on billing terminals; there, enter the master PC's address in DinePOS Settings."
+    ${NSD_CreateLabel} 0 78u 100% 48u "The server runs in its own window (keep it open while the restaurant works) and stores data in %ProgramData%\DinePOS. Port 7420 (TCP and UDP) is opened on private networks only. Untick 'master' on billing terminals; there, enter the master PC's address in DinePOS Settings."
     Pop $0
     nsDialogs::Show
   FunctionEnd
@@ -120,6 +120,9 @@
       nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="${DINEPOS_FIREWALL_RULE}"'
       Pop $0
       nsExec::ExecToLog 'netsh advfirewall firewall add rule name="${DINEPOS_FIREWALL_RULE}" dir=in action=allow protocol=TCP localport=7420 profile=private,domain'
+      Pop $0
+      ; P2-15: kitchen screens find the server by UDP on the same port number (same rule name, so uninstall removes both)
+      nsExec::ExecToLog 'netsh advfirewall firewall add rule name="${DINEPOS_FIREWALL_RULE}" dir=in action=allow protocol=UDP localport=7420 profile=private,domain'
       Pop $0
       WriteRegStr HKLM "${DINEPOS_REG_KEY}" "Master" "1"
       WriteRegStr HKLM "${DINEPOS_REG_KEY}" "Autostart" "$DinePosAutostart"

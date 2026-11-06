@@ -3,6 +3,7 @@ import { currentBusinessDate } from '../core/business-day.js';
 import type { Db } from '../db/connection.js';
 import { schemaVersion } from '../db/migrate.js';
 import { SERVER_VERSION } from '../version.js';
+import { readServerId } from '../core/server-id.js';
 import type { BackupStatus } from '../backup/scheduler.js';
 
 export interface Health {
@@ -14,6 +15,8 @@ export interface Health {
   timeZone: string;
   serverTime: string;
   uptimeSec: number;
+  /** P2-15: who this server is (a kitchen screen follows it to a new address); absent before the first start. */
+  serverId?: string;
   /** P2-08: newest backup and whether backups are healthy (one in the last hour, no error). */
   backup?: { lastAt: string | null; ageMin: number | null; ok: boolean; error: string | null };
   /** P2-09: the licence in brief (details: GET /v1/licence). */
@@ -32,6 +35,7 @@ export interface HealthDeps {
 export function getHealth({ db, timeZone, now, startedAt, backupStatus, licence }: HealthDeps): Health {
   const at = now();
   const businessDate = currentBusinessDate(db);
+  const serverId = readServerId(db);
   return {
     ok: businessDate !== null,
     service: 'dinepos-server',
@@ -41,6 +45,7 @@ export function getHealth({ db, timeZone, now, startedAt, backupStatus, licence 
     timeZone,
     serverTime: isoInZone(at, timeZone),
     uptimeSec: Math.max(0, Math.floor((at.getTime() - startedAt.getTime()) / 1000)),
+    ...(serverId ? { serverId } : {}),
     ...(backupStatus ? { backup: backupHealth(backupStatus()) } : {}),
     ...(licence ? { licence: brief(licence()) } : {}),
   };

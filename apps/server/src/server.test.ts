@@ -1,6 +1,8 @@
+import { createSocket } from 'node:dgram';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { DISCOVERY_PROBE, parseDiscoveryReply } from '@dinepos/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ServerConfig } from './config.js';
 import { loadMigrations } from './db/migrate.js';
@@ -68,6 +70,37 @@ describe('startServer', () => {
       timeZone: 'Asia/Kolkata',
       serverTime: '2026-11-02T12:00:00.000+05:30',
     });
+  });
+
+  it('P2-15: keeps one server id across restarts, shows it in health and answers discovery with it', async () => {
+    running = await startServer(config(), { now, logger: false, discoveryPort: 0 });
+    const first = ((await (await fetch(`${running.url}/v1/health`)).json()) as { serverId?: string }).serverId;
+    expect(first).toMatch(/^[0-9A-Z]{26}$/);
+    await running.close();
+    running = await startServer(config(), { now, logger: false, discoveryPort: 0 });
+    expect(((await (await fetch(`${running.url}/v1/health`)).json()) as { serverId?: string }).serverId).toBe(first);
+    const net = (await (await fetch(`${running.url}/v1/network`)).json()) as { nameUrl: string | null };
+    expect(net.nameUrl === null || /^http:\/\/[a-z0-9-]+\.local:\d+$/.test(net.nameUrl)).toBe(true);
+  });
+
+  it('P2-15: a probe gets the server id and TCP port back', async () => {
+    // a fixed free UDP port: ask the OS for one, then start the server on it
+    const probe = createSocket('udp4');
+    await new Promise<void>((res) => probe.bind(0, '127.0.0.1', () => res()));
+    const udpPort = await new Promise<number>((res) => {
+      const t = createSocket('udp4');
+      t.bind(0, '127.0.0.1', () => {
+        const p = t.address().port;
+        t.close(() => res(p));
+      });
+    });
+    running = await startServer(config(), { now, logger: false, discoveryPort: udpPort });
+    const reply = new Promise<string>((res) => probe.once('message', (m) => res(m.toString('utf8'))));
+    probe.send(DISCOVERY_PROBE, udpPort, '127.0.0.1');
+    const r = parseDiscoveryReply(await reply);
+    probe.close();
+    const health = (await (await fetch(`${running.url}/v1/health`)).json()) as { serverId: string };
+    expect(r).toMatchObject({ service: 'dinepos-server', serverId: health.serverId, name: 'Restaurant', port: Number(new URL(running.url).port) });
   });
 
   it('refuses a second server on the same data dir and leaves the first running', async () => {

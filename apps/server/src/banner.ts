@@ -20,6 +20,8 @@ export interface BannerInfo {
   businessDate: string | null;
   logFile: string | null;
   lan: string[];
+  /** P2-15: http://<computer name>.local:<port>, which survives a new IP address (null: the name cannot be one). */
+  nameUrl?: string | null;
 }
 
 export function formatBanner(i: BannerInfo): string {
@@ -33,6 +35,7 @@ export function formatBanner(i: BannerInfo): string {
   if (listensOnLan) {
     if (i.lan.length) {
       i.lan.forEach((ip, n) => lines.push(`  ${n === 0 ? 'Other devices:    ' : '                  '}http://${ip}:${i.port}`));
+      if (i.nameUrl) lines.push(`  By name:          ${i.nameUrl}   (keeps working if the address above changes)`);
       lines.push('                    (enter this address in DinePOS Settings on billing terminals)');
     } else {
       lines.push('  Other devices:    no network connection found; only this PC can connect.');
