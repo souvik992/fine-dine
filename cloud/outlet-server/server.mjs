@@ -84758,6 +84758,7 @@ var createReservation = defineCommand({
 // src/commands/day-end.ts
 var KEEP_PROCESSED_DAYS = 7;
 var KEEP_EVENTS = 1e4;
+var KEEP_PRINT_BYTES_DAYS = 30;
 function buildZReport(db, businessDate, cashCountedPaise, outletName, closedAt) {
   const totals = db.prepare(
     `SELECT count(*) AS bills, COALESCE(sum(b.subtotal_paise), 0) AS gross, COALESCE(sum(b.discount_paise), 0) AS discount,
@@ -84859,6 +84860,8 @@ var dayEnd = defineCommand({
     const cutoff = new Date(ctx.now.getTime() - KEEP_PROCESSED_DAYS * 864e5).toISOString();
     db.prepare("DELETE FROM processed_command WHERE at < ?").run(cutoff);
     db.prepare("DELETE FROM event_log WHERE seq <= (SELECT max(seq) FROM event_log) - ?").run(KEEP_EVENTS);
+    const printCutoff = new Date(ctx.now.getTime() - KEEP_PRINT_BYTES_DAYS * 864e5).toISOString();
+    db.prepare("UPDATE print_job SET bytes = x'', preview_text = NULL WHERE state IN ('done', 'failed') AND created_at < ? AND length(bytes) > 0").run(printCutoff);
     ctx.audit({
       entity: "business_day",
       entityId: ctx.businessDate,
