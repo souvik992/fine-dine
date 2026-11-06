@@ -20,6 +20,10 @@ write_files:
       HUB_DATA_DIR=/var/lib/dinepos-cloud
       # Set to your own domain (e.g. hub.example.in) once its DNS points at this VM, then run dinepos-cloud-domain.
       HUB_DOMAIN=
+      # Off-server backups: an S3 bucket name (the VM needs an IAM role that may write to it). Empty: backups stay here.
+      HUB_S3_BUCKET=
+      # Alerts (hosted outlet down, backup failed): a Slack, Discord or Google Chat webhook address. Empty: no alerts.
+      HUB_ALERT_WEBHOOK=
 
   - path: /etc/systemd/system/dinepos-cloud.service
     content: |
@@ -97,17 +101,16 @@ write_files:
       systemctl restart dinepos-cloud
       echo "Hub updated to $(git -C /opt/dinepos log -1 --format='%h %s')"
 
-  # Daily copy of the hub database, last 14 days kept. Shops' online backup files are under /var/lib/dinepos-cloud too.
-  - path: /etc/cron.daily/dinepos-cloud-backup
+  # Every hour: the cloud's database and each hosted outlet's newest backup, kept 14 days here, and copied to S3 when
+  # HUB_S3_BUCKET is set (deploy/backup.sh in the repository, so updates reach it).
+  - path: /etc/cron.hourly/dinepos-cloud-backup
     permissions: '0755'
     content: |
       #!/bin/bash
-      set -e
-      mkdir -p /var/backups/dinepos-cloud
-      sqlite3 /var/lib/dinepos-cloud/hub.db ".backup /var/backups/dinepos-cloud/hub-$(date +%F).db"
-      find /var/backups/dinepos-cloud -name 'hub-*.db' -mtime +14 -delete
+      exec /bin/bash /opt/dinepos/cloud/hub/deploy/backup.sh
 
 runcmd:
+  - snap install aws-cli --classic || true
   # Node 24
   - curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
   - apt-get install -y nodejs

@@ -20,7 +20,8 @@
     "lint:fix": "eslint . --fix",
     "check": "npm run typecheck && npm run lint && npm run test",
     "start": "npm run bundle -w @dinepos/server && node apps/server/dist-bundle/server.mjs",
-    "test:cloud": "npm test --prefix cloud/hub"
+    "test:cloud": "npm test --prefix cloud/hub",
+    "load-test": "node scripts/load-test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

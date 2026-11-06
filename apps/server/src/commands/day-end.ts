@@ -9,6 +9,8 @@ import { billPrinter, printedDateTime } from './billing-support.js';
 
 const KEEP_PROCESSED_DAYS = 7;
 const KEEP_EVENTS = 10_000;
+/** Finished print jobs keep their record (when, which printer, done or failed); their ticket bytes only this long. */
+const KEEP_PRINT_BYTES_DAYS = 30;
 
 /** Z-report figures for one business date (all its orders are settled or void when this runs). */
 export function buildZReport(db: Db, businessDate: string, cashCountedPaise: number, outletName: string, closedAt: string): ZReportData {
@@ -139,6 +141,10 @@ export const dayEnd = defineCommand({
     const cutoff = new Date(ctx.now.getTime() - KEEP_PROCESSED_DAYS * 86_400_000).toISOString();
     db.prepare('DELETE FROM processed_command WHERE at < ?').run(cutoff);
     db.prepare('DELETE FROM event_log WHERE seq <= (SELECT max(seq) FROM event_log) - ?').run(KEEP_EVENTS);
+    // A busy outlet prints ~20 MB of tickets a day; the bills and KOTs themselves are kept elsewhere (bill_document,
+    // kot_document), so old finished jobs drop their bytes. Waiting or retrying jobs are never touched.
+    const printCutoff = new Date(ctx.now.getTime() - KEEP_PRINT_BYTES_DAYS * 86_400_000).toISOString();
+    db.prepare("UPDATE print_job SET bytes = x'', preview_text = NULL WHERE state IN ('done', 'failed') AND created_at < ? AND length(bytes) > 0").run(printCutoff);
 
     ctx.audit({
       entity: 'business_day',

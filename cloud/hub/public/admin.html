@@ -169,6 +169,7 @@
   const keyStore = { get: () => { try { return sessionStorage.getItem('hubAdminKey') || ''; } catch { return ''; } },
     set: (v) => { try { v ? sessionStorage.setItem('hubAdminKey', v) : sessionStorage.removeItem('hubAdminKey'); } catch { /* private window */ } } };
   let key = keyStore.get(), overview = null, timer = null, settingsDirty = false;
+  let health = null; // GET /health/deep: hosted outlets down, backups failing
   const ui = { orderStore: '', orderStatus: 'open', expanded: new Set(), links: new Map(), pausing: false, up: new Map(), licence: new Map(), sitePasswords: new Map() };
 
   if (location.protocol === 'http:' && !/^(localhost|127\.|\[::1\])/.test(location.hostname)) $('insecure').classList.remove('hidden');
@@ -245,6 +246,7 @@
     if (!key) return;
     try {
       overview = await api('GET', '/v1/admin/overview');
+      health = await fetch('/health/deep').then((r) => r.json()).catch(() => null);
       renderWarnings(); fillStoreFilter();
       const r = route();
       if (r.tab === 'orders') await renderOrders();
@@ -259,7 +261,9 @@
   function renderWarnings() {
     const hub = overview.hub;
     $('hubWarn').replaceChildren(...(hub.devOtp ? [h('div', { class: 'banner' }, 'OTP codes are shown to customers (HUB_DEV_OTP=1). Use this only for development and testing.')] : []),
-      ...(!hub.smsProvider ? [h('div', { class: 'banner info' }, 'No SMS provider is set up yet: customers cannot receive OTP codes by SMS.')] : []));
+      ...(!hub.smsProvider ? [h('div', { class: 'banner info' }, 'No SMS provider is set up yet: customers cannot receive OTP codes by SMS.')] : []),
+      ...(health && !health.ok ? health.problems.map((p) => h('div', { class: 'banner' }, p)) : []),
+      ...(health && health.backup && health.backup.ok && !health.backup.offsite ? [h('div', { class: 'banner info' }, 'Backups stay on this server only. Set HUB_S3_BUCKET in /etc/dinepos-cloud.env (and give the server an S3 role) to copy them off it every hour.')] : []));
   }
 
   // ------------------------------------------------------------ orders

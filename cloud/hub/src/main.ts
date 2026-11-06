@@ -9,12 +9,14 @@
 //   HUB_DEVICE_DOMAIN  P6-02: devices reach an outlet at https://<store>.<this domain> (default: the host of HUB_PUBLIC_URL)
 //   HUB_OUTLET_SERVER  P6-04: the DinePOS server for hosted outlets (default: ../../outlet-server/server.mjs in this repository)
 //   HUB_TIMEZONE       P6-04: hosted outlets' time zone (default Asia/Kolkata)
+//   HUB_ALERT_WEBHOOK  Slack / Discord / Google Chat webhook for alerts (hosted outlet down, backups failing)
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hub } from './hub.ts';
 import { createHubServer } from './http.ts';
 import { UrbanPiper } from './urbanpiper.ts';
 import { HostedOutlets } from './hosted.ts';
+import { Monitor } from './monitor.ts';
 
 const dir = process.env.HUB_DATA_DIR ?? './hub-data';
 mkdirSync(dir, { recursive: true });
@@ -34,7 +36,11 @@ const hosted = new HostedOutlets(hub, {
   log,
 });
 hosted.start();
-const server = createHubServer(hub, { hosted, adminKey: process.env.HUB_ADMIN_KEY, publicUrl: process.env.HUB_PUBLIC_URL || undefined, deviceDomain: process.env.HUB_DEVICE_DOMAIN || undefined, urbanpiper });
+// alerts: hosted outlets down, backups failing (deploy/backup.sh writes backup-status.json every hour)
+const monitor = new Monitor(hub, { hosted, backupStatusFile: join(dir, 'backup-status.json'), webhook: process.env.HUB_ALERT_WEBHOOK || undefined, log });
+const watcher = setInterval(() => void monitor.tick().catch((e) => log.warn('monitor failed', String(e))), 30_000);
+watcher.unref();
+const server = createHubServer(hub, { hosted, monitor, adminKey: process.env.HUB_ADMIN_KEY, publicUrl: process.env.HUB_PUBLIC_URL || undefined, deviceDomain: process.env.HUB_DEVICE_DOMAIN || undefined, urbanpiper });
 const sweeper = setInterval(() => { try { hub.sweep(); } catch (e) { log.warn('sweep failed', String(e)); } void urbanpiper.pump().catch((e) => log.warn('urbanpiper outbox failed', String(e))); }, 5000);
 const port = Number(process.env.HUB_PORT ?? 4900);
 server.listen(port, process.env.HUB_HOST ?? '0.0.0.0', () => log.info(`DinePOS Cloud on http://localhost:${port} (data: ${dir})`));

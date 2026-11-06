@@ -18,6 +18,11 @@ if ! node --version 2>/dev/null | grep -q '^v24\.'; then
   apt-get install -y -q nodejs
 fi
 
+if ! command -v aws >/dev/null && command -v snap >/dev/null; then
+  say "AWS CLI (off-server backups to S3)"
+  snap install aws-cli --classic || echo "AWS CLI not installed: backups stay on this server."
+fi
+
 if ! command -v caddy >/dev/null; then
   say "Caddy (HTTPS)"
   curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
@@ -37,6 +42,10 @@ HUB_PORT=4900
 HUB_DATA_DIR=/var/lib/dinepos-cloud
 # Set to your own domain (e.g. hub.example.in) once its DNS points at this server, then run dinepos-cloud-domain.
 HUB_DOMAIN=
+# Off-server backups: an S3 bucket name (the server needs an IAM role that may write to it). Empty: backups stay here.
+HUB_S3_BUCKET=
+# Alerts (hosted outlet down, backup failed): a Slack, Discord or Google Chat webhook address. Empty: no alerts.
+HUB_ALERT_WEBHOOK=
 EOF
   chmod 600 /etc/dinepos-cloud.env
 fi
@@ -118,14 +127,14 @@ SCRIPT
 chmod 755 /usr/local/bin/dinepos-cloud-update
 
 # Daily copy of the hub database, last 14 days kept.
-cat > /etc/cron.daily/dinepos-cloud-backup <<'SCRIPT'
+# Every hour: the cloud's database and each hosted outlet's newest backup, kept 14 days here, and copied to S3 when
+# HUB_S3_BUCKET is set (deploy/backup.sh in the repository, so updates reach it).
+rm -f /etc/cron.daily/dinepos-cloud-backup
+cat > /etc/cron.hourly/dinepos-cloud-backup <<'SCRIPT'
 #!/bin/bash
-set -e
-mkdir -p /var/backups/dinepos-cloud
-sqlite3 /var/lib/dinepos-cloud/hub.db ".backup /var/backups/dinepos-cloud/hub-$(date +%F).db"
-find /var/backups/dinepos-cloud -name 'hub-*.db' -mtime +14 -delete
+exec /bin/bash /opt/dinepos/cloud/hub/deploy/backup.sh
 SCRIPT
-chmod 755 /etc/cron.daily/dinepos-cloud-backup
+chmod 755 /etc/cron.hourly/dinepos-cloud-backup
 
 say "The hub"
 id dineposcloud >/dev/null 2>&1 || useradd --system --home /var/lib/dinepos-cloud --shell /usr/sbin/nologin dineposcloud

@@ -8,6 +8,7 @@ import { UrbanPiper } from './urbanpiper.ts';
 import { GuestRelay, GUEST_CSP } from './relay.ts';
 import { REQUEST_HEADERS, Tunnels } from './tunnel.ts';
 import type { HostedOutlets } from './hosted.ts';
+import type { Monitor } from './monitor.ts';
 import { randomUUID } from 'node:crypto';
 import { acceptUpgrade, refuseUpgrade } from './ws.ts';
 import type { PublishedMenu } from '../../contract/src/menu.ts';
@@ -36,6 +37,8 @@ export interface HttpOptions {
   tunnels?: Tunnels;
   /** P6-04: outlets whose DinePOS server runs here (no main PC at the outlet). */
   hosted?: HostedOutlets;
+  /** Hosted outlets down, backups failing (GET /health/deep, the admin page). */
+  monitor?: Monitor;
 }
 
 interface Ctx { req: IncomingMessage; res: ServerResponse; params: Record<string, string>; query: URLSearchParams; body: unknown; ip: string }
@@ -141,6 +144,14 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server {
   // a guest page load is the page, its script and style, the menu, photos, then a status check every few seconds
   const guestLimit = limiter(() => 240);
   add('GET', '/health', () => ({ ok: true }));
+  /** For an uptime service: 503 while a hosted outlet is down or backups fail (store addresses only, no data). */
+  add('GET', '/health/deep', (c) => {
+    const r = o.monitor?.report() ?? { ok: true, problems: [], hosted: { total: 0, running: 0, down: [] }, backup: null, checkedAt: new Date().toISOString() };
+    const body = JSON.stringify(r);
+    c.res.writeHead(r.ok ? 200 : 503, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'no-store' });
+    c.res.end(body);
+    return Symbol.for('handled');
+  });
 
   // ---- website builder (the ordering website's /admin page): one store's editor password, then a token (X-Site-Token)
   const siteLoginLimit = limiter(() => 10);

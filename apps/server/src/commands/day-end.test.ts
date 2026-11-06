@@ -80,6 +80,19 @@ describe('DayEnd', () => {
     expect(h.count('processed_command', "command_id = 'old'")).toBe(0);
   });
 
+  it('finished print jobs older than 30 days drop their ticket bytes (the record stays); recent or waiting ones are kept', () => {
+    const job = (id: string, state: string, at: string) =>
+      h.db.prepare("INSERT INTO print_job (id, printer_id, doc_kind, bytes, preview_text, state, created_at) VALUES (?, ?, 'kot', x'1b40414243', 'KOT', ?, ?)").run(id, S.kitchenPrinter, state, at);
+    job('old-done', 'done', '2026-09-01T10:00:00.000Z');
+    job('old-failed', 'failed', '2026-09-01T10:00:00.000Z');
+    job('old-waiting', 'retry', '2026-09-01T10:00:00.000Z');
+    job('recent', 'done', '2026-10-30T10:00:00.000Z');
+    dayEnd(0);
+    const bytes = (id: string) => h.db.prepare('SELECT length(bytes) FROM print_job WHERE id = ?').pluck().get(id);
+    expect([bytes('old-done'), bytes('old-failed'), bytes('old-waiting'), bytes('recent')]).toEqual([0, 0, 5, 5]);
+    expect(h.count('print_job', "id IN ('old-done', 'old-failed')")).toBe(2);
+  });
+
   it('FORBIDDEN without the dayend right; DUPLICATE replay does not close twice', () => {
     h.fail('DayEnd', { cashCountedPaise: 0 }, 'FORBIDDEN', { rights: denyAll });
     const commandId = newId();

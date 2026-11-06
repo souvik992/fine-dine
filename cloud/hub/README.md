@@ -311,3 +311,34 @@ outlet (P6-03).
 - Back up `<HUB_DATA_DIR>/outlets` with the cloud's data (the daily copy covers the cloud's own database only). Each
   outlet's DinePOS server also keeps its own backups in its data folder.
 
+## Backups off the server
+
+Every hour, `deploy/backup.sh` (run by `/etc/cron.hourly/dinepos-cloud-backup`) does three things:
+- copies the cloud's own database into `/var/backups/dinepos-cloud`, one copy a day;
+- copies each hosted outlet's newest DinePOS backup into `.../outlets/<store id>/`;
+- keeps 14 days of copies there.
+
+A copy on the same server is lost with the server. To copy them off it:
+
+1. Create an S3 bucket (for example `yourbrand-dinepos-backups`, in the same region, with public access blocked).
+2. **EC2 › the instance › Actions › Security › Modify IAM role:** give it a role whose policy allows `s3:PutObject`,
+   `s3:ListBucket` and `s3:GetObject` on that bucket.
+3. In `/etc/dinepos-cloud.env`, set `HUB_S3_BUCKET=yourbrand-dinepos-backups`.
+
+From the next hour, everything is copied to `s3://<bucket>/dinepos-cloud/`, so losing the server loses at most an hour.
+The result of each run is in `<data>/backup-status.json`. The admin page warns while backups fail, or stay on the server
+only. For extra safety, also turn on daily EBS snapshots (**EC2 › Lifecycle Manager**).
+
+Servers installed before this change: run the one-line installer again. It keeps the key, the settings and the data, adds
+the hourly job and the AWS CLI, and removes the old daily job. Then add the `HUB_S3_BUCKET=` and `HUB_ALERT_WEBHOOK=`
+lines to `/etc/dinepos-cloud.env` yourself.
+
+## Monitoring and alerts
+
+- `GET /health/deep` answers 503 while a hosted outlet is down (more than a minute) or backups fail or have not run for
+  two hours. It names the problems, and lists store addresses only, no data. Point a free uptime service at it, for
+  example UptimeRobot with an HTTP(s) monitor on `https://<cloud>/health/deep`, to get an email or SMS when it is not 200.
+- `HUB_ALERT_WEBHOOK=<Slack, Discord or Google Chat webhook>` in `/etc/dinepos-cloud.env` posts each new problem, a
+  reminder every 6 hours while it lasts, and "resolved" when it is fixed (`src/monitor.ts`).
+- The admin page shows the same problems at the top.
+
