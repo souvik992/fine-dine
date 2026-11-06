@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, Menu, protocol, session, shell, type MenuItemConstructorOptions } from 'electron';
 import { CSP, isAppUrl, resolveAppFile, SCHEME, START_URL } from './protocol.js';
 import { ADDON_FILES, loadAddonFile, parseAddonUrl } from './addons.js';
+import { runServerMode } from './server-mode.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const RENDERER_DIR = path.join(here, '..', 'dist-renderer');
@@ -21,7 +22,11 @@ protocol.registerSchemesAsPrivileged([
 
 // Tests run the app in their own profile, so another copy (a dev window, the installed app) shares neither the
 // single-instance lock nor the stored session.
+/** `DinePOS.exe --server`: the DinePOS Server window on the master PC (server-mode.ts), not a billing terminal. */
+const SERVER_MODE = process.argv.includes('--server');
 if (process.env.DINEPOS_USER_DATA_DIR) app.setPath('userData', process.env.DINEPOS_USER_DATA_DIR);
+// its own profile, so the server window and a billing window run side by side on the master PC
+else if (SERVER_MODE) app.setPath('userData', path.join(app.getPath('appData'), 'DinePOS Server'));
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -99,6 +104,7 @@ function buildMenu(): void {
 }
 
 app.on('second-instance', () => {
+  if (SERVER_MODE) return; // server-mode.ts shows its own window
   const [win] = BrowserWindow.getAllWindows();
   if (win) {
     if (win.isMinimized()) win.restore();
@@ -122,6 +128,7 @@ void app.whenReady().then(() => {
   // The POS needs no camera, microphone, location or notifications from the web layer.
   session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
   protocol.handle(SCHEME, serveApp);
+  if (SERVER_MODE) return runServerMode(DEV_URL);
   buildMenu();
   createWindow();
   app.on('activate', () => {
@@ -130,5 +137,6 @@ void app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  if (SERVER_MODE) return; // the server keeps running in the tray
   if (process.platform !== 'darwin') app.quit();
 });

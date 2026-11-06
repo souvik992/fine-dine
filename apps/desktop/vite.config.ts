@@ -13,5 +13,12 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@dinepos/shared': shared, '@dinepos/client': client } },
   server: { port: 5173, strictPort: true, host: '127.0.0.1' },
-  build: { outDir: 'dist-renderer', emptyOutDir: true, target: 'chrome140', sourcemap: true },
+  build: {
+    outDir: 'dist-renderer',
+    emptyOutDir: true,
+    target: 'chrome140',
+    sourcemap: true,
+    // the billing app, and the DinePOS Server window (`DinePOS.exe --server`)
+    rollupOptions: { input: { main: fileURLToPath(new URL('./index.html', import.meta.url)), server: fileURLToPath(new URL('./server.html', import.meta.url)) } },
+  },
 });

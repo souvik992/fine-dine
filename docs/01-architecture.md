@@ -104,10 +104,21 @@ checking the same signature themselves. Code: `apps/server/src/addons/`, `apps/d
 ## Running the server on the master (P1-11)
 Decided 2026-11-02 by the product owner: the server runs as a **standalone local process, like the Tiffin order
 hub**, not as a Windows service. The installer's "Install as master" option adds a **DinePOS Server** shortcut
-(Start menu + desktop) that opens the bundled server (`resources\server\node.exe server.mjs`, Node 24.21.0) in its
-own window: production settings by default, data in `%ProgramData%\DinePOS`, JSON logs in
-`%ProgramData%\DinePOS\logs\server-<date>.log`, a start-up banner with the LAN address for terminals. Closing the
-window or Ctrl+C stops it cleanly. "Start with Windows" puts the shortcut in the all-users Startup folder, so the
-server starts when someone signs in (not before sign-in, which only a service could do). Firewall: inbound TCP 7420
+(Start menu + desktop) that opens the **DinePOS Server window** (`DinePOS.exe --server`,
+`apps/desktop/electron/server-mode.ts`; 2026-11-07, replacing the console window). It runs the bundled server
+(`resources\server\node.exe server.mjs`, Node 24.21.0) with production settings, data in `%ProgramData%\DinePOS`,
+JSON logs in `%ProgramData%\DinePOS\logs\server-<date>.log`, and shows:
+- whether the server is running, with Restart, Stop/Start, Open billing and Quit;
+- the business day, licence, backups and the DinePOS Cloud connection;
+- each LAN address with QR codes for captain phones (`/captain`) and kitchen screens (`/kds`), and devices waiting to
+  be paired;
+- the paired devices (online or not) and the printers;
+- the live log, with a Problems filter.
+
+The server is restarted by itself if it stops. Closing the window keeps the server running (tray icon); Quit asks, then
+stops it. A server already running on the port (started elsewhere) is shown, not started twice. The window uses its own
+profile, so a billing window runs beside it on the master PC. "Start with Windows" puts the shortcut (`--server
+--minimized`: tray only) in the all-users Startup folder, so the server starts when someone signs in (not before
+sign-in, which only a service could do). Firewall: inbound TCP 7420
 on private/domain profiles only. Users get modify rights on the data folder. Uninstall stops the server and removes
 shortcuts and the rule, never the data folder. Developers run it with `npm start` (bundle) or `npm run dev:server`.

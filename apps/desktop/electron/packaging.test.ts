@@ -21,9 +21,10 @@ describe('installer script (NSIS): standalone server like the order hub', () => 
     expect(nsh).toMatch(/ReadRegStr \$0 HKLM "\$\{DINEPOS_REG_KEY\}" "Master"/); // upgrades keep the choice
   });
 
-  it('starts the bundled server through a "DinePOS Server" shortcut (no Windows service)', () => {
-    expect(nsh).toContain('CreateShortCut "$SMPROGRAMS\\${DINEPOS_SERVER_LNK}" "${DINEPOS_SERVER_DIR}\\node.exe" \'"${DINEPOS_SERVER_DIR}\\server.mjs"\'');
-    expect(nsh).toContain('CreateShortCut "$SMSTARTUP\\${DINEPOS_SERVER_LNK}"');
+  it('starts the bundled server through a "DinePOS Server" shortcut: the DinePOS Server window (no Windows service)', () => {
+    expect(nsh).toContain('CreateShortCut "$SMPROGRAMS\\${DINEPOS_SERVER_LNK}" "$INSTDIR\\${APP_EXECUTABLE_FILENAME}" "--server"');
+    // at Windows start: in the tray
+    expect(nsh).toContain('CreateShortCut "$SMSTARTUP\\${DINEPOS_SERVER_LNK}" "$INSTDIR\\${APP_EXECUTABLE_FILENAME}" "--server --minimized"');
     expect(nsh).not.toMatch(/WinSW|sc\.exe|New-Service/i);
   });
 

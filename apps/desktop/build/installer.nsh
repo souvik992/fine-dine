@@ -110,10 +110,12 @@
       ; The server runs as whoever is signed in: every local user may write the data folder (S-1-5-32-545 = Users).
       nsExec::ExecToLog 'icacls "$APPDATA\DinePOS" /grant *S-1-5-32-545:(OI)(CI)M /T /Q'
       Pop $0
-      CreateShortCut "$SMPROGRAMS\${DINEPOS_SERVER_LNK}" "${DINEPOS_SERVER_DIR}\node.exe" '"${DINEPOS_SERVER_DIR}\server.mjs"' "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 SW_SHOWNORMAL "" "Run the DinePOS outlet server"
-      CreateShortCut "$DESKTOP\${DINEPOS_SERVER_LNK}" "${DINEPOS_SERVER_DIR}\node.exe" '"${DINEPOS_SERVER_DIR}\server.mjs"' "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 SW_SHOWNORMAL "" "Run the DinePOS outlet server"
+      ; The DinePOS Server window (DinePOS.exe --server) runs node.exe + server.mjs and shows its status; at Windows
+      ; start it opens in the tray (--minimized). The server itself is unchanged.
+      CreateShortCut "$SMPROGRAMS\${DINEPOS_SERVER_LNK}" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "--server" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 SW_SHOWNORMAL "" "Run the DinePOS outlet server"
+      CreateShortCut "$DESKTOP\${DINEPOS_SERVER_LNK}" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "--server" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 SW_SHOWNORMAL "" "Run the DinePOS outlet server"
       ${If} $DinePosAutostart == "1"
-        CreateShortCut "$SMSTARTUP\${DINEPOS_SERVER_LNK}" "${DINEPOS_SERVER_DIR}\node.exe" '"${DINEPOS_SERVER_DIR}\server.mjs"' "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 SW_SHOWMINIMIZED "" "Run the DinePOS outlet server"
+        CreateShortCut "$SMSTARTUP\${DINEPOS_SERVER_LNK}" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "--server --minimized" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 SW_SHOWMINIMIZED "" "Run the DinePOS outlet server"
       ${Else}
         Delete "$SMSTARTUP\${DINEPOS_SERVER_LNK}"
       ${EndIf}

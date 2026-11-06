@@ -88,11 +88,13 @@ archive holds node_modules or `resources/server` misses anything the server need
 
 ### Manual acceptance (P1-11) on a test PC or VM, not a live outlet PC
 1. Run `DinePOS-Setup-0.1.0.exe`, keep "Install as master" and "Start with Windows" ticked, finish.
-2. A "DinePOS Server" window opens showing the addresses; DinePOS opens and the floor says "Live" with no setup.
+2. The "DinePOS Server" window opens (Running, the addresses and QR codes for phones and kitchen screens); DinePOS
+   opens and the floor says "Live" with no setup.
 3. Reboot and sign in. The server window appears by itself; `http://127.0.0.1:7420/v1/health` → `"ok":true`;
    DinePOS shows "Live".
 4. From another PC on the LAN: `http://<master-ip>:7420/v1/health` answers (firewall rule).
-5. Close the server window → DinePOS shows "Offline"; open "DinePOS Server" from the Start menu → "Live" again.
+5. In the DinePOS Server window press Stop → DinePOS shows "Offline"; press Start → "Live" again. Closing the window
+   keeps the server running (tray icon by the clock); Quit stops it after asking.
 6. Uninstall → shortcuts gone, `%ProgramData%\DinePOS\dinepos.db` still present.
 
 ## Conflict handling

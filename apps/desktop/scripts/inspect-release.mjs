@@ -10,7 +10,7 @@ const { listPackage } = createRequire(import.meta.url)('@electron/asar');
 const problems = [];
 const entries = listPackage(`${release}resources/app.asar`).map((p) => p.replace(/\\/g, '/'));
 if (entries.some((p) => p.startsWith('/node_modules'))) problems.push('app.asar contains node_modules');
-for (const need of ['/package.json', '/dist-electron/main.js', '/dist-renderer/index.html']) {
+for (const need of ['/package.json', '/dist-electron/main.js', '/dist-electron/server-preload.cjs', '/dist-renderer/index.html', '/dist-renderer/server.html']) {
   if (!entries.includes(need)) problems.push(`app.asar is missing ${need}`);
 }
 

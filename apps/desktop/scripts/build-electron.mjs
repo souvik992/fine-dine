@@ -15,4 +15,16 @@ await build({
   sourcemap: true,
   logLevel: 'warning',
 });
-console.warn('built dist-electron/main.js');
+// The DinePOS Server window's preload (a sandboxed preload must be CommonJS; only electron is required).
+await build({
+  absWorkingDir: root,
+  entryPoints: ['electron/server-preload.ts'],
+  outfile: 'dist-electron/server-preload.cjs',
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  target: 'node22',
+  external: ['electron'],
+  logLevel: 'warning',
+});
+console.warn('built dist-electron/main.js and server-preload.cjs');
