@@ -6,13 +6,56 @@ Base path: `/api/v1`. Keep this separate from outlet POS `/v1` and hub `/v1` API
 - POST `/auth/register`
 - POST `/auth/login`
 - POST `/auth/verify-email`
+- POST `/auth/resend-verification`
 - POST `/auth/forgot-password`
 - POST `/auth/reset-password`
 - POST `/auth/refresh`
 - POST `/auth/logout`
 - GET/PATCH `/account/me`
 
-Register body: `{ fullName, email, phone?, password, organizationName, outletName }`. Response returns user/org/outlet IDs and verification state. Do not return a session until verification policy is satisfied.
+Registration is a single onboarding transaction with these sections:
+- Account: `fullName`, `email`, optional `phone`, `password`.
+- Business: `tradeName`, optional `registeredBusinessName`, `businessType`, `industry`, optional `pan`, `gstin`, `cin`, `fssaiLicense`, `websiteUrl`, `businessEmail`, `businessPhone`, registered address.
+- First outlet: `outletName`, optional `outletCode`, outlet phone/email, full address, optional outlet GSTIN/FSSAI licence and timezone.
+- Deployment: MVP demo signup selects `on_premise` + `windows`; hosted deployment remains a later gated capability.
+
+Response returns user/org/outlet IDs and verification state. Do not return an authenticated session until email verification succeeds. Create user, organization, owner membership, business profile, first outlet and trial/provisioning request transactionally or through a durable idempotent workflow. Do not start the 14-day trial clock until provisioning succeeds.
+
+Example (address values are illustrative):
+```json
+{
+  "fullName": "Alex Owner",
+  "email": "owner@example.com",
+  "phone": "+919876543210",
+  "password": "a-long-user-chosen-password",
+  "business": {
+    "tradeName": "Sakura Cafe",
+    "registeredBusinessName": "Sakura Foods Private Limited",
+    "businessType": "cafe",
+    "industry": "food_service",
+    "gstin": "optional",
+    "fssaiLicense": "optional",
+    "businessPhone": "+919876543210",
+    "address": {
+      "addressLine1": "12 Example Road",
+      "city": "Bengaluru",
+      "state": "Karnataka",
+      "postalCode": "560001",
+      "countryCode": "IN"
+    }
+  },
+  "outlet": {
+    "name": "Sakura Cafe - Indiranagar",
+    "phone": "+919876543210",
+    "city": "Bengaluru",
+    "state": "Karnataka",
+    "postalCode": "560038",
+    "timezone": "Asia/Kolkata"
+  }
+}
+```
+
+Tax IDs are optional for demo signup. Validate PAN/GSTIN syntax and state-code consistency when supplied; production tax compliance and invoice validation require accountant review. Never ask for bank credentials or payment card details in the registration form.
 
 ## Trials and activation
 - POST `/trials` — authenticated, idempotent; body `{ organizationId, outletName, deploymentType:"on_premise", platform:"windows" }`.
@@ -61,7 +104,7 @@ Checkout accepts a plan code and billing snapshot. Server calculates amount from
 Require admin role, MFA and audit every privileged action.
 
 ## Idempotency
-Require `Idempotency-Key` for trial creation, activation completion, checkout and licence issuance. Persist key + request hash + result; same key/same request replays result; same key/different request returns 409.
+Require `Idempotency-Key` for registration, trial creation, activation completion, checkout and licence issuance. Persist key + request hash + result; same key/same request replays result; same key/different request returns 409.
 
 ## Error codes
 `VALIDATION_ERROR`, `EMAIL_NOT_VERIFIED`, `ORGANIZATION_FORBIDDEN`, `TRIAL_ALREADY_USED`, `TRIAL_EXPIRED`, `PROVISIONING_IN_PROGRESS`, `ACTIVATION_CODE_INVALID`, `ACTIVATION_CODE_EXPIRED`, `HARDWARE_ALREADY_BOUND`, `ENTITLEMENT_LIMIT_REACHED`, `PAYMENT_NOT_VERIFIED`, `IDEMPOTENCY_CONFLICT`.
