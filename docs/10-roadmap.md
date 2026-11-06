@@ -143,3 +143,16 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
   UPI ("Table QR").
 - [x] **P5-05 Add-on installer**: `DinePOS-TableQR-Setup-<version>.exe` (NSIS, administrator) copies the signed package to
   `C:\ProgramData\DinePOS\addons\tableqr`; uninstall keeps its data.
+
+## Phase 6 â€” DinePOS Cloud (ADR-0005)
+
+- [x] **P6-01 DinePOS Cloud service** (`cloud/hub`): a separate cloud service for DinePOS only, copied from the Tiffin
+  hub and rebranded (service `dinepos-cloud`, one-line AWS installer from this repository): website orders, Swiggy /
+  Zomato through UrbanPiper, sales sync, licence renewals, backups, Table QR relay, website builder. Accept: its tests
+  pass (`npm run test:cloud`); a DinePOS outlet connects to it like to the old hub.
+- [ ] **P6-02 Devices from anywhere (relay)**: terminals, captain phones and kitchen screens reach the outlet PC through
+  the cloud (HTTP and the live stream down the outlet's own connection); pairing and rights unchanged; billing stays
+  offline-safe on the LAN.
+- [ ] **P6-03 Cloud printing**: a print agent at the outlet prints KOTs and bills queued in the cloud.
+- [ ] **P6-04 Hosted outlets**: the DinePOS server runs in the cloud, one database per outlet, chosen per outlet; no
+  master PC; printing through the agent.
