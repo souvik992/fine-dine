@@ -159,6 +159,11 @@ describe('desktop app', () => {
     await page.getByTestId('licence-status').getByText('Licensed', { exact: true }).waitFor();
     await page.getByTestId('licence-status').getByText(/Spice Garden \(E2E\)/).waitFor();
     expect(await page.getByTestId('hardware-id').innerText()).toBe(HARDWARE_ID);
+    // Copy puts it on the clipboard (the window may write the clipboard, nothing more)
+    await app.evaluate(({ clipboard }) => clipboard.writeText(''));
+    await page.getByTestId('hardware-id').locator('..').getByRole('button', { name: /Copy/ }).click();
+    await page.getByTestId('hardware-id').locator('..').getByRole('button', { name: /Copied/ }).waitFor();
+    expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe(HARDWARE_ID);
     await page.getByRole('list', { name: 'Seats' }).getByText('1 of 3').waitFor(); // this PC is one terminal
     // A key for another PC is refused with a reason.
     await page.getByLabel('Licence key').fill(testLicence().replace(/^[^.]+/, Buffer.from(JSON.stringify({ v: 1, licensee: 'x', hardwareId: '0000-0000-0000-0000-0000', issuedAt: '', expiresAt: '2030-01-01T00:00:00Z', seats: { terminals: 1, captains: 0, kds: 0 }, features: [] })).toString('base64url')));

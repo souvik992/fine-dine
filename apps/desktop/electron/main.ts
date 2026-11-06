@@ -125,8 +125,9 @@ app.on('web-contents-created', (_e, contents) => {
 });
 
 void app.whenReady().then(() => {
-  // The POS needs no camera, microphone, location or notifications from the web layer.
-  session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+  // The POS needs no camera, microphone, location or notifications from the web layer. Writing to the clipboard (the
+  // Copy buttons: cloud address, hardware id, print agent key) is allowed; reading it is not.
+  session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === 'clipboard-sanitized-write'));
   protocol.handle(SCHEME, serveApp);
   if (SERVER_MODE) return runServerMode(DEV_URL);
   buildMenu();
