@@ -11,7 +11,9 @@ import { ulid } from 'ulid';
 import { sessionAuth, type Authenticator } from './auth/authenticate.js';
 import { commandRegistry, coreHandlers } from './commands/registry.js';
 import type { AddonSet } from './addons/loader.js';
-import { addonRoutes, RELAY_HEADER } from './routes/addons.js';
+import { addonRoutes, RELAY_HEADER, relayedAddress } from './routes/addons.js';
+import { CloudTunnel, type TunnelAnswer, type TunnelRequest } from './cloud/tunnel.js';
+import type { WebSocket as WsSocket } from 'ws';
 import { randomBytes } from 'node:crypto';
 import type { GuestAnswer, GuestRequest } from './online/connector.js';
 import { linkRow } from './online/online-support.js';
@@ -90,7 +92,7 @@ export const LOG_REDACT = [
   'req.headers["x-manager-pin"]',
 ];
 
-export type DinePosApp = FastifyInstance & { realtime: RealtimeHub; online: OnlineConnector; sync: SyncAgent; guestRelay: (r: GuestRequest) => Promise<GuestAnswer> };
+export type DinePosApp = FastifyInstance & { realtime: RealtimeHub; online: OnlineConnector; sync: SyncAgent; guestRelay: (r: GuestRequest) => Promise<GuestAnswer>; cloud: CloudTunnel };
 
 /** Builds the HTTP app without listening, so tests can use `app.inject()`. */
 export function buildApp(deps: AppDeps): DinePosApp {
@@ -109,6 +111,14 @@ export function buildApp(deps: AppDeps): DinePosApp {
     void reply.header('x-request-id', req.id);
   });
 
+  // P5-03 / P6-02: requests that came through the cloud are replayed here with this secret (never a LAN client's)
+  const relaySecret = randomBytes(24).toString('base64url');
+  app.decorateRequest('viaCloud', false);
+  app.addHook('onRequest', (req, _reply, done) => {
+    req.viaCloud = relayedAddress(req.headers[RELAY_HEADER], relaySecret) !== null;
+    done();
+  });
+
   // Every request names its device (P2-02): a paired device's token, or the master PC itself (loopback).
   const trustLoopback = deps.trustLoopback ?? true;
   app.decorateRequest('deviceId', null);
@@ -122,7 +132,8 @@ export function buildApp(deps: AppDeps): DinePosApp {
       if (url === '/captain' || url.startsWith('/captain/') || url === '/kds' || url.startsWith('/kds/')) return done();
       // P5-01: add-ons' guest pages and guest API (public, rate limited) and their signed screens
       if (url.startsWith('/a/')) return done();
-      if (trustLoopback && isLoopback(req.ip)) {
+      // through the cloud it is a remote device, whatever the replay's own address (P6-02)
+      if (trustLoopback && isLoopback(req.ip) && !req.viaCloud) {
         req.deviceId = MASTER_DEVICE_ID;
         req.deviceKind = 'master';
         return done();
@@ -199,7 +210,6 @@ export function buildApp(deps: AppDeps): DinePosApp {
     };
   const auth = deps.auth ?? sessionAuth(db, now);
   // P5-03: guest requests the order hub relays (phones on mobile data) are replayed here, for add-on guest pages only
-  const relaySecret = randomBytes(24).toString('base64url');
   const guestRelay = async (r: GuestRequest): Promise<GuestAnswer> => {
     const m = /^\/a\/([a-z][a-z0-9]{1,19})\//.exec(String(r.path));
     if (!m || r.path.includes('..') || r.path.includes('/_pkg/') || !addons?.hubAllowed(m[1]!)) {
@@ -237,9 +247,38 @@ export function buildApp(deps: AppDeps): DinePosApp {
   const online = new OnlineConnector({ db, now, execute, bus, relay: guestRelay, wantsHub: () => addons?.wantsHub() ?? false, ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}), log: { info: (m, d) => app.log.info(d ?? {}, m), warn: (m, d) => app.log.warn(d ?? {}, m) } });
   // P4-05: the outbox sent up to the same hub, licence renewals fetched down. Started by the server; idle unless paired.
   const sync = new SyncAgent({ db, now, execute, bus, ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}), log: { info: (m, d) => app.log.info(d ?? {}, m), warn: (m, d) => app.log.warn(d ?? {}, m) } });
+  // P6-02: terminals, captain phones and kitchen screens through DinePOS Cloud (tunnelled to this PC)
+  const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'] as const;
+  const cloudInject = async (r: TunnelRequest): Promise<TunnelAnswer> => {
+    const method = METHODS.find((m) => m === r.method.toUpperCase());
+    if (!method || !r.path.startsWith('/') || r.path.startsWith('//')) {
+      return { status: 400, headers: { 'content-type': 'application/json; charset=utf-8' }, body: Buffer.from(JSON.stringify(errorBody('VALIDATION', 'Bad request.'))) };
+    }
+    const headers: Record<string, string> = {};
+    for (const [k, v] of Object.entries(r.headers)) if (k !== 'host' && k !== RELAY_HEADER && typeof v === 'string') headers[k] = v;
+    headers[RELAY_HEADER] = `${relaySecret} cloud`;
+    const res = await app.inject({ method, url: r.path, headers, ...(r.body?.length ? { payload: r.body } : {}) });
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(res.headers)) {
+      if (k === 'content-length' || k === 'transfer-encoding' || k === 'connection' || v === undefined) continue;
+      out[k] = Array.isArray(v) ? v.join(', ') : String(v);
+    }
+    return { status: res.statusCode, headers: out, body: res.rawPayload };
+  };
+  const cloud = new CloudTunnel({
+    db,
+    bus,
+    inject: cloudInject,
+    // a device's stream through the cloud is never the master PC's own: authorised by its device token alone
+    attachStream: (socket) => hub.attach(socket as unknown as WsSocket, 'cloud'),
+    ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}),
+    log: { info: (m, d) => app.log.info(d ?? {}, m), warn: (m, d) => app.log.warn(d ?? {}, m) },
+  });
+  app.get('/v1/cloud', (_req, reply) => reply.header('cache-control', 'no-store').send(cloud.status()));
   app.addHook('onClose', async () => {
     await online.stop();
     await sync.stop();
+    await cloud.stop();
   });
   onlineRoutes(app, { db, now, connector: online, execute, ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}) });
   syncRoutes(app, { db, now, agent: sync });
@@ -252,7 +291,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
   webAppRoutes(app, 'kds', deps.kdsDir ?? defaultWebDir('kds'));
   if (deps.backups) backupRoutes(app, { db, now, timeZone, dataDir: deps.backups.dataDir, backups: deps.backups.scheduler, requestRestart: deps.backups.requestRestart });
   streamRoutes(app, hub, allowedOrigins);
-  return Object.assign(app, { realtime: hub, online, sync, guestRelay });
+  return Object.assign(app, { realtime: hub, online, sync, guestRelay, cloud });
 }
 
 function errorBody(code: string, message: string, details?: unknown) {
@@ -265,5 +304,7 @@ declare module 'fastify' {
     deviceId: string | null;
     /** The paired device's kind, or `master` for the master PC itself (P4-02: device rights). */
     deviceKind: DeviceKind | null;
+    /** P6-02: replayed from DinePOS Cloud (a remote device), never the master PC itself. */
+    viaCloud: boolean;
   }
 }

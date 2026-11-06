@@ -150,9 +150,11 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria �
   hub and rebranded (service `dinepos-cloud`, one-line AWS installer from this repository): website orders, Swiggy /
   Zomato through UrbanPiper, sales sync, licence renewals, backups, Table QR relay, website builder. Accept: its tests
   pass (`npm run test:cloud`); a DinePOS outlet connects to it like to the old hub.
-- [ ] **P6-02 Devices from anywhere (relay)**: terminals, captain phones and kitchen screens reach the outlet PC through
+- [x] **P6-02 Devices from anywhere (relay)**: terminals, captain phones and kitchen screens reach the outlet PC through
   the cloud (HTTP and the live stream down the outlet's own connection); pairing and rights unchanged; billing stays
-  offline-safe on the LAN.
+  offline-safe on the LAN. Each outlet is at `https://<store>.<cloud>` (HTTPS made on demand for known stores only);
+  the outlet keeps one outgoing WebSocket (`/v1/pos/tunnel`); Settings › Cloud sync › Devices from anywhere. Accept: a
+  device through the cloud is never the trusted master PC (no token: 401); the live stream works for paired devices.
 - [ ] **P6-03 Cloud printing**: a print agent at the outlet prints KOTs and bills queued in the cloud.
 - [ ] **P6-04 Hosted outlets**: the DinePOS server runs in the cloud, one database per outlet, chosen per outlet; no
   master PC; printing through the agent.

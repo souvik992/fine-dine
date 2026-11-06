@@ -1,6 +1,6 @@
 # ADR-0005: DinePOS Cloud
 
-Status: accepted (2026-11-06, P6-01). P6-02 to P6-04 are planned.
+Status: accepted (2026-11-06). P6-01 and P6-02 built; P6-03 and P6-04 planned.
 
 ## Context
 
@@ -31,10 +31,13 @@ and the Table QR relay. The owner wants a cloud service for DinePOS only:
    Settings › Online orders › Order hub.
 
 2. **Two ways to run an outlet, chosen per outlet:**
-   - **Relay (P6-02):** the outlet PC stays the master and the only database (ADR-0001), and billing keeps working on the
-     LAN without internet. Devices outside the LAN reach it through the cloud. Their HTTP requests and the live stream
-     travel down the outlet's own outgoing connection, the same way as the Table QR relay (ADR-0004). The outlet never
-     accepts incoming connections. Device pairing, sessions and rights stay exactly as on the LAN.
+   - **Relay (P6-02, built):** the outlet PC stays the master and the only database (ADR-0001), and billing keeps working
+     on the LAN without internet. Devices outside the LAN reach it at `https://<store>.<cloud>`. The PC keeps one
+     outgoing WebSocket to `<cloud>/v1/pos/tunnel` (`apps/server/src/cloud/tunnel.ts`, `cloud/hub/src/tunnel.ts`). Device
+     HTTP requests are replayed inside the server, and their live streams are attached to the realtime hub through a
+     virtual socket. The outlet never accepts incoming connections. Device pairing, sessions and rights stay exactly as
+     on the LAN, and a replayed request is never the trusted master PC. The cloud keeps zero runtime dependencies,
+     including its own small WebSocket server (`cloud/hub/src/ws.ts`).
    - **Hosted (P6-04):** the DinePOS server runs inside the cloud, one database per outlet with one writer per outlet,
      and devices point at the cloud address. This needs internet at the outlet; there is no offline billing in this
      mode, and the owner chooses it knowing that.

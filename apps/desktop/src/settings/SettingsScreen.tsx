@@ -32,7 +32,7 @@ const SECTIONS: Array<{ key: SectionKey; label: string; hint: string; icon: Comp
   { key: 'staff', label: 'Staff & roles', hint: 'People, PINs, rights and discount limits', icon: Users, right: 'users.manage' },
   { key: 'sections', label: 'Captain sections', hint: 'Who looks after which areas and tables', icon: MapPinned, right: 'staff.sections' },
   { key: 'online', label: 'Online orders', hint: 'Order hub, delivery, charges, hours', icon: ShoppingBag, right: 'admin' },
-  { key: 'sync', label: 'Cloud sync', hint: 'Sales sent to the hub; licence renewals', icon: CloudUpload, right: 'admin' },
+  { key: 'sync', label: 'Cloud sync', hint: 'Sales to the cloud, licence renewals, devices from anywhere', icon: CloudUpload, right: 'admin' },
   { key: 'licence', label: 'Licence', hint: 'Key, end date, seats; this PC’s hardware id', icon: KeyRound, right: 'admin' },
   { key: 'addons', label: 'Add-ons', hint: 'Installed add-ons and whether each is on', icon: Puzzle, right: 'admin' },
   { key: 'terminal', label: 'This terminal', hint: 'Outlet server address', icon: MonitorSmartphone, right: null },

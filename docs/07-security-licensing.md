@@ -157,3 +157,11 @@ request can carry that kind.
   `/v1`, never the signed package files) and only while that add-on allows it. A relayed request carries the guest's
   address with a per-start secret; a header guessed by someone on the network is ignored. The hub stores no guest data
   and caches only the page and its files, for a minute; only the store the request was sent to may answer it.
+- Devices from anywhere (P6-02): the outlet PC opens one outgoing WebSocket to DinePOS Cloud with its device key; the cloud
+  sends devices' requests and live streams for `https://<store>.<cloud>` down it. Replayed requests carry a per-start
+  secret, so they are never the master PC on loopback: each device needs its own pairing token, and staff their PIN and
+  rights, exactly as on the LAN. Only the device's credentials and content headers pass (no cookies); only a fixed list
+  of answer headers comes back. Device streams are accepted only from the outlet's own address, the DinePOS terminal
+  app or a native client. Caddy makes HTTPS certificates on demand only for addresses the cloud confirms
+  (`/v1/tls-ask`). The cloud stores none of this traffic.
+

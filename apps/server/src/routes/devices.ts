@@ -32,7 +32,7 @@ export function deviceRoutes(app: FastifyInstance, deps: { db: Db; now: () => Da
   app.get('/v1/device', (req, reply) => {
     const id = req.deviceId ?? MASTER_DEVICE_ID;
     const d = db.prepare('SELECT id, name, kind FROM device WHERE id = ?').get(id) as { id: string; name: string; kind: string };
-    return reply.headers(noStore).send({ ...d, master: id === MASTER_DEVICE_ID, loopback: isLoopback(req.ip) });
+    return reply.headers(noStore).send({ ...d, master: id === MASTER_DEVICE_ID, loopback: isLoopback(req.ip) && !req.viaCloud });
   });
 
   app.get('/v1/devices', (req, reply) => {

@@ -271,3 +271,21 @@ event stream as a `guest.request` event (no event number, never replayed). The P
 - If the POS does not answer within 15 s, the guest gets "did not answer in time" (504).
 - Limits: 240 requests a minute per address, and at most 40 waiting requests per store.
 - The page and its script and style files are kept for a minute.
+
+## Devices from anywhere (P6-02)
+
+Each outlet has its own address, `https://<store>.<cloud address>`, for example `https://spice-garden.3-6-30-45.sslip.io`
+or `https://spice-garden.cloud.yourbrand.in`. Captain phones, kitchen screens and terminals use it exactly like the
+outlet PC's LAN address, but from anywhere.
+
+- The outlet's main PC keeps one outgoing WebSocket to `/v1/pos/tunnel`, authorised with its device key. Every request
+  and live stream for the outlet's address goes down it (`src/tunnel.ts`; `src/ws.ts` is the small WebSocket server).
+  Nothing is stored here.
+- Caddy makes each outlet address's HTTPS certificate on demand, only after `/v1/tls-ask` confirms the store (see the
+  Caddyfile written by `dinepos-cloud-domain`). With your own domain, add a wildcard DNS record `*.cloud.yourbrand.in`
+  pointing at the server too.
+- `HUB_DEVICE_DOMAIN` overrides the base name (default: the host of `HUB_PUBLIC_URL`).
+- If the PC is not connected, devices get a clear 503: the outlet's own network still works.
+- On the outlet PC: **Settings › Cloud sync › Devices from anywhere**, switch on. It shows the outlet's address and how
+  to set up each kind of device.
+

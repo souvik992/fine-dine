@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { ErrorText, SectionHeader, useSave } from './common.js';
+import { RemoteDevices } from './RemoteDevices.js';
 
 const STATE_TEXT: Record<SyncStatus['state'], string> = {
   'not-paired': 'Not connected to a hub',
@@ -96,6 +97,7 @@ export function CloudSyncSettings() {
           </p>
         </>
       )}
+      <RemoteDevices />
     </div>
   );
 }

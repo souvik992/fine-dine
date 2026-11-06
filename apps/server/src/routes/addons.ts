@@ -117,7 +117,7 @@ export function addonRoutes(app: FastifyInstance, deps: AddonRouteDeps): void {
 function mount(app: FastifyInstance, a: LoadedAddon, r: AddonRoute, deps: AddonRouteDeps, limiter: RateLimiter): void {
   const url = r.access === 'staff' ? `/v1/addons/${a.manifest.id}${r.path}` : `/a/${a.manifest.id}/api${r.path}`;
   const handler = async (req: FastifyRequest, reply: FastifyReply) => {
-    const relayed = guestAddress(req.headers[RELAY_HEADER], deps.relaySecret);
+    const relayed = relayedAddress(req.headers[RELAY_HEADER], deps.relaySecret);
     const ip = relayed ?? req.ip;
     if (r.access === 'guest' && !limiter.take(`${a.manifest.id}:${relayed ? 'hub:' : ''}${ip}`)) throw new PosError('RATE_LIMITED', 'Too many requests. Please wait a moment.');
     const actor = r.access === 'staff' ? deps.auth.authenticate(req, r.right ? { right: r.right } : {}) : null;
@@ -147,7 +147,7 @@ function mount(app: FastifyInstance, a: LoadedAddon, r: AddonRoute, deps: AddonR
 }
 
 /** The guest's address of a relayed request, when it carries the right secret; otherwise null. */
-function guestAddress(header: string | string[] | undefined, secret: string | undefined): string | null {
+export function relayedAddress(header: string | string[] | undefined, secret: string | undefined): string | null {
   if (!secret || typeof header !== 'string') return null;
   const [given, ip] = header.split(' ');
   return given === secret && ip ? ip.slice(0, 64) : null;

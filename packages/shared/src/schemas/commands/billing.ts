@@ -121,6 +121,11 @@ export const configSchemas = {
     .max(260)
     .regex(/^([A-Za-z]:[\\/]|\\\\|\/)/, 'use a full folder path, like E:\\ or D:\\Backups')
     .nullable(),
+  /**
+   * P6-02: terminals, captain phones and kitchen screens may reach this outlet through DinePOS Cloud
+   * (https://<store>.<cloud>), tunnelled to this PC. Needs the outlet connected to the cloud.
+   */
+  'cloud.remoteDevices': z.boolean(),
 } as const;
 
 export type ConfigKey = keyof typeof configSchemas;

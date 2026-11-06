@@ -25,6 +25,7 @@ export const CONFIG_DEFAULTS: OutletConfig = {
   'online.settings': DEFAULT_ONLINE_SETTINGS,
   'reservation.graceMin': 15,
   'backup.copyDir': null,
+  'cloud.remoteDevices': false,
 };
 
 const KEYS = Object.keys(configSchemas) as ConfigKey[];
