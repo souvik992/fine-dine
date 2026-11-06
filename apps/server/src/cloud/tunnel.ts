@@ -172,7 +172,7 @@ export class CloudTunnel {
         if (!this.running) break;
         this.lastError ??= 'the cloud closed the connection';
       } catch (e) {
-        this.lastError = e instanceof Error ? e.message : String(e);
+        this.lastError = (await this.whyRefused()) ?? (e instanceof Error ? e.message : String(e));
       }
       for (const s of this.streams.values()) s.ended(1012);
       this.streams.clear();
@@ -214,6 +214,22 @@ export class CloudTunnel {
         resolve();
       };
     });
+  }
+
+  /**
+   * After a failed connection: a hub that answers but has no relay (the Tiffin order hub, or an old DinePOS Cloud) is
+   * named as such, so the owner knows to link this outlet to a DinePOS Cloud server rather than wait for it to recover.
+   */
+  private async whyRefused(): Promise<string | null> {
+    const link = linkRow(this.o.db);
+    try {
+      const r = await this.o.fetch(`${String(link.hub_url).replace(/\/+$/, '')}/v1/pos/tunnel-info`, { headers: { authorization: `Bearer ${link.device_key ?? ''}` }, signal: AbortSignal.timeout(10_000) });
+      if (r.status === 404) return 'this hub is not DinePOS Cloud (it has no device relay): link this outlet to a DinePOS Cloud server';
+      if (r.status === 401 || r.status === 403) return 'DinePOS Cloud does not know this outlet: link it again in Cloud sync';
+    } catch {
+      // not reachable at all: the connection error says so
+    }
+    return null;
   }
 
   /** The device address for this outlet, as the cloud names it. */

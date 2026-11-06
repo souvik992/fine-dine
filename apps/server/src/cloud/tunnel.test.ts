@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { newId } from '@dinepos/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp, type DinePosApp } from '../app.js';
+import { CloudTunnel } from './tunnel.js';
 import { commandRegistry } from '../commands/registry.js';
 import { ensureBusinessDay } from '../core/business-day.js';
 import { EventBus, noopPrintWaker } from '../core/events.js';
@@ -172,5 +173,31 @@ describe('devices through DinePOS Cloud (P6-02)', () => {
     app.cloud.refresh();
     await expect.poll(() => app.cloud.status().connection, { timeout: 10_000 }).toBe('off');
     await expect.poll(async () => (await device('/v1/health')).status, { timeout: 10_000 }).toBe(503);
+  });
+});
+
+describe('a hub without the device relay (the Tiffin order hub)', () => {
+  it('is named as not DinePOS Cloud instead of "could not reach"', { timeout: 20_000 }, async () => {
+    // answers everything (sync works) but has no /v1/pos/tunnel or /v1/pos/tunnel-info
+    const plain = http.createServer((_req, res) => {
+      res.writeHead(404, { 'content-type': 'application/json' });
+      res.end('{"error":{"code":"NOT_FOUND"}}');
+    });
+    await new Promise<void>((r) => plain.listen(0, '127.0.0.1', () => r()));
+    const tdb = createTestDb();
+    try {
+      tdb.prepare('UPDATE online_link SET hub_url = ?, device_key = ?, store_slug = ? WHERE id = 1').run(`http://127.0.0.1:${(plain.address() as { port: number }).port}`, 'key', 'dum-durrust');
+      setConfigValue(tdb, 'cloud.remoteDevices', true);
+      const t = new CloudTunnel({ db: tdb, bus: new EventBus(), inject: () => Promise.reject(new Error('unused')), attachStream: () => undefined, retryMs: [60_000] });
+      t.start();
+      await expect.poll(() => t.status().lastError, { timeout: 10_000 }).toMatch(/not DinePOS Cloud/);
+      await t.stop();
+    } finally {
+      tdb.close();
+      await new Promise<void>((r) => {
+        plain.close(() => r());
+        plain.closeAllConnections();
+      });
+    }
   });
 });
