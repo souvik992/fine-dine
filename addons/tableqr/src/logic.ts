@@ -11,10 +11,15 @@ export interface QrSettings {
   payOnline: boolean;
   /** Address printed in the QR codes for guests on the outlet's Wi-Fi (empty: the server's first network address). */
   baseUrl: string;
+  /**
+   * What the codes open (P5-03): the outlet server on the Wi-Fi, or the order hub on the internet (phones on mobile data
+   * too; the hub relays each request to this outlet over its own connection).
+   */
+  codeAddress: 'wifi' | 'hub';
   welcome: string;
 }
 
-export const DEFAULT_SETTINGS: QrSettings = { enabled: false, acceptMode: 'staff', payOnline: false, baseUrl: '', welcome: '' };
+export const DEFAULT_SETTINGS: QrSettings = { enabled: false, acceptMode: 'staff', payOnline: false, baseUrl: '', codeAddress: 'wifi', welcome: '' };
 
 export type RequestKind = 'order' | 'waiter' | 'pay';
 export type RequestStatus = 'pending' | 'accepted' | 'rejected' | 'done';
@@ -125,6 +130,12 @@ export function guestUrl(base: string, token: string): string {
   return `${base.replace(/\/+$/, '')}/a/tableqr/?t=${encodeURIComponent(token)}`;
 }
 
+/** Where the codes point: the order hub's address for this store (`<hub>/s/<store>`), or the server on the Wi-Fi. */
+export function codeBase(s: Pick<QrSettings, 'codeAddress' | 'baseUrl'>, wifi: string, hub: { url: string; storeSlug: string } | null): string {
+  if (s.codeAddress === 'hub') return hub ? `${hub.url.replace(/\/+$/, '')}/s/${encodeURIComponent(hub.storeSlug)}` : '';
+  return s.baseUrl || wifi;
+}
+
 /** The marks on a floor tile from the table's pending requests. */
 export function badgesFor(pending: ReadonlyArray<{ kind: RequestKind; amountPaise: number | null }>): Array<{ key: string; label: string; tone: 'info' | 'warn' | 'alert' }> {
   const out: Array<{ key: string; label: string; tone: 'info' | 'warn' | 'alert' }> = [];
@@ -144,6 +155,7 @@ export function readSettings(rows: ReadonlyArray<{ key: string; value: string }>
     acceptMode: m.get('acceptMode') === 'auto' ? 'auto' : 'staff',
     payOnline: m.get('payOnline') === '1',
     baseUrl: m.get('baseUrl') ?? '',
+    codeAddress: m.get('codeAddress') === 'hub' ? 'hub' : 'wifi',
     welcome: m.get('welcome') ?? '',
   };
 }

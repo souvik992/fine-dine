@@ -35,6 +35,14 @@ Any failure switches that add-on off with a reason, shown in Settings › Add-on
 - **Floor badges.** `host.floorBadges()` adds marks to floor tiles (`FloorTable.badges`). The desktop and captain apps show them.
 - **The add-on's own actor.** `host.systemActor()` is the add-on acting with no one signed in. It may use only the rights listed in its signed manifest (`rights`), for example `kot.fire` when guest orders are accepted automatically.
 
+**Through the order hub (P5-03).** An add-on may let guests reach its pages through the order hub
+(`host.hubAccess(fn)`, e.g. Table QR with codes pointing at the hub). Phones then open
+`<hub>/s/<store>/a/<id>/…`. The hub sends each request down the outlet's existing event stream as a `guest.request`
+event, never stored or numbered. The outlet replays it inside the server on `/a/<id>/…` only, with a secret header
+carrying the guest's address so rate limits stay per guest, and posts the answer to `POST /v1/pos/relay/:id`. The outlet
+keeps the hub connection open while any add-on wants it, even with online orders off. The hub keeps only the page and its
+script and style files for a minute, so many guests opening the menu do not each pull them down the restaurant's line.
+
 **Screens.** The terminal asks `GET /v1/addons` which add-ons are on and loads `app://dinepos/addons/<id>/ui.js?server=…`. The Electron main process fetches the manifest and the file from the server's public `/a/<id>/_pkg/…`. It checks the signature itself with the keys built into the app, then serves the file (`apps/desktop/electron/addons.ts`). A server, or anyone on the LAN, cannot make a terminal run unsigned code. The renderer CSP stays `script-src 'self'`.
 
 The add-on's `ui.js`:

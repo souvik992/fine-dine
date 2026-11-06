@@ -58,7 +58,13 @@ A UPI payment is settled only by a cashier with `bill.settle`, after they confir
 - The table code is 18 random bytes. A new code stops the old one at once.
 - The guest API is public but rate-limited per address. Each table can have at most 5 requests waiting.
 - The guest page may load only its own files and talk only to the outlet server (CSP).
-- Phones must be on the outlet's Wi-Fi in this version. P5-03 adds the order hub for phones on mobile data.
+- **What the codes open** (Settings › Table QR):
+  - **the internet, through the order hub** (recommended): works on mobile data. The outlet must be connected to the order
+    hub (Settings › Online orders › Order hub); online orders need not be on. The hub only relays: each request goes down
+    the outlet's own connection, and nothing about guests or orders is kept on the hub. If the outlet is offline, guests
+    are told so.
+  - **the outlet Wi-Fi only**: works with no internet; guests must join the Wi-Fi first.
+  Changing it changes every code: print them again.
 
 ## Build, test, install
 

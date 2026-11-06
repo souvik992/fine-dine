@@ -5,7 +5,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { MenuItem, MenuSnapshot, OrderSnapshot } from '@dinepos/shared';
 import { z } from 'zod';
-import { badgesFor, checkOrder, guestUrl, readSettings, stableId, upiLink, type CheckedLine, type QrSettings, type RequestKind, type RequestStatus } from './logic.js';
+import { badgesFor, checkOrder, codeBase, guestUrl, readSettings, stableId, upiLink, type CheckedLine, type QrSettings, type RequestKind, type RequestStatus } from './logic.js';
 
 // ---- the host (apps/server/src/addons/loader.ts); only what this add-on uses ----
 interface Actor {
@@ -51,6 +51,9 @@ interface Host {
   order(orderId: string): OrderSnapshot | null;
   config(): Record<string, string | number | boolean | null | string[]>;
   network(): { addresses: string[]; port: number };
+  /** DinePOS with P5-03 (older ones: Wi-Fi codes only). */
+  hub?(): { url: string; storeSlug: string; connected: boolean } | null;
+  hubAccess?(fn: () => boolean): void;
 }
 
 const MIGRATIONS = [
@@ -91,6 +94,7 @@ const settingsSchema = z
     acceptMode: z.enum(['staff', 'auto']),
     payOnline: z.boolean(),
     baseUrl: z.union([z.literal(''), z.string().trim().max(200).regex(/^https?:\/\/[^\s/?#]+(:\d+)?\/?$/, 'Use an address such as http://192.168.1.20:7420')]),
+    codeAddress: z.enum(['wifi', 'hub']).default('wifi'),
     welcome: z.string().trim().max(200),
   })
   .strict();
@@ -141,10 +145,13 @@ export function register(host: Host): void {
         ['acceptMode', p.acceptMode],
         ['payOnline', p.payOnline ? '1' : '0'],
         ['baseUrl', p.baseUrl.replace(/\/+$/, '')],
+        ['codeAddress', p.codeAddress],
         ['welcome', p.welcome],
       ];
       for (const [k, v] of rows) ctx.db.prepare('INSERT INTO tableqr_setting (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(k, v);
       ctx.audit({ entity: 'tableqr', entityId: 'settings', action: 'tableqr.settings', before, after: p });
+      // the outlet keeps its order hub connection while the codes point there (P5-03)
+      if (before.codeAddress !== p.codeAddress || before.enabled !== p.enabled) ctx.emit('system', 'addon.hub', { addonId: 'tableqr' });
       return { result: { saved: true } };
     },
   });
@@ -228,11 +235,17 @@ export function register(host: Host): void {
     const m = host.menu();
     return { m, byId: new Map<string, MenuItem>(m.items.map((i) => [i.id, i])) };
   };
-  const baseUrl = (s: QrSettings) => {
-    if (s.baseUrl) return s.baseUrl;
+  const wifiUrl = () => {
     const n = host.network();
     return n.addresses[0] && n.port ? `http://${n.addresses[0]}:${n.port}` : '';
   };
+  const hubLink = () => host.hub?.() ?? null;
+  const baseUrl = (s: QrSettings) => codeBase(s, wifiUrl(), hubLink());
+  // guests reach these pages through the order hub only while the codes point there
+  host.hubAccess?.(() => {
+    const s = settings();
+    return s.enabled && s.codeAddress === 'hub';
+  });
   const since = (iso: string) => new Date(Date.parse(iso) - LIVE_HOURS * 3_600_000).toISOString();
 
   host.floorBadges((db) => {
@@ -284,6 +297,8 @@ export function register(host: Host): void {
         upiReady: !!cfg['bill.upiVpa'],
         outletName: text(cfg['outlet.name']),
         baseUrl: base,
+        wifiUrl: wifiUrl(),
+        hub: hubLink(),
         addresses: host.network().addresses,
         port: host.network().port,
         tables: tables.map((t) => ({ id: t.id, label: t.label, area: t.area, url: t.token && base ? guestUrl(base, t.token) : null })),

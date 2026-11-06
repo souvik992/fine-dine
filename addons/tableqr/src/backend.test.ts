@@ -204,4 +204,45 @@ describe('Table QR', () => {
     const res = await app.inject({ method: 'POST', url: '/v1/commands', payload: { commandId: newId(), type: 'TableQrResolve', payload: { requestId: newId(), status: 'done' }, createdAt: now().toISOString() } });
     expect(res.json<Err>().error?.message).toMatch(/Unknown command type/);
   });
+
+  it('through the order hub (P5-03): codes point at <hub>/s/<store>; relayed requests are answered only while the codes point there', async () => {
+    db.prepare("UPDATE online_link SET hub_url = 'https://hub.example.in', device_key = 'dev-key', store_slug = 'spice-garden' WHERE id = 1").run();
+    const { token } = await setUp('staff');
+    const relay = (path: string, ip = '203.0.113.7', method: 'GET' | 'POST' = 'GET', body: unknown = null) =>
+      app.guestRelay({ id: 'r1', method, path, query: method === 'GET' ? `t=${token}&g=${GUEST}` : '', body: body === null ? null : JSON.stringify(body), ip });
+    // Wi-Fi codes: the hub may not reach the guest pages
+    expect((await relay('/a/tableqr/api/table')).status).toBe(404);
+    const s = (await staff<{ settings: Record<string, unknown> }>('GET', '/settings')).body.settings;
+    const hubEvents = () => db.prepare("SELECT count(*) FROM event_log WHERE event = 'addon.hub'").pluck().get() as number;
+    const before = hubEvents(); // switching Table QR on already told the connector once
+    expect((await staff('POST', '/settings', { ...s, codeAddress: 'hub' })).status).toBe(200);
+    expect(hubEvents()).toBe(before + 1);
+    const t2 = (await staff<{ tables: Array<{ label: string; url: string }>; hub: { storeSlug: string } }>('GET', '/settings')).body;
+    expect(t2.hub).toMatchObject({ url: 'https://hub.example.in', storeSlug: 'spice-garden', connected: false });
+    expect(t2.tables.find((t) => t.label === 'T2')!.url).toBe(`https://hub.example.in/s/spice-garden/a/tableqr/?t=${token}`);
+
+    const table = await relay('/a/tableqr/api/table');
+    expect(table).toMatchObject({ status: 200, cacheControl: 'no-store' });
+    expect(table.contentType).toContain('application/json');
+    expect(JSON.parse(Buffer.from(table.bodyBase64, 'base64').toString())).toMatchObject({ table: 'T2' });
+    const page = await relay('/a/tableqr/');
+    expect(page.contentType).toContain('text/html');
+    expect(Buffer.from(page.bodyBase64, 'base64').toString()).toContain('<title>Order</title>');
+    // a guest order through the hub is the same request as on the Wi-Fi
+    const m = await menu();
+    const dish = m.items.find((x) => x.available && !x.variants.length && !x.addonGroupIds.length)!;
+    const placed = await relay('/a/tableqr/api/order', '203.0.113.7', 'POST', { t: token, guestId: GUEST, covers: 2, lines: [{ itemId: dish.id, qty: 1 }] });
+    expect(placed.status).toBe(200);
+    expect(db.prepare("SELECT count(*) FROM tableqr_request WHERE kind = 'order' AND status = 'pending'").pluck().get()).toBe(1);
+    // never the staff side, the package files or other paths
+    for (const path of ['/v1/floor', '/v1/addons/tableqr/settings', '/a/tableqr/_pkg/manifest.json', '/a/other/x', '/a/tableqr/../../v1/floor']) expect((await relay(path)).status, path).toBe(404);
+    // rate limited per guest, not per hub: one busy phone does not block the others
+    let last = 0;
+    for (let k = 0; k < 35; k++) last = (await relay('/a/tableqr/api/table', '198.51.100.1')).status;
+    expect(last).toBe(429);
+    expect((await relay('/a/tableqr/api/table', '198.51.100.2')).status).toBe(200);
+    // a header made up by someone on the network does not change their address
+    const forged = await app.inject({ method: 'GET', url: `/a/tableqr/api/table?t=${token}`, headers: { 'x-dinepos-relay': 'guess 10.9.9.9' } });
+    expect(forged.statusCode).toBe(200);
+  });
 });

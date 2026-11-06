@@ -152,3 +152,8 @@ request can carry that kind.
 - Table QR: table codes are 18 random bytes, renewable per table (the old printed code stops at once); guests are never
   signed in; at most 5 requests waiting per table; prices always from the server; a UPI payment settles only when a
   cashier with `bill.settle` confirms it.
+- Table QR through the order hub (P5-03): the outlet still accepts no connection from the internet. The hub relays guest
+  requests down the outlet's own outgoing event stream. The outlet answers only add-on guest paths (`/a/<id>/…`, never
+  `/v1`, never the signed package files) and only while that add-on allows it. A relayed request carries the guest's
+  address with a per-start secret; a header guessed by someone on the network is ignored. The hub stores no guest data
+  and caches only the page and its files, for a minute; only the store the request was sent to may answer it.

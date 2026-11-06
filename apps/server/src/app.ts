@@ -11,7 +11,10 @@ import { ulid } from 'ulid';
 import { sessionAuth, type Authenticator } from './auth/authenticate.js';
 import { commandRegistry, coreHandlers } from './commands/registry.js';
 import type { AddonSet } from './addons/loader.js';
-import { addonRoutes } from './routes/addons.js';
+import { addonRoutes, RELAY_HEADER } from './routes/addons.js';
+import { randomBytes } from 'node:crypto';
+import type { GuestAnswer, GuestRequest } from './online/connector.js';
+import { linkRow } from './online/online-support.js';
 import { getFloor } from './queries/floor.js';
 import { getMenu } from './queries/menu.js';
 import { getOrderSnapshot } from './queries/order-snapshot.js';
@@ -87,7 +90,7 @@ export const LOG_REDACT = [
   'req.headers["x-manager-pin"]',
 ];
 
-export type DinePosApp = FastifyInstance & { realtime: RealtimeHub; online: OnlineConnector; sync: SyncAgent };
+export type DinePosApp = FastifyInstance & { realtime: RealtimeHub; online: OnlineConnector; sync: SyncAgent; guestRelay: (r: GuestRequest) => Promise<GuestAnswer> };
 
 /** Builds the HTTP app without listening, so tests can use `app.inject()`. */
 export function buildApp(deps: AppDeps): DinePosApp {
@@ -195,6 +198,20 @@ export function buildApp(deps: AppDeps): DinePosApp {
       onPostCommitError: (err, stage) => app.log.error({ err, stage }, 'post-commit step failed'),
     };
   const auth = deps.auth ?? sessionAuth(db, now);
+  // P5-03: guest requests the order hub relays (phones on mobile data) are replayed here, for add-on guest pages only
+  const relaySecret = randomBytes(24).toString('base64url');
+  const guestRelay = async (r: GuestRequest): Promise<GuestAnswer> => {
+    const m = /^\/a\/([a-z][a-z0-9]{1,19})\//.exec(String(r.path));
+    if (!m || r.path.includes('..') || r.path.includes('/_pkg/') || !addons?.hubAllowed(m[1]!)) {
+      const body = { ok: false, error: { code: 'NOT_FOUND', message: 'This page is not available through the internet. Please ask a member of staff.' } };
+      return { status: 404, contentType: 'application/json; charset=utf-8', cacheControl: 'no-store', bodyBase64: Buffer.from(JSON.stringify(body)).toString('base64') };
+    }
+    const headers: Record<string, string> = { [RELAY_HEADER]: `${relaySecret} ${String(r.ip).replace(/\s/g, '')}` };
+    if (r.method === 'POST') headers['content-type'] = 'application/json';
+    const res = await app.inject({ method: r.method === 'POST' ? 'POST' : 'GET', url: `${r.path}${r.query ? `?${r.query}` : ''}`, headers, ...(r.method === 'POST' ? { payload: r.body ?? '{}' } : {}) });
+    const cc = res.headers['cache-control'];
+    return { status: res.statusCode, contentType: String(res.headers['content-type'] ?? 'application/octet-stream'), cacheControl: typeof cc === 'string' ? cc : null, bodyBase64: res.rawPayload.toString('base64') };
+  };
   commandRoutes(app, executeDeps, auth);
   if (addons) {
     addons.bind({
@@ -204,16 +221,20 @@ export function buildApp(deps: AppDeps): DinePosApp {
       order: (orderId) => getOrderSnapshot(db, orderId) ?? null,
       config: () => getConfig(db),
       network: () => ({ addresses: lanAddresses(), port: deps.port ?? 0 }),
+      hub: () => {
+        const l = linkRow(db);
+        return l.device_key && l.hub_url && l.store_slug ? { url: l.hub_url.replace(/\/+$/, ''), storeSlug: l.store_slug, connected: online.status().connection === 'connected' } : null;
+      },
       newId,
     });
-    addonRoutes(app, { db, addons, auth, rights: executeDeps.rights });
+    addonRoutes(app, { db, addons, auth, rights: executeDeps.rights, relaySecret });
     app.addHook('onClose', async () => addons.stop());
   }
 
   // P4-06: online orders through the order hub. Started by the server (server.ts); idle unless switched on and paired.
   const execute: Execute = (type, payload, actor = SYSTEM_ACTOR) =>
     executeCommand(executeDeps, { commandId: newId(), type, payload, createdAt: now().toISOString() }, actor);
-  const online = new OnlineConnector({ db, now, execute, bus, ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}), log: { info: (m, d) => app.log.info(d ?? {}, m), warn: (m, d) => app.log.warn(d ?? {}, m) } });
+  const online = new OnlineConnector({ db, now, execute, bus, relay: guestRelay, wantsHub: () => addons?.wantsHub() ?? false, ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}), log: { info: (m, d) => app.log.info(d ?? {}, m), warn: (m, d) => app.log.warn(d ?? {}, m) } });
   // P4-05: the outbox sent up to the same hub, licence renewals fetched down. Started by the server; idle unless paired.
   const sync = new SyncAgent({ db, now, execute, bus, ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}), log: { info: (m, d) => app.log.info(d ?? {}, m), warn: (m, d) => app.log.warn(d ?? {}, m) } });
   app.addHook('onClose', async () => {
@@ -231,7 +252,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
   webAppRoutes(app, 'kds', deps.kdsDir ?? defaultWebDir('kds'));
   if (deps.backups) backupRoutes(app, { db, now, timeZone, dataDir: deps.backups.dataDir, backups: deps.backups.scheduler, requestRestart: deps.backups.requestRestart });
   streamRoutes(app, hub, allowedOrigins);
-  return Object.assign(app, { realtime: hub, online, sync });
+  return Object.assign(app, { realtime: hub, online, sync, guestRelay });
 }
 
 function errorBody(code: string, message: string, details?: unknown) {

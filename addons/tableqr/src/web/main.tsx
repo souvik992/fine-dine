@@ -82,7 +82,7 @@ const GUEST = guestId();
 async function call<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API}${path}`, body === undefined ? { cache: 'no-store' } : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const data = (await res.json().catch(() => null)) as (T & { error?: { message?: string } }) | null;
-  if (!res.ok) throw new Error(data?.error?.message ?? 'Could not reach the restaurant’s system. Check that you are on its Wi-Fi.');
+  if (!res.ok) throw new Error(data?.error?.message ?? 'Could not reach the restaurant. Check your internet or Wi-Fi connection and try again.');
   return data as T;
 }
 const msg = (e: unknown) => (e instanceof Error ? e.message : 'Something went wrong.');

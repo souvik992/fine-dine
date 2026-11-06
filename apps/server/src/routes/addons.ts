@@ -46,12 +46,20 @@ export class RateLimiter {
   }
 }
 
+/**
+ * P5-03: requests the order hub relays are replayed inside the server (app.inject) with this header, carrying a secret
+ * made at start and the guest's address. Only those requests can name another address (rate limiting is per guest).
+ */
+export const RELAY_HEADER = 'x-dinepos-relay';
+
 export interface AddonRouteDeps {
   db: Db;
   addons: AddonSet;
   auth: Authenticator;
   rights: RightsPolicy;
   limiter?: RateLimiter;
+  /** The secret of relayed requests (RELAY_HEADER). */
+  relaySecret?: string;
 }
 
 export function addonRoutes(app: FastifyInstance, deps: AddonRouteDeps): void {
@@ -109,7 +117,9 @@ export function addonRoutes(app: FastifyInstance, deps: AddonRouteDeps): void {
 function mount(app: FastifyInstance, a: LoadedAddon, r: AddonRoute, deps: AddonRouteDeps, limiter: RateLimiter): void {
   const url = r.access === 'staff' ? `/v1/addons/${a.manifest.id}${r.path}` : `/a/${a.manifest.id}/api${r.path}`;
   const handler = async (req: FastifyRequest, reply: FastifyReply) => {
-    if (r.access === 'guest' && !limiter.take(`${a.manifest.id}:${req.ip}`)) throw new PosError('RATE_LIMITED', 'Too many requests. Please wait a moment.');
+    const relayed = guestAddress(req.headers[RELAY_HEADER], deps.relaySecret);
+    const ip = relayed ?? req.ip;
+    if (r.access === 'guest' && !limiter.take(`${a.manifest.id}:${relayed ? 'hub:' : ''}${ip}`)) throw new PosError('RATE_LIMITED', 'Too many requests. Please wait a moment.');
     const actor = r.access === 'staff' ? deps.auth.authenticate(req, r.right ? { right: r.right } : {}) : null;
     // the route's right, as a command would check it (a manager PIN may approve)
     let approved = actor;
@@ -122,7 +132,8 @@ function mount(app: FastifyInstance, a: LoadedAddon, r: AddonRoute, deps: AddonR
       body: req.body ?? null,
       query: (req.query ?? {}) as Record<string, string>,
       params: (req.params ?? {}) as Record<string, string>,
-      ip: req.ip,
+      ip,
+      via: relayed ? 'hub' : 'lan',
     });
     if (result instanceof AddonFile) {
       return reply.header('content-type', result.contentType).header('x-content-type-options', 'nosniff').header('cache-control', 'private, max-age=86400').send(Buffer.from(result.bytes));
@@ -133,4 +144,11 @@ function mount(app: FastifyInstance, a: LoadedAddon, r: AddonRoute, deps: AddonR
   };
   if (r.method === 'GET') app.get(url, handler);
   else app.post(url, { bodyLimit: 64 * 1024 }, handler);
+}
+
+/** The guest's address of a relayed request, when it carries the right secret; otherwise null. */
+function guestAddress(header: string | string[] | undefined, secret: string | undefined): string | null {
+  if (!secret || typeof header !== 'string') return null;
+  const [given, ip] = header.split(' ');
+  return given === secret && ip ? ip.slice(0, 64) : null;
 }

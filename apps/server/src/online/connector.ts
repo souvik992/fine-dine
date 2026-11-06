@@ -18,6 +18,22 @@ import { linkRow } from './online-support.js';
 
 export type Execute = (type: string, payload: unknown, actor?: Actor) => CommandSuccess;
 
+/** P5-03: a guest's request the hub relays down the event stream (a phone on mobile data opening an add-on page). */
+export interface GuestRequest {
+  id: string;
+  method: 'GET' | 'POST';
+  path: string;
+  query: string;
+  body: string | null;
+  ip: string;
+}
+export interface GuestAnswer {
+  status: number;
+  contentType: string;
+  cacheControl: string | null;
+  bodyBase64: string;
+}
+
 export interface ConnectorOptions {
   db: Db;
   now: () => Date;
@@ -29,6 +45,10 @@ export interface ConnectorOptions {
   /** Housekeeping tick: publish if changed, send the outbox. The stream is dead after 3 ticks of silence. */
   tickMs?: number;
   log?: { info: (msg: string, data?: unknown) => void; warn: (msg: string, data?: unknown) => void };
+  /** P5-03: answers a relayed guest request (the add-on guest pages, served inside this server). */
+  relay?: (r: GuestRequest) => Promise<GuestAnswer>;
+  /** P5-03: an add-on needs the hub connection even with online orders off (e.g. Table QR through the hub). */
+  wantsHub?: () => boolean;
 }
 
 export const SYSTEM_ACTOR: Actor = { deviceId: null, userId: null, deviceKind: 'system' };
@@ -38,7 +58,7 @@ interface HubAnswer {
 }
 
 export class OnlineConnector {
-  private readonly o: Required<Omit<ConnectorOptions, 'log'>> & Pick<ConnectorOptions, 'log'>;
+  private readonly o: Required<Omit<ConnectorOptions, 'log' | 'relay' | 'wantsHub'>> & Pick<ConnectorOptions, 'log' | 'relay' | 'wantsHub'>;
   private state: OnlineStatus['connection'] = 'off';
   private lastError: string | null = null;
   private lastEventAt: string | null = null;
@@ -60,7 +80,7 @@ export class OnlineConnector {
   start(): void {
     this.unsubscribe ??= this.o.bus.subscribe((e) => {
       if (e.event === 'online.outbox') void this.flush();
-      else if (e.event === 'online.linked' || e.event === 'config.changed' || e.event === 'day.changed') this.refresh();
+      else if (e.event === 'online.linked' || e.event === 'config.changed' || e.event === 'day.changed' || e.event === 'addon.hub') this.refresh();
       else if (e.event === 'menu.changed' || e.event === 'stock.changed') void this.publish();
     });
     this.refresh();
@@ -96,9 +116,9 @@ export class OnlineConnector {
     return this.settings().enabled && Boolean(linkRow(this.o.db).device_key) && currentBusinessDate(this.o.db) !== null;
   }
 
-  /** Start, stop or wake according to the settings (online on + paired). */
+  /** Start, stop or wake according to the settings (paired, and online orders on or an add-on using the hub). */
   refresh(): void {
-    const should = this.settings().enabled && Boolean(linkRow(this.o.db).device_key);
+    const should = Boolean(linkRow(this.o.db).device_key) && (this.settings().enabled || this.o.wantsHub?.() === true);
     if (should && !this.running) {
       this.running = true;
       this.loopDone = this.loop().catch((e: unknown) => this.o.log?.warn('order hub connection stopped', String(e)));
@@ -194,16 +214,48 @@ export class OnlineConnector {
         while ((i = buf.indexOf('\n\n')) >= 0) {
           const block = buf.slice(0, i);
           buf = buf.slice(i + 2);
-          const data = block
-            .split('\n')
+          const lines = block.split('\n');
+          const name = lines.find((l) => l.startsWith('event:'))?.slice(6).trim();
+          const data = lines
             .filter((l) => l.startsWith('data:'))
             .map((l) => l.slice(5).trimStart())
             .join('\n');
-          if (data) this.handle(JSON.parse(data) as HubEvent);
+          if (!data) continue;
+          // a guest's request (P5-03) is answered, never stored: it is not an order event and has no number
+          if (name === 'guest.request') void this.answerGuest(JSON.parse(data) as GuestRequest);
+          else this.handle(JSON.parse(data) as HubEvent);
         }
       }
     } finally {
       if (silence) clearTimeout(silence);
+    }
+  }
+
+  /** P5-03: answers a relayed guest request and sends the answer back to the hub. Never rejects. */
+  async answerGuest(r: GuestRequest): Promise<void> {
+    const plain = (status: number, message: string): GuestAnswer => ({
+      status,
+      contentType: 'application/json; charset=utf-8',
+      cacheControl: 'no-store',
+      bodyBase64: Buffer.from(JSON.stringify({ ok: false, error: { code: status === 404 ? 'NOT_FOUND' : 'INTERNAL', message } })).toString('base64'),
+    });
+    let answer: GuestAnswer;
+    try {
+      answer = this.o.relay ? await this.o.relay(r) : plain(404, 'This page is not available through the internet.');
+    } catch (e) {
+      this.o.log?.warn('a guest request through the hub failed', String(e));
+      answer = plain(500, 'Something went wrong at the restaurant. Please try again.');
+    }
+    try {
+      const res = await this.o.fetch(this.url(`/v1/pos/relay/${encodeURIComponent(String(r.id))}`), {
+        method: 'POST',
+        headers: this.headers({ 'content-type': 'application/json' }),
+        body: JSON.stringify(answer),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok && res.status !== 404) this.failed('answering a guest through the hub failed', new Error(`the hub answered ${res.status}`));
+    } catch (e) {
+      this.failed('answering a guest through the hub failed', e);
     }
   }
 

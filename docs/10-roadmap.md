@@ -128,8 +128,11 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
   guest menu, cart and order; accepting by staff (default) or straight to the kitchen; call waiter; ask for the bill; the
   running bill; alerts with a chime on every terminal screen; marks on the floor tiles (desktop and captain). Accept: an
   accepted order is seated, added and fired once (retries never repeat food); prices always from the server.
-- [ ] **P5-03 Table QR through the order hub**: the same guest page served by the hub, so phones on mobile data can order;
-  requests relayed over the existing hub connection (the outlet still accepts no incoming internet connections).
+- [x] **P5-03 Table QR through the order hub**: the same guest page served by the hub, so phones on mobile data can order;
+  requests relayed over the existing hub connection (the outlet still accepts no incoming internet connections). Codes
+  open `<hub>/s/<store>/a/tableqr/`; the hub passes each request down the outlet's event stream and the outlet answers
+  (pos-backend `hub/src/relay.ts`, DinePOS `OnlineConnector.answerGuest`). Accept: works with online orders off; only an
+  add-on's guest pages, only while it allows it; rate limited per guest; nothing stored on the hub.
 - [x] **P5-04 Guest UPI payment (staff confirms)**: once the bill is printed the guest's UPI app opens with the outlet's UPI
   id and the exact amount; "I have paid" marks the table; a cashier with `bill.settle` confirms and the bill is settled as
   UPI ("Table QR").

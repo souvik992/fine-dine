@@ -32,6 +32,8 @@ export interface AddonRequest {
   query: Record<string, string>;
   params: Record<string, string>;
   ip: string;
+  /** P5-03: on the outlet network, or relayed by the order hub (a phone on mobile data). */
+  via?: 'lan' | 'hub';
 }
 
 export interface AddonRoute {
@@ -91,6 +93,8 @@ export interface AddonRuntime {
   order(orderId: string): unknown;
   config(): unknown;
   network(): { addresses: string[]; port: number };
+  /** The order hub this outlet is paired with (P5-03), or null. */
+  hub(): { url: string; storeSlug: string; connected: boolean } | null;
   newId(): string;
 }
 
@@ -103,6 +107,8 @@ export interface LoadedAddon {
   routes: AddonRoute[];
   statics: Map<string, AddonStatic>;
   badges: BadgeSource[];
+  /** P5-03: whether its guest pages may be reached through the order hub now. */
+  hubAccess: (() => boolean) | null;
   stops: Array<() => unknown>;
 }
 
@@ -166,6 +172,21 @@ export class AddonSet {
   }
 
   /** Rights an add-on's own actor may use (its signed manifest). */
+  /** May this add-on's guest pages be reached through the order hub now (its own switch)? */
+  hubAllowed(addonId: string): boolean {
+    const a = this.active.find((x) => x.manifest.id === addonId);
+    try {
+      return !!a?.hubAccess?.();
+    } catch {
+      return false;
+    }
+  }
+
+  /** Does any add-on want the order hub connection (even with online orders off)? */
+  wantsHub(): boolean {
+    return this.active.some((a) => this.hubAllowed(a.manifest.id));
+  }
+
   rightsOf(addonId: string): readonly Right[] {
     return this.active.find((a) => a.manifest.id === addonId)?.manifest.rights ?? [];
   }
@@ -232,7 +253,7 @@ export function loadAddons(o: LoadOptions): AddonSet {
     let a: LoadedAddon | null = null;
     try {
       const pkg = checkPackage(dir, o.posVersion, o.trustKeys ?? ADDON_TRUST_KEYS);
-      a = { manifest: pkg.manifest, files: pkg.files, status: 'off', error: null, commands: [], routes: [], statics: new Map(), badges: [], stops: [] };
+      a = { manifest: pkg.manifest, files: pkg.files, status: 'off', error: null, commands: [], routes: [], statics: new Map(), badges: [], hubAccess: null, stops: [] };
       const prev = stateOf(o.db, pkg.manifest.id);
       if (prev && compareVersions(pkg.manifest.version, prev.highest_version) < 0) {
         throw new Error(`Version ${pkg.manifest.version} is older than ${prev.highest_version}, which already ran here. Install ${prev.highest_version} or newer.`);
@@ -254,6 +275,7 @@ export function loadAddons(o: LoadOptions): AddonSet {
           routes: [],
           statics: new Map(),
           badges: [],
+          hubAccess: null,
           stops: [],
         };
       } else {
@@ -349,6 +371,15 @@ function register(a: LoadedAddon, set: AddonSet, o: LoadOptions): string[] {
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) throw new Error('host.file() serves images only.');
       return new AddonFile(contentType, bytes);
     },
+    /**
+     * P5-03: says whether guests may reach this add-on's pages through the order hub (phones on mobile data). While it
+     * returns true the outlet keeps its connection to the hub open; tell DinePOS when it changes with an `addon.hub`
+     * event from a command.
+     */
+    hubAccess(fn: () => boolean) {
+      if (typeof fn !== 'function') throw new Error('hubAccess() takes a function.');
+      a.hubAccess = fn;
+    },
     floorBadges(source: BadgeSource) {
       if (typeof source !== 'function') throw new Error('floorBadges() takes a function.');
       a.badges.push(source);
@@ -372,6 +403,7 @@ function register(a: LoadedAddon, set: AddonSet, o: LoadOptions): string[] {
     order: (orderId: string) => set.rt().order(orderId),
     config: () => set.rt().config(),
     network: () => set.rt().network(),
+    hub: () => set.rt().hub(),
     newId: () => set.rt().newId(),
     onStop(fn: () => unknown) {
       if (typeof fn === 'function') a.stops.push(fn);

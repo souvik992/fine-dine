@@ -1,7 +1,7 @@
 import type { MenuSnapshot } from '@dinepos/shared';
 import { ULID_RE } from '@dinepos/shared';
 import { describe, expect, it } from 'vitest';
-import { badgesFor, checkOrder, formatRupees, guestUrl, readSettings, rupees, stableId, upiLink } from './logic.js';
+import { badgesFor, checkOrder, codeBase, formatRupees, guestUrl, readSettings, rupees, stableId, upiLink } from './logic.js';
 
 const menu: MenuSnapshot = {
   menuVersion: 1,
@@ -71,8 +71,17 @@ describe('Table QR rules', () => {
     ]);
   });
 
+  it('codes point at the Wi-Fi server, or at the order hub for the store (none while the outlet is not paired)', () => {
+    const hub = { url: 'https://hub.example.in/', storeSlug: 'spice-garden' };
+    expect(codeBase({ codeAddress: 'wifi', baseUrl: '' }, 'http://192.168.1.20:7420', hub)).toBe('http://192.168.1.20:7420');
+    expect(codeBase({ codeAddress: 'wifi', baseUrl: 'http://10.0.0.5:7420' }, 'http://192.168.1.20:7420', hub)).toBe('http://10.0.0.5:7420');
+    expect(guestUrl(codeBase({ codeAddress: 'hub', baseUrl: '' }, 'http://x', hub), 'tok')).toBe('https://hub.example.in/s/spice-garden/a/tableqr/?t=tok');
+    expect(codeBase({ codeAddress: 'hub', baseUrl: '' }, 'http://x', null)).toBe('');
+  });
+
   it('settings fall back to safe values', () => {
-    expect(readSettings([])).toEqual({ enabled: false, acceptMode: 'staff', payOnline: false, baseUrl: '', welcome: '' });
+    expect(readSettings([])).toEqual({ enabled: false, acceptMode: 'staff', payOnline: false, baseUrl: '', codeAddress: 'wifi', welcome: '' });
+    expect(readSettings([{ key: 'codeAddress', value: 'hub' }]).codeAddress).toBe('hub');
     expect(readSettings([{ key: 'enabled', value: '1' }, { key: 'acceptMode', value: 'auto' }, { key: 'acceptMode', value: 'weird' }]).acceptMode).toBe('staff');
   });
 });

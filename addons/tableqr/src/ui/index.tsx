@@ -31,6 +31,8 @@ interface SettingsData {
   upiReady: boolean;
   outletName: string;
   baseUrl: string;
+  wifiUrl: string;
+  hub: { url: string; storeSlug: string; connected: boolean } | null;
   addresses: string[];
   port: number;
   tables: Array<{ id: string; label: string; area: string; url: string | null }>;
@@ -312,7 +314,7 @@ function Settings({ host }: { host: Host }) {
     <section className="qr:max-w-4xl qr:space-y-6">
       <div>
         <h2 className="qr:font-display qr:text-2xl qr:font-semibold">Table QR</h2>
-        <p className="qr:text-sm qr:text-muted-foreground">Guests scan the code on their table to see the menu, order, call a waiter, ask for the bill and pay by UPI. Phones must be on the outlet’s Wi-Fi.</p>
+        <p className="qr:text-sm qr:text-muted-foreground">Guests scan the code on their table to see the menu, order, call a waiter, ask for the bill and pay by UPI.</p>
       </div>
 
       <form
@@ -348,9 +350,34 @@ function Settings({ host }: { host: Host }) {
             {!data.upiReady ? <span className="qr:block qr:text-sm qr:text-danger">Set the outlet’s UPI ID first in Settings › Outlet & bills.</span> : null}
           </span>
         </label>
-        <Field label="Address in the codes" hint="The main PC’s address on the outlet Wi-Fi. Keep this PC’s address fixed (reserve it in the router), or the printed codes stop working.">
-          <select className="input" value={form.baseUrl} onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}>
-            <option value="">Automatic ({data.baseUrl || 'no network address found'})</option>
+        <fieldset className="qr:space-y-2" data-qr-code-address>
+          <legend className="qr:text-sm qr:font-semibold">What the codes open</legend>
+          <label className="qr:flex qr:items-start qr:gap-2">
+            <input type="radio" name="addr" checked={form.codeAddress === 'hub'} disabled={!data.hub} onChange={() => setForm({ ...form, codeAddress: 'hub' })} className="qr:mt-1" />
+            <span>
+              <b>The internet, through the order hub</b> (recommended): works on mobile data and on any Wi-Fi.
+              <span className="qr:block qr:text-sm qr:text-muted-foreground">
+                {data.hub ? (
+                  <>
+                    {data.hub.url}/s/{data.hub.storeSlug} · {data.hub.connected ? <span className="qr:text-ok">connected</span> : <span className="qr:text-danger">not connected now: guests are told the restaurant is offline</span>}
+                  </>
+                ) : (
+                  'Connect this outlet to the order hub first (Settings › Online orders › Order hub). Online orders need not be on.'
+                )}
+              </span>
+            </span>
+          </label>
+          <label className="qr:flex qr:items-start qr:gap-2">
+            <input type="radio" name="addr" checked={form.codeAddress === 'wifi'} onChange={() => setForm({ ...form, codeAddress: 'wifi' })} className="qr:mt-1" />
+            <span>
+              <b>The outlet Wi-Fi only</b>: works with no internet; guests must join your Wi-Fi first.
+            </span>
+          </label>
+          <p className="qr:text-xs qr:text-muted-foreground">Changing this changes every code: print them again.</p>
+        </fieldset>
+        <Field label="Wi-Fi address in the codes" hint="The main PC’s address on the outlet Wi-Fi (Wi-Fi only). Keep it fixed (reserve it in the router), or the printed codes stop working.">
+          <select className="input" value={form.baseUrl} disabled={form.codeAddress === 'hub'} onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}>
+            <option value="">Automatic ({data.wifiUrl || 'no network address found'})</option>
             {addressChoices.map((a) => (
               <option key={a} value={a}>
                 {a}
@@ -410,7 +437,7 @@ function Settings({ host }: { host: Host }) {
             <p className="tableqr-outlet">{data.outletName}</p>
             <img src={qrImage(t.url!)} alt="" />
             <p className="tableqr-table">Table {t.label}</p>
-            <p className="tableqr-hint">Scan to see the menu and order · connect to our Wi-Fi first</p>
+            <p className="tableqr-hint">{data.settings.codeAddress === 'hub' ? 'Scan to see the menu and order' : 'Scan to see the menu and order · connect to our Wi-Fi first'}</p>
           </div>
         ))}
       </div>,
