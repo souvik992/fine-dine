@@ -1,6 +1,8 @@
 # @dinepos/captain — waiter app (PWA)
 
-Runs in the phone browser (Chrome on Android) and can be "installed" to the home screen. Built with Vite +
+Runs in the phone browser (Chrome on Android) and can be "installed" to the home screen, or in the Android app
+`apps/captain-android` (P3-06), which opens this same page from the server. Its outbox carry-over depends on
+`src/offline/idb.ts`: change both together. Built with Vite +
 React and served by the outlet server at `/captain`.
 
 Read first: `docs/09-ui-screens.md` (Captain), `docs/05-sync-offline.md`, `docs/03-command-api.md`.

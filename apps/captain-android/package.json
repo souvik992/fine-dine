@@ -1,0 +1,11 @@
+{
+  "name": "@dinepos/captain-android",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DinePOS Captain for Android: the captain app (served by the outlet server at /captain) as an installable phone app.",
+  "type": "module",
+  "scripts": {
+    "apk": "node scripts/gradle.mjs apk",
+    "test": "node scripts/gradle.mjs test"
+  }
+}

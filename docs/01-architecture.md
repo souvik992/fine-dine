@@ -95,7 +95,8 @@ checking the same signature themselves. Code: `apps/server/src/addons/`, `apps/d
     so they should open the master by computer name: the banner and Settings › Kitchen & printers show
     `http://<computer-name>.local:7420` (`GET /v1/network` → `nameUrl`). Windows answers `.local` names itself; Windows
     PCs and iPhones resolve them, many Android phones do not, so for Android phones the router reservation is the fix.
-- Captain and KDS PWAs are served at `/captain` and `/kds`.
+- Captain and KDS PWAs are served at `/captain` and `/kds`. Android phones can also use DinePOS Captain (`apps/captain-android`),
+  an APK that opens the server's `/captain` page in a locked-down WebView (it never carries its own copy).
 
 ## Data directory (master)
 `%ProgramData%\DinePOS\` → `dinepos.db`, `backups\`, `logs\`, `prints\`, `config.json`, `license.key`.

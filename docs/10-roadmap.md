@@ -110,6 +110,10 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
 - [x] **P3-03 Offline outbox + replay + "Needs attention" list** (`05-sync-offline.md`)
 - [x] **P3-04 Captain assignment to areas/tables + Request bill notification**
 - [x] **P3-05 Captain performance report**
+- [x] **P3-06 Captain Android app** (added 2026-11-06 at the product owner's request; `apps/captain-android`) â€” Accept:
+  installable signed APK that opens the server's `/captain` page (never a copy); setup checks `/v1/health` and lists
+  servers found on the Wi-Fi; only the server's own pages open, permissions denied; offline start uses the page's
+  service worker; follows its own server id to a new IP and carries the pairing and unsent offline orders over.
 
 ## Phase 4 â€” Controls, KDS, reports, cloud
 
@@ -158,3 +162,4 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
 - [ ] **P6-03 Cloud printing**: a print agent at the outlet prints KOTs and bills queued in the cloud.
 - [ ] **P6-04 Hosted outlets**: the DinePOS server runs in the cloud, one database per outlet, chosen per outlet; no
   master PC; printing through the agent.
+

@@ -1,0 +1,8 @@
+.gradle/
+build/
+app/build/
+local.properties
+release/
+# the signing key: keep a backup somewhere safe (phones only accept updates signed with the same key)
+keystore/
+keystore.properties

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DinePOS Captain</string>
+    <string name="shortcut_setup_short">Main PC</string>
+    <string name="shortcut_setup_long">Change the main PC</string>
+    <string name="setup_title">Connect to the main PC</string>
+    <string name="setup_hint">Type the main PC\'s address, shown on the billing PC in Settings › Devices (for example 192.168.1.4).</string>
+    <string name="setup_address">Address, e.g. 192.168.1.4</string>
+    <string name="setup_connect">Connect</string>
+    <string name="setup_checking">Checking…</string>
+    <string name="setup_found">DinePOS servers on this Wi-Fi</string>
+    <string name="setup_searching">Looking for DinePOS servers on this Wi-Fi…</string>
+    <string name="setup_none_found">None found. Is this phone on the shop Wi-Fi?</string>
+    <string name="setup_search_again">Search again</string>
+    <string name="setup_retrying">Trying again every 10 seconds.</string>
+    <string name="connecting">Connecting to %1$s…</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The outlet server is on the shop LAN at a plain-http IP address (docs/01), so cleartext must be allowed.
+     The app only ever opens that server's pages (ServerAddress.mayOpen). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
