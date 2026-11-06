@@ -79,6 +79,8 @@ export interface CommandContext {
   readonly nowIso: string;
   /** P2-09: may a new business date open; seats; verifying a key. */
   readonly licence: LicenceGate;
+  /** P6-04: a hosted outlet (its server runs in DinePOS Cloud): there is no master PC. */
+  readonly hosted: boolean;
   audit(entry: AuditEntry): void;
   emit(topics: string | string[], event: string, data: unknown): void;
   print(job: Omit<PendingPrintJob, 'id'> & { id?: string }): string;

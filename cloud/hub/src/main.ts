@@ -7,11 +7,14 @@
 //                      only the starting value: a routing server saved on the admin page wins
 //   HUB_ONLINE_PAYMENTS=1  online payment (phase 3; needs a payment gateway)
 //   HUB_DEVICE_DOMAIN  P6-02: devices reach an outlet at https://<store>.<this domain> (default: the host of HUB_PUBLIC_URL)
+//   HUB_OUTLET_SERVER  P6-04: the DinePOS server for hosted outlets (default: ../../outlet-server/server.mjs in this repository)
+//   HUB_TIMEZONE       P6-04: hosted outlets' time zone (default Asia/Kolkata)
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hub } from './hub.ts';
 import { createHubServer } from './http.ts';
 import { UrbanPiper } from './urbanpiper.ts';
+import { HostedOutlets } from './hosted.ts';
 
 const dir = process.env.HUB_DATA_DIR ?? './hub-data';
 mkdirSync(dir, { recursive: true });
@@ -23,10 +26,18 @@ const hub = new Hub({
 if (!process.env.HUB_ADMIN_KEY) log.warn('HUB_ADMIN_KEY is not set: store admin is disabled (use scripts/admin.ts on this machine)');
 else log.info('hub admin page: /admin');
 const urbanpiper = new UrbanPiper(hub, { log }); // Swiggy / Zomato (set up per store on the admin page)
-const server = createHubServer(hub, { adminKey: process.env.HUB_ADMIN_KEY, publicUrl: process.env.HUB_PUBLIC_URL || undefined, deviceDomain: process.env.HUB_DEVICE_DOMAIN || undefined, urbanpiper });
+// P6-04: outlets with no main PC: their DinePOS server runs here, one per outlet, data in <HUB_DATA_DIR>/outlets
+const hosted = new HostedOutlets(hub, {
+  serverEntry: process.env.HUB_OUTLET_SERVER ?? join(import.meta.dirname, '..', '..', 'outlet-server', 'server.mjs'),
+  dataRoot: join(dir, 'outlets'),
+  timeZone: process.env.HUB_TIMEZONE ?? 'Asia/Kolkata',
+  log,
+});
+hosted.start();
+const server = createHubServer(hub, { hosted, adminKey: process.env.HUB_ADMIN_KEY, publicUrl: process.env.HUB_PUBLIC_URL || undefined, deviceDomain: process.env.HUB_DEVICE_DOMAIN || undefined, urbanpiper });
 const sweeper = setInterval(() => { try { hub.sweep(); } catch (e) { log.warn('sweep failed', String(e)); } void urbanpiper.pump().catch((e) => log.warn('urbanpiper outbox failed', String(e))); }, 5000);
 const port = Number(process.env.HUB_PORT ?? 4900);
 server.listen(port, process.env.HUB_HOST ?? '0.0.0.0', () => log.info(`DinePOS Cloud on http://localhost:${port} (data: ${dir})`));
-const stop = () => { clearInterval(sweeper); server.close(); server.closeAllConnections(); hub.close(); process.exit(0); };
+const stop = () => { clearInterval(sweeper); server.close(); server.closeAllConnections(); void hosted.stop().finally(() => { hub.close(); process.exit(0); }); };
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);

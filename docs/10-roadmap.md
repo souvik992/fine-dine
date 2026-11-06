@@ -165,6 +165,10 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
   SetPrinterAgent; the print queue keeps jobs, retries, backup printer and status. Accept: a KOT for an agent's printer
   prints on the agent's network printer; a refusing printer fails with the agent's reason; an agent gone quiet shows
   its printers offline; a removed key is refused.
-- [ ] **P6-04 Hosted outlets**: the DinePOS server runs in the cloud, one database per outlet, chosen per outlet; no
-  master PC; printing through the agent.
+- [x] **P6-04 Hosted outlets**: the DinePOS server runs in the cloud, one database per outlet, chosen per outlet; no
+  master PC; printing through the agent. The cloud runs `cloud/outlet-server` (the server bundle for Linux,
+  `npm run bundle:cloud -w @dinepos/server`) per hosted outlet on 127.0.0.1 and proxies `https://<store>.<cloud>` to it;
+  admin page: run in the cloud, first step (outlet, owner, PIN), approve the first device's pairing code. Accept: the
+  proxy never makes a device the master (no token: 401, even with the host key sent from outside); a device pairs and
+  works; the master PC takes no licence seat; each hosted outlet has its own hardware id.
 

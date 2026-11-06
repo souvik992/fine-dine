@@ -11,15 +11,19 @@ import { pairedCount } from '../routes/licence.js';
 const SEAT_NAME = { terminal: 'billing terminals', captain: 'captain phones', kds: 'kitchen screens' } as const;
 const SEAT_KEY = { terminal: 'terminals', captain: 'captains', kds: 'kds' } as const;
 
-/** P2-09 (docs/07 "Seats enforced at device pairing"): the master PC counts as one terminal; revoked devices free a seat. */
+/**
+ * P2-09 (docs/07 "Seats enforced at device pairing"): the master PC counts as one terminal; revoked devices free a seat.
+ * A hosted outlet (P6-04) has no master PC: only its paired terminals count.
+ */
 function refuseOverSeats(ctx: CommandContext, kind: 'terminal' | 'captain' | 'kds'): void {
   const seats = ctx.licence.seats(ctx.db, ctx.now);
   if (!seats) return; // development run
   const paired = pairedCount(ctx.db, kind);
-  const used = paired + (kind === 'terminal' ? 1 : 0);
+  const master = kind === 'terminal' && !ctx.hosted ? 1 : 0;
+  const used = paired + master;
   const allowed = seats[SEAT_KEY[kind]];
   if (used >= allowed) {
-    throw new PosError('INVALID_STATE', `The licence allows ${allowed} ${SEAT_NAME[kind]}${kind === 'terminal' ? ' (the master PC included)' : ''} and all are in use. Revoke one in Settings › Devices, or ask for more seats.`, {
+    throw new PosError('INVALID_STATE', `The licence allows ${allowed} ${SEAT_NAME[kind]}${master ? ' (the master PC included)' : ''} and all are in use. Revoke one in Settings › Devices, or ask for more seats.`, {
       reason: 'seats',
       kind,
       allowed,

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Hub admin</title>
+<title>DinePOS Cloud admin</title>
 <style>
   :root { --bg: #f6f2ec; --card: #fff; --text: #3a2a1f; --muted: #8a7b6e; --primary: #ea580c; --line: #eadfd3; --ok: #16a34a; --bad: #b91c1c; --warn: #b45309; --soft: #fffaf5; }
   * { box-sizing: border-box; }
@@ -75,7 +75,7 @@
 </head>
 <body>
 <header><div class="in">
-  <h1>Hub admin</h1>
+  <h1>DinePOS Cloud admin</h1>
   <nav id="nav" class="hidden">
     <a href="#orders" data-tab="orders">Orders</a>
     <a href="#stores" data-tab="stores">Stores</a>
@@ -367,6 +367,7 @@
     const upState = await loadUp(slug).catch((e) => ({ error: e.message }));
     const sales = await api('GET', `/v1/admin/stores/${encodeURIComponent(slug)}/sales`).catch((e) => ({ error: e.message }));
     const lic = await api('GET', `/v1/admin/stores/${encodeURIComponent(slug)}/licence`).catch((e) => ({ error: e.message }));
+    const hosted = await api('GET', `/v1/admin/stores/${encodeURIComponent(slug)}/hosted`).catch((e) => ({ error: e.message }));
     const err = h('div', { class: 'err' });
     const pauseInput = h('input', { maxlength: '200', placeholder: 'This store is not taking online orders right now.' });
     box.replaceChildren(
@@ -398,6 +399,9 @@
           h('td', { class: 'num' }, d.revokedAt ? h('span', { class: 'muted' }, `Revoked ${when(d.revokedAt)}`) : h('button', { class: 'danger', onclick: () => revoke(s, d) }, 'Revoke'))))))
         : h('p', { class: 'muted', style: 'margin:0' }, 'No POS connected yet. Make a connection link and send it to the shop.')),
 
+      h('h2', {}, 'DinePOS in the cloud (no main PC)'),
+      hosted.error ? h('div', { class: 'card err' }, hosted.error) : hostedCard(slug, hosted),
+
       h('h2', {}, 'Sales (DinePOS)'),
       sales.error ? h('div', { class: 'card err' }, sales.error) : salesCard(sales),
       h('h2', {}, 'Licence (DinePOS)'),
@@ -409,6 +413,39 @@
       h('h2', {}, 'Store settings'),
       p ? storeSettings(p) : h('div', { class: 'card muted' }, 'Nothing published yet. The settings appear here once the shop’s POS connects and turns on online orders.'),
       p ? h('p', { class: 'muted' }, `Set by the shop in its POS (Settings > Online orders and Serviceability) and sent here with menu version ${s.menuVersion}. Change them there.`) : null);
+  }
+
+  // P6-04: an outlet whose DinePOS server runs in this cloud (no main PC at the outlet).
+  function hostedCard(slug, v) {
+    const err = h('div', { class: 'err' }), note = h('div', { class: 'hint' });
+    const path = `/v1/admin/stores/${encodeURIComponent(slug)}/hosted`;
+    const run = async (fn, okText) => { err.textContent = ''; try { await fn(); if (okText) ui.hostedNote = okText; await renderStore(slug); } catch (e) { err.textContent = e.message; } };
+    if (!v.available && !v.hosted) return h('div', { class: 'card muted' }, 'This cloud has no DinePOS outlet server installed (cloud/outlet-server). Update the cloud (sudo dinepos-cloud-update).');
+    if (!v.hosted) {
+      return h('div', { class: 'card' },
+        h('p', { style: 'margin-top:0' }, 'Run this outlet’s DinePOS in the cloud: no main PC at the outlet. Terminals, captain phones and kitchen screens connect to ', h('b', {}, v.deviceUrl || 'its cloud address'), '. Billing then needs the internet; printers need a DinePOS Print Agent at the outlet.'),
+        h('div', { class: 'actions' }, h('button', { class: 'primary', onclick: () => confirm('Run this outlet’s DinePOS in the cloud?') && run(() => api('PUT', path, { enabled: true }), 'Started.') }, 'Run this outlet in the cloud')),
+        err);
+    }
+    const chips = h('div', { class: 'row' }, v.running ? chip('ok', 'Running') : chip('bad', 'Stopped'), v.restarts ? chip('bad', `Restarted ${v.restarts}×`) : null);
+    const parts = [chips, v.deviceUrl ? h('p', {}, 'Devices use: ', h('b', {}, v.deviceUrl), ' (terminal: Settings › This terminal; captain phone: ', h('b', {}, `${v.deviceUrl}/captain`), '; kitchen: ', h('b', {}, `${v.deviceUrl}/kds`), ').') : null,
+      v.lastExit && !v.running ? h('div', { class: 'box err' }, `Last stop: ${v.lastExit}`) : null];
+    if (v.setup && v.setup.setupNeeded) {
+      const outlet = h('input', { maxlength: '60', placeholder: 'As on the bill' }), owner = h('input', { maxlength: '40', placeholder: 'Owner’s name' }), pin = h('input', { type: 'password', inputmode: 'numeric', maxlength: '6', placeholder: '4–6 digits' });
+      parts.push(h('div', { class: 'box' }, h('b', {}, 'First step: the outlet and its owner'),
+        h('label', {}, 'Outlet name'), outlet, h('label', {}, 'Owner'), owner, h('label', {}, 'Owner’s PIN'), pin,
+        h('div', { class: 'actions' }, h('button', { class: 'primary', onclick: () => run(() => api('POST', `${path}/setup`, { outletName: outlet.value, ownerName: owner.value, pin: pin.value }), 'Outlet set up. Now pair the first terminal.') }, 'Set up'))));
+    } else if (v.setup) {
+      const code = h('input', { inputmode: 'numeric', maxlength: '7', placeholder: '6-digit code on the device' }), pin = h('input', { type: 'password', inputmode: 'numeric', maxlength: '6', placeholder: 'Owner’s PIN' });
+      parts.push(h('div', { class: 'box' }, h('b', {}, `Pair a device (${v.setup.outletName})`),
+        h('div', { class: 'hint' }, 'Open DinePOS on the first terminal with the address above: it shows a pairing code. Enter it here with the owner’s PIN. Later devices can be approved on that terminal (Settings › Devices).'),
+        h('label', {}, 'Pairing code'), code, h('label', {}, 'Owner’s PIN'), pin,
+        h('div', { class: 'actions' }, h('button', { class: 'primary', onclick: () => run(() => api('POST', `${path}/approve`, { code: code.value, pin: pin.value }), 'Device paired: it opens by itself.') }, 'Approve'))));
+    }
+    if (ui.hostedNote) { note.textContent = ui.hostedNote; ui.hostedNote = ''; }
+    parts.push(note, err, h('div', { class: 'actions' }, v.running ? null : h('button', { onclick: () => run(() => api('PUT', path, { enabled: true }), 'Started.') }, 'Start again'),
+      h('button', { class: 'danger', onclick: () => confirm('Stop running this outlet in the cloud? Devices cannot bill until it runs again. Its data is kept.') && run(() => api('PUT', path, { enabled: false }), 'Stopped. Its data is kept.') }, 'Stop running in the cloud')));
+    return h('div', { class: 'card' }, ...parts);
   }
 
   // The website builder lives on the ordering website (/admin). Here only its sign-in: one password per store, shown once.

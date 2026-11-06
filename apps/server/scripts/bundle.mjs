@@ -16,7 +16,10 @@ import { build } from 'esbuild';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
-const out = `${root}dist-bundle/`;
+// P6-04: `npm run bundle:cloud` writes the same server for DinePOS Cloud's hosted outlets (Linux) to cloud/outlet-server.
+const cloud = process.argv.includes('--cloud');
+const out = cloud ? `${repo}cloud/outlet-server/` : `${root}dist-bundle/`;
+const platforms = cloud ? ['linux-x64', 'linux-arm64'] : ['win32-x64'];
 const pkg = JSON.parse(readFileSync(`${root}package.json`, 'utf8'));
 
 rmSync(out, { recursive: true, force: true });
@@ -30,7 +33,7 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node22',
-  sourcemap: 'linked',
+  sourcemap: cloud ? false : 'linked',
   // Native and optional modules stay outside the bundle.
   external: ['better-sqlite3', 'bufferutil', 'utf-8-validate'],
   define: { __DINEPOS_VERSION__: JSON.stringify(pkg.version) },
@@ -52,12 +55,12 @@ cpSync(`${repo}apps/captain/dist`, `${out}web/captain`, { recursive: true, filte
 execSync('npm run build -w @dinepos/kds', { cwd: repo, stdio: 'inherit' });
 cpSync(`${repo}apps/kds/dist`, `${out}web/kds`, { recursive: true, filter: (p) => !p.endsWith('.map') });
 
-// better-sqlite3: only what runs (no sources, no build tooling), Windows x64 prebuild.
+// better-sqlite3: only what runs (no sources, no build tooling), the prebuilds for where it runs.
 const sqlite = `${repo}node_modules/better-sqlite3/`;
 const sqliteOut = `${out}node_modules/better-sqlite3/`;
 cpSync(`${sqlite}lib`, `${sqliteOut}lib`, { recursive: true });
 mkdirSync(`${sqliteOut}prebuilds`, { recursive: true });
-cpSync(`${sqlite}prebuilds/win32-x64.node`, `${sqliteOut}prebuilds/win32-x64.node`);
+for (const pl of platforms) cpSync(`${sqlite}prebuilds/${pl}.node`, `${sqliteOut}prebuilds/${pl}.node`);
 cpSync(`${sqlite}LICENSE`, `${sqliteOut}LICENSE`);
 const sqlitePkg = JSON.parse(readFileSync(`${sqlite}package.json`, 'utf8'));
 writeFileSync(`${sqliteOut}package.json`, JSON.stringify({ name: sqlitePkg.name, version: sqlitePkg.version, main: sqlitePkg.main, license: sqlitePkg.license }, null, 2));

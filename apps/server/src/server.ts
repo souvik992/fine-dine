@@ -148,6 +148,7 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
       printQueue,
       allowedOrigins: config.allowedOrigins,
       trustLoopback: config.trustLoopback ?? true,
+      ...(config.hostKey ? { hostKey: config.hostKey } : {}),
       backups: { scheduler: backups, dataDir: config.dataDir, requestRestart: opts.requestRestart ?? (() => undefined) },
       licence,
     });

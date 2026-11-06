@@ -1,6 +1,6 @@
 # ADR-0005: DinePOS Cloud
 
-Status: accepted (2026-11-06). P6-01, P6-02 and P6-03 built; P6-04 planned.
+Status: accepted (2026-11-07). P6-01 to P6-04 built.
 
 ## Context
 
@@ -38,9 +38,18 @@ and the Table QR relay. The owner wants a cloud service for DinePOS only:
      virtual socket. The outlet never accepts incoming connections. Device pairing, sessions and rights stay exactly as
      on the LAN, and a replayed request is never the trusted master PC. The cloud keeps zero runtime dependencies,
      including its own small WebSocket server (`cloud/hub/src/ws.ts`).
-   - **Hosted (P6-04):** the DinePOS server runs inside the cloud, one database per outlet with one writer per outlet,
-     and devices point at the cloud address. This needs internet at the outlet; there is no offline billing in this
-     mode, and the owner chooses it knowing that.
+   - **Hosted (P6-04, built):** the DinePOS server runs inside the cloud, one database per outlet with one writer per
+     outlet, and devices point at the cloud address. This needs internet at the outlet; there is no offline billing in
+     this mode, and the owner chooses it knowing that.
+     - **Process:** the cloud (`cloud/hub/src/hosted.ts`) runs the server bundle `cloud/outlet-server` (built with
+       `npm run bundle:cloud -w @dinepos/server` and committed, so the cloud only pulls) once per hosted outlet on
+       127.0.0.1. It restarts a server that stops, and proxies the outlet's address to it (HTTP and the live stream).
+     - **Trust:** the outlet server trusts nobody on loopback (`DINEPOS_TRUST_LOOPBACK=0`). Only the cloud process holds
+       the outlet's host key (`DINEPOS_HOST_KEY`, `x-dinepos-host-key`), which acts as the master device for the
+       owner's first steps on the admin page: setting up the outlet and approving the first device with the owner's
+       PIN. The proxy strips that header from every outside request.
+     - **Licence:** the master PC takes no licence seat. Each hosted outlet has its own hardware id: the machine's
+       identifiers plus the outlet id, so one cloud machine needs one key per outlet.
 
 3. **Cloud printing (P6-03, built):** KOT and bill printers stay on the outlet LAN. A small print agent at the outlet
    (`apps/print-agent`, a Windows installer with no Electron) asks the server for the tickets of its printers and prints

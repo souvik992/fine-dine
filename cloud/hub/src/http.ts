@@ -7,6 +7,8 @@ import { Hub, HubError } from './hub.ts';
 import { UrbanPiper } from './urbanpiper.ts';
 import { GuestRelay, GUEST_CSP } from './relay.ts';
 import { REQUEST_HEADERS, Tunnels } from './tunnel.ts';
+import type { HostedOutlets } from './hosted.ts';
+import { randomUUID } from 'node:crypto';
 import { acceptUpgrade, refuseUpgrade } from './ws.ts';
 import type { PublishedMenu } from '../../contract/src/menu.ts';
 
@@ -32,6 +34,8 @@ export interface HttpOptions {
    */
   deviceDomain?: string;
   tunnels?: Tunnels;
+  /** P6-04: outlets whose DinePOS server runs here (no main PC at the outlet). */
+  hosted?: HostedOutlets;
 }
 
 interface Ctx { req: IncomingMessage; res: ServerResponse; params: Record<string, string>; query: URLSearchParams; body: unknown; ip: string }
@@ -244,6 +248,59 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server {
     }
     throw new HubError('NOT_FOUND', 'Not a DinePOS Cloud address.', 404);
   });
+  // ---- P6-04: hosted outlets (their DinePOS server runs here)
+  const hosted = o.hosted;
+  const needHosted = () => {
+    if (!hosted) throw new HubError('NOT_AVAILABLE', 'Hosted outlets are not set up on this cloud.', 503);
+    return hosted;
+  };
+  const outletUrl = (slug: string) => (deviceDomain ? `${deviceScheme}//${slug}.${deviceDomain}` : null);
+  const hostedView = async (slug: string) => {
+    const st = hub.store({ slug });
+    const s = hosted ? hosted.status(st.id) : { hosted: false, running: false, port: null, restarts: 0, lastExit: null, startedAt: null };
+    let setup: { setupNeeded: boolean; outletName: string; users: Array<{ id: string; name: string; roleName: string }> } | null = null;
+    if (hosted && s.running) setup = (await hosted.call(st.id, 'GET', '/v1/setup-state').catch(() => null))?.json as typeof setup;
+    return { available: !!hosted?.available, ...s, deviceUrl: outletUrl(slug), setup };
+  };
+  add('GET', '/v1/admin/stores/:slug/hosted', (c) => { admin(c); return hostedView(c.params.slug!); });
+  add('PUT', '/v1/admin/stores/:slug/hosted', async (c) => {
+    admin(c);
+    const on = (c.body as { enabled?: unknown } | null)?.enabled === true;
+    const h = needHosted();
+    if (on) {
+      h.enable(c.params.slug!);
+      await h.ready(hub.store({ slug: c.params.slug! }).id, 30_000);
+    } else await h.disable(c.params.slug!);
+    return hostedView(c.params.slug!);
+  });
+  /** The owner's first step: outlet name, owner and PIN (only while the outlet has no staff). */
+  add('POST', '/v1/admin/stores/:slug/hosted/setup', async (c) => {
+    admin(c);
+    const b = (c.body ?? {}) as { outletName?: unknown; ownerName?: unknown; pin?: unknown };
+    const id = hub.store({ slug: c.params.slug! }).id;
+    const r = await needHosted().call(id, 'POST', '/v1/commands', { commandId: ulidLike(), type: 'SetupOutlet', payload: { outletName: String(b.outletName ?? ''), ownerId: ulidLike(), ownerName: String(b.ownerName ?? ''), pin: String(b.pin ?? '') }, createdAt: new Date().toISOString() });
+    if (r.status !== 200) throw new HubError('SETUP_FAILED', (r.json as { error?: { message?: string } })?.error?.message ?? 'The outlet could not be set up.', r.status >= 400 && r.status < 500 ? r.status : 502);
+    return hostedView(c.params.slug!);
+  });
+  /** Approves a terminal's (or phone's, or kitchen screen's) pairing code with a manager's PIN, as the outlet's host. */
+  add('POST', '/v1/admin/stores/:slug/hosted/approve', async (c) => {
+    admin(c);
+    const b = (c.body ?? {}) as { code?: unknown; pin?: unknown; userId?: unknown };
+    const id = hub.store({ slug: c.params.slug! }).id;
+    const h = needHosted();
+    const state = (await h.call(id, 'GET', '/v1/setup-state')).json as { users?: Array<{ id: string; roleName: string }> };
+    const users = state.users ?? [];
+    const userId = typeof b.userId === 'string' && b.userId ? b.userId : (users.find((u) => u.roleName === 'Owner') ?? users[0])?.id;
+    if (!userId) throw new HubError('NO_STAFF', 'Set up the outlet first (owner and PIN).', 409);
+    const signIn = await h.call(id, 'POST', '/v1/sessions', { userId, pin: String(b.pin ?? '') });
+    if (signIn.status !== 200) throw new HubError('WRONG_PIN', (signIn.json as { error?: { message?: string } })?.error?.message ?? 'Wrong PIN.', 401);
+    const token = (signIn.json as { token: string }).token;
+    const r = await h.call(id, 'POST', '/v1/commands', { commandId: ulidLike(), type: 'PairDevice', payload: { code: String(b.code ?? '').replace(/\D/g, '') }, createdAt: new Date().toISOString() }, { 'x-user-session': token, 'x-manager-pin': String(b.pin ?? '') });
+    await h.call(id, 'DELETE', '/v1/session', undefined, { 'x-user-session': token }).catch(() => undefined);
+    if (r.status !== 200) throw new HubError('PAIR_FAILED', (r.json as { error?: { message?: string } })?.error?.message ?? 'The device could not be paired.', r.status >= 400 && r.status < 500 ? r.status : 502);
+    return { ok: true };
+  });
+
   /** The address devices use for this outlet, and whether its tunnel is up. */
   add('GET', '/v1/pos/tunnel-info', (c) => {
     const dev = device(c);
@@ -348,6 +405,7 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server {
     // P6-02: everything for https://<store>.<cloud>/ goes to that outlet's main PC
     const outlet = outletOf(req);
     if (outlet === 'unknown') return json(res, 404, { ok: false, error: { code: 'NOT_FOUND', message: 'No DinePOS outlet at this address.' } });
+    if (outlet && hosted?.isHosted(outlet.id)) return void hosted.proxy(outlet.id, req, res);
     if (outlet) return void forwardToOutlet(req, res, outlet);
     try {
       const url = new URL(req.url ?? '/', 'http://hub');
@@ -387,6 +445,8 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server {
       const path = new URL(req.url ?? '/', 'http://x').pathname;
       const outlet = outletOf(req);
       if (outlet === 'unknown') return refuseUpgrade(socket, 404, 'Not Found');
+      // P6-04: a hosted outlet's server checks the stream itself (origin, device token)
+      if (outlet && hosted?.isHosted(outlet.id)) return hosted.proxyUpgrade(outlet.id, req, socket, head);
       if (outlet) {
         if (path !== '/v1/stream') return refuseUpgrade(socket, 404, 'Not Found');
         const origin = req.headers.origin;
@@ -414,3 +474,19 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server {
   });
   return server;
 }
+
+const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+/** A fresh ULID-shaped id (time + random) for commands sent to a hosted outlet's server. */
+function ulidLike(): string {
+  let t = Date.now();
+  let time = '';
+  for (let i = 0; i < 10; i++) {
+    time = CROCKFORD[t % 32]! + time;
+    t = Math.floor(t / 32);
+  }
+  const rnd = randomUUID().replace(/-/g, '');
+  let rest = '';
+  for (let i = 0; i < 16; i++) rest += CROCKFORD[parseInt(rnd.slice(i * 2, i * 2 + 2), 16) % 32];
+  return time + rest;
+}
+

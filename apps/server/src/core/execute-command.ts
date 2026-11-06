@@ -25,6 +25,8 @@ export interface ExecuteDeps {
   onPostCommitError?: (err: unknown, stage: 'publish' | 'print') => void;
   /** P2-09: the licence check (default: not enforced, as in development and tests). */
   licence?: LicenceGate;
+  /** P6-04: this server is a hosted outlet's (no master PC). */
+  hosted?: boolean;
 }
 
 interface StoredCommand {
@@ -144,6 +146,7 @@ function runInTransaction(
     now,
     nowIso,
     licence: deps.licence ?? unenforcedGate(),
+    hosted: deps.hosted ?? false,
     audit: (e) => audits.push(e),
     emit: (topics, event, data) => events.push({ topics: Array.isArray(topics) ? topics : [topics], event, data }),
     print: (job) => {

@@ -16,7 +16,7 @@ import { CloudTunnel, type TunnelAnswer, type TunnelRequest } from './cloud/tunn
 import { AgentBroker } from './print/agent-broker.js';
 import { printAgentRoutes } from './routes/print-agent.js';
 import type { WebSocket as WsSocket } from 'ws';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { GuestAnswer, GuestRequest } from './online/connector.js';
 import { linkRow } from './online/online-support.js';
 import { getFloor } from './queries/floor.js';
@@ -83,6 +83,8 @@ export interface AppDeps {
   onlineFetch?: typeof fetch;
   /** P5-01: the signed add-ons loaded at start (server.ts); absent when none. */
   addons?: AddonSet;
+  /** P6-04: a hosted outlet's host key (DinePOS Cloud on the same machine acts as the master device with it). */
+  hostKey?: string;
   /** P6-03: print agents (shared with the print queue). */
   agents?: AgentBroker;
   /** The port the server listens on (add-ons print it in links such as table QR codes). */
@@ -99,6 +101,16 @@ export const LOG_REDACT = [
 export type DinePosApp = FastifyInstance & { realtime: RealtimeHub; online: OnlineConnector; sync: SyncAgent; guestRelay: (r: GuestRequest) => Promise<GuestAnswer>; cloud: CloudTunnel };
 
 /** Builds the HTTP app without listening, so tests can use `app.inject()`. */
+/** P6-04: the header DinePOS Cloud sends with a hosted outlet's host key. */
+export const HOST_KEY_HEADER = 'x-dinepos-host-key';
+
+function isHostKey(given: string | string[] | undefined, key: string): boolean {
+  if (typeof given !== 'string') return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(key);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 export function buildApp(deps: AppDeps): DinePosApp {
   const { db, timeZone, now = () => new Date(), logger = false } = deps;
   const startedAt = deps.startedAt ?? now();
@@ -125,6 +137,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
 
   // Every request names its device (P2-02): a paired device's token, or the master PC itself (loopback).
   const trustLoopback = deps.trustLoopback ?? true;
+  const hostKey = deps.hostKey;
   app.decorateRequest('deviceId', null);
   app.decorateRequest('deviceKind', null);
   if (deps.devices !== 'off') {
@@ -138,6 +151,12 @@ export function buildApp(deps: AppDeps): DinePosApp {
       if (url.startsWith('/a/')) return done();
       // P6-03: print agents carry their own key (routes/print-agent.ts)
       if (url.startsWith('/v1/print-agent/')) return done();
+      // P6-04: the DinePOS Cloud process hosting this outlet (the owner's first steps from its admin page)
+      if (hostKey && isHostKey(req.headers[HOST_KEY_HEADER], hostKey)) {
+        req.deviceId = MASTER_DEVICE_ID;
+        req.deviceKind = 'master';
+        return done();
+      }
       // through the cloud it is a remote device, whatever the replay's own address (P6-02)
       if (trustLoopback && isLoopback(req.ip) && !req.viaCloud) {
         req.deviceId = MASTER_DEVICE_ID;
@@ -212,6 +231,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
       bus,
       printWaker: deps.printWaker ?? noopPrintWaker,
       licence: licenceGate,
+      hosted: Boolean(deps.hostKey),
       onPostCommitError: (err, stage) => app.log.error({ err, stage }, 'post-commit step failed'),
     };
   const auth = deps.auth ?? sessionAuth(db, now);
@@ -261,7 +281,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
       return { status: 400, headers: { 'content-type': 'application/json; charset=utf-8' }, body: Buffer.from(JSON.stringify(errorBody('VALIDATION', 'Bad request.'))) };
     }
     const headers: Record<string, string> = {};
-    for (const [k, v] of Object.entries(r.headers)) if (k !== 'host' && k !== RELAY_HEADER && typeof v === 'string') headers[k] = v;
+    for (const [k, v] of Object.entries(r.headers)) if (k !== 'host' && k !== RELAY_HEADER && k !== HOST_KEY_HEADER && typeof v === 'string') headers[k] = v;
     headers[RELAY_HEADER] = `${relaySecret} cloud`;
     const res = await app.inject({ method, url: r.path, headers, ...(r.body?.length ? { payload: r.body } : {}) });
     const out: Record<string, string> = {};

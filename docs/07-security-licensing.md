@@ -164,4 +164,10 @@ request can carry that kind.
   of answer headers comes back. Device streams are accepted only from the outlet's own address, the DinePOS terminal
   app or a native client. Caddy makes HTTPS certificates on demand only for addresses the cloud confirms
   (`/v1/tls-ask`). The cloud stores none of this traffic.
+- Hosted outlets (P6-04): the outlet's server runs in DinePOS Cloud on 127.0.0.1 with `DINEPOS_TRUST_LOOPBACK=0`, so every
+  device pairs and every person signs in. The cloud's own process alone holds the outlet's host key, sent as
+  `x-dinepos-host-key` for the owner's first steps from the admin page. That page is protected by the admin key, and
+  pairing still needs the owner's PIN. The cloud's proxy strips the header from all outside requests, and an outlet PC
+  (no host key configured) ignores it. Licences: one key per hosted outlet (`hostedHardwareId`); the master PC takes no
+  seat.
 

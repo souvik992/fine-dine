@@ -24,6 +24,11 @@ export interface ServerConfig {
    * play a second PC (DINEPOS_TRUST_LOOPBACK=0); optional so configs made before P2-02 stay valid.
    */
   trustLoopback?: boolean;
+  /**
+   * P6-04: a hosted outlet's server (run by DinePOS Cloud) accepts this key from the cloud process on the same machine
+   * as the master device (the owner's first steps); never set on an outlet PC.
+   */
+  hostKey?: string;
 }
 
 export const DEFAULT_ALLOWED_ORIGINS = ['app://dinepos', 'http://localhost:5173', 'http://127.0.0.1:5173'];
@@ -84,5 +89,6 @@ export function loadConfig(
     allowedOrigins: e.DINEPOS_ALLOWED_ORIGINS,
     logToFile: e.DINEPOS_LOG_TO_FILE ? e.DINEPOS_LOG_TO_FILE === '1' : e.NODE_ENV === 'production',
     trustLoopback: env.DINEPOS_TRUST_LOOPBACK !== '0',
+    ...(env.DINEPOS_HOST_KEY && env.DINEPOS_HOST_KEY.length >= 32 ? { hostKey: env.DINEPOS_HOST_KEY } : {}),
   };
 }

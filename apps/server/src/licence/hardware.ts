@@ -36,6 +36,14 @@ export function formatHardwareId(identifiers: readonly string[]): string {
   return hex.match(/.{4}/g)!.join('-');
 }
 
+/**
+ * P6-04: a hosted outlet's hardware id (its server runs in DinePOS Cloud): the cloud machine's identifiers and the
+ * outlet's own id, so each hosted outlet on one machine needs its own licence key.
+ */
+export function hostedHardwareId(outletId: string, identifiers: readonly string[] = machineIdentifiers()): string {
+  return formatHardwareId([...identifiers, `hosted:${outletId}`]);
+}
+
 let cached: string | null = null;
 export function hardwareId(): string {
   cached ??= formatHardwareId(machineIdentifiers());

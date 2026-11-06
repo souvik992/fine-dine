@@ -15,7 +15,7 @@ What it does today (P6-01):
 Next (docs/10-roadmap.md, Phase 6):
 - **P6-02** captain phones, kitchen screens and terminals connect from anywhere, tunnelled to the outlet PC.
 - **P6-03** cloud printing through a small print agent at the outlet.
-- **P6-04** fully hosted outlets with no master PC (one database per outlet in the cloud).
+- **P6-04** fully hosted outlets with no master PC (one database per outlet in the cloud): see below.
 
 Zero runtime dependencies: Node 24 and `node:sqlite`. It follows the order contract in `../contract/` (life cycle,
 shapes, checks, prices; the pricing code is in `../core/`).
@@ -288,4 +288,26 @@ outlet PC's LAN address, but from anywhere.
 - If the PC is not connected, devices get a clear 503: the outlet's own network still works.
 - On the outlet PC: **Settings › Cloud sync › Devices from anywhere**, switch on. It shows the outlet's address and how
   to set up each kind of device.
+
+## Hosted outlets: no main PC (P6-04)
+
+An outlet can run entirely in the cloud. Its DinePOS server runs on this machine: one process and one database per
+outlet, in `<HUB_DATA_DIR>/outlets/<store id>/`, listening on 127.0.0.1 only. Devices use `https://<store>.<cloud>`
+exactly as with a main PC. Billing needs the internet at the outlet. Printers need a DinePOS Print Agent on a PC at the
+outlet (P6-03).
+
+1. On the admin page, open the store and choose **DinePOS in the cloud › Run this outlet in the cloud**.
+2. **First step:** enter the outlet name, the owner's name and the owner's PIN.
+3. On the outlet's first terminal, set the server address to `https://<store>.<cloud>`. It shows a pairing code: enter
+   it on the admin page with the owner's PIN. Later devices are approved on that terminal (Settings › Devices).
+4. **Licence:** in DinePOS, Settings › Licence shows this outlet's own hardware id. Make its key with the keygen as
+   usual. Each hosted outlet needs its own key.
+5. **Printers:** add a print agent (Settings › Kitchen & printers) and install DinePOS Print Agent on a PC by the
+   printers, with the server address `https://<store>.<cloud>`.
+
+- The server it runs is `cloud/outlet-server` (`HUB_OUTLET_SERVER` overrides). Rebuild it with
+  `npm run bundle:cloud -w @dinepos/server` whenever DinePOS changes, and commit it; `dinepos-cloud-update` brings it here.
+- **Stop running in the cloud** stops the outlet's server and keeps its data. Running it again carries on.
+- Back up `<HUB_DATA_DIR>/outlets` with the cloud's data (the daily copy covers the cloud's own database only). Each
+  outlet's DinePOS server also keeps its own backups in its data folder.
 
