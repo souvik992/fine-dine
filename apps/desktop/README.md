@@ -13,7 +13,7 @@ and a preload bridge arrive when the offline outbox needs them (P2-07/P3-03).
 
 ## Security (P1-08)
 The renderer is our own bundle served on `app://dinepos` with a strict CSP (`script-src 'self'`, connect only
-to http/ws). `contextIsolation`, `sandbox`, no `nodeIntegration`, no webviews, no navigation away from the app,
+to http/ws, outside images only from `tile.openstreetmap.org` for the delivery map on Online orders). `contextIsolation`, `sandbox`, no `nodeIntegration`, no webviews, no navigation away from the app,
 no new windows (https links open in the browser), all permission requests denied, single instance. The
 renderer calls the outlet server directly; the server allows the `app://dinepos` origin via CORS and on the
 WebSocket upgrade. Verified on Electron 45 against both `127.0.0.1` and a LAN IP.

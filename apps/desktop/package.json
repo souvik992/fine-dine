@@ -1,6 +1,6 @@
 {
   "name": "@dinepos/desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "DinePOS billing terminal (Electron). A client of the outlet server; never opens the database.",
   "type": "module",

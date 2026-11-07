@@ -34,5 +34,6 @@ describe('app:// scheme', () => {
     expect(CSP).not.toMatch(/script-src[^;]*unsafe/);
     expect(CSP).toContain("object-src 'none'");
     expect(CSP).toContain("frame-ancestors 'none'");
+    expect(CSP).toContain("img-src 'self' data: blob: https://tile.openstreetmap.org;"); // map tiles are the only outside images
   });
 });

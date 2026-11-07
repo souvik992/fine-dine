@@ -1,11 +1,12 @@
-import { formatINR, REJECT_REASONS, type OnlineOrderView, type OnlineStatus, type RejectReason } from '@dinepos/shared';
+import { formatINR, REJECT_REASONS, type OnlineOrderView, type OnlineStatus, type OutletConfig, type RejectReason } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Bike, Check, Clock, MapPin, Phone, ReceiptText, ShoppingBag, TriangleAlert, X } from 'lucide-react';
+import { ArrowLeft, Bike, Check, Clock, Map as MapIcon, MapPin, Phone, ReceiptText, ShoppingBag, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { Modal } from '../components/Modal.js';
 import { SettleDialog } from '../billing/SettleDialog.js';
+import { DeliveryMap } from './DeliveryMap.js';
 import { board, nextSteps, REJECT_LABEL, STATE_LABEL, timeLeft, type Column } from './online-model.js';
 
 const COLUMNS: Array<[Column, string]> = [
@@ -29,6 +30,9 @@ export function OnlineScreen({ onBack, onOpenOrder }: { onBack: () => void; onOp
   const [now, setNow] = useState(() => Date.now());
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
   const [dialog, setDialog] = useState<{ kind: 'reject' | 'rider' | 'cancel' | 'payment'; order: OnlineOrderView; to?: 'DELIVERED' | 'PICKED_UP' } | null>(null);
+  const config = useQuery({ queryKey: ['config'], queryFn: () => api.get<OutletConfig>('/v1/config'), staleTime: 60_000 });
+  const storeLoc = config.data?.['online.settings'].serviceability.location ?? null;
+  const [mapFor, setMapFor] = useState<OnlineOrderView | null>(null);
   const [priceOk, setPriceOk] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
@@ -96,6 +100,11 @@ export function OnlineScreen({ onBack, onOpenOrder }: { onBack: () => void; onOp
               <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               {[ord.address.line1, ord.address.line2, ord.address.landmark, `${ord.address.city} ${ord.address.pincode}`].filter(Boolean).join(', ')}
               {ord.distanceKm !== null ? ` (${ord.distanceKm} km)` : ''}
+              {ord.location ? (
+                <button className="ml-auto inline-flex shrink-0 items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs font-semibold hover:bg-secondary" onClick={() => setMapFor(o)} aria-label={`Map for ${o.number}`}>
+                  <MapIcon className="h-3.5 w-3.5" /> Map
+                </button>
+              ) : null}
             </p>
           ) : null}
           {ord.rider ? (
@@ -236,6 +245,7 @@ export function OnlineScreen({ onBack, onOpenOrder }: { onBack: () => void; onOp
           }}
         />
       ) : null}
+      {mapFor?.order.location ? <DeliveryMap order={mapFor} store={storeLoc ? { lat: storeLoc.lat, lng: storeLoc.lng } : null} onClose={() => setMapFor(null)} /> : null}
       {dialog?.kind === 'cancel' ? <CancelDialog order={dialog.order} onClose={() => setDialog(null)} onCancel={(reason) => void run(dialog.order.id, 'CancelOnlineOrder', { onlineOrderId: dialog.order.id, reason }, `${dialog.order.number} cancelled; its bill is void.`).then(() => setDialog(null))} /> : null}
     </div>
   );
