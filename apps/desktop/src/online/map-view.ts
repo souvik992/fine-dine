@@ -96,25 +96,32 @@ export function openStreetMapUrl(p: LatLng): string {
   return `https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lng}#map=17/${p.lat}/${p.lng}`;
 }
 
-// ---------------------------------------------------------------- place search (OpenStreetMap Nominatim)
+// ---------------------------------------------------------------- place search (Photon, OpenStreetMap data)
 
 export interface Place extends LatLng {
   name: string;
 }
 
-/** Search for an area or address in India by name (Nominatim; one search per press, as its usage policy asks). */
+/** Search-as-you-type for an area or address in India (Photon allows typing searches; Nominatim's free server does not). */
 export function placeSearchUrl(query: string): string {
-  return `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&countrycodes=in&accept-language=en&q=${encodeURIComponent(query.trim())}`;
+  return `https://photon.komoot.io/api/?q=${encodeURIComponent(query.trim())}&limit=6&lang=en&bbox=68,6,98,38`;
 }
 
-/** The matches from a Nominatim answer, skipping anything malformed. */
+/** The matches from a Photon answer (GeoJSON), in India only, skipping anything malformed or repeated. */
 export function parsePlaces(body: unknown): Place[] {
-  if (!Array.isArray(body)) return [];
+  const features = (body as { features?: unknown } | null)?.features;
+  if (!Array.isArray(features)) return [];
   const out: Place[] = [];
-  for (const r of body as Array<Record<string, unknown>>) {
-    const lat = Number(r?.lat);
-    const lng = Number(r?.lon);
-    if (typeof r?.display_name === 'string' && Number.isFinite(lat) && Number.isFinite(lng)) out.push({ name: r.display_name, lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 });
+  for (const f of features as Array<{ properties?: Record<string, unknown>; geometry?: { coordinates?: unknown } } | null>) {
+    const pr = f?.properties ?? {};
+    const c = f?.geometry?.coordinates;
+    if (!Array.isArray(c) || pr.countrycode !== 'IN') continue;
+    const lng = Number(c[0]);
+    const lat = Number(c[1]);
+    const parts = [pr.name, pr.street, pr.district, pr.city, pr.county, pr.state].filter((x): x is string => typeof x === 'string' && x.length > 0);
+    const name = [...new Set(parts)].join(', ');
+    if (!name || !Number.isFinite(lat) || !Number.isFinite(lng) || out.some((p) => p.name === name)) continue;
+    out.push({ name, lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 });
   }
   return out;
 }

@@ -8,7 +8,7 @@ const INDIA: LatLng = { lat: 22.35, lng: 78.67 };
 /**
  * Settings › Online orders › Delivery: the store on a map with a ring for each delivery band. Click to put the store
  * there; drag to move around; + / − or the mouse wheel to zoom. Rings are the straight-line reach of each band
- * (its km ÷ the road factor), since bands count road distance. Search an area name to jump there.
+ * (its km ÷ the road factor), since bands count road distance. Type an area name to search as you type and jump there.
  */
 export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { location: LatLng | null; bandsKm: number[]; roadFactor: number; onPick: (p: LatLng) => void }) {
   const box = useRef<HTMLDivElement>(null);
@@ -63,24 +63,47 @@ export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { lo
     const r = e.currentTarget.getBoundingClientRect();
     onPick(pointAt(centre, zoom, width, H, e.clientX - r.left, e.clientY - r.top));
   };
-  const search = async () => {
-    if (query.trim().length < 3 || searching) return;
-    setSearching(true);
-    setSearchError(null);
-    setPlaces(null);
-    try {
-      const res = await fetch(placeSearchUrl(query), { headers: { accept: 'application/json' } });
-      if (!res.ok) throw new Error(String(res.status));
-      const found = parsePlaces(await res.json());
-      setPlaces(found);
-      if (!found.length) setSearchError('No place found with that name. Try adding the city, like "Marathahalli, Bengaluru".');
-    } catch {
-      setSearchError('Could not search (no internet?). Drag and zoom the map, or type the latitude and longitude.');
-    } finally {
-      setSearching(false);
+  // search as you type: 400 ms after the last key, the newest search wins
+  const skip = useRef(false);
+  useEffect(() => {
+    if (skip.current) {
+      skip.current = false;
+      return;
     }
-  };
+    const q = query.trim();
+    setSearchError(null);
+    if (q.length < 3) {
+      setPlaces(null);
+      setSearching(false);
+      return;
+    }
+    const ctl = new AbortController();
+    setSearching(true);
+    const t = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch(placeSearchUrl(q), { headers: { accept: 'application/json' }, signal: ctl.signal });
+          if (!res.ok) throw new Error(String(res.status));
+          const found = parsePlaces(await res.json());
+          setPlaces(found);
+          if (!found.length) setSearchError('No place found with that name yet. Keep typing, or add the city, like "Marathahalli, Bengaluru".');
+        } catch {
+          if (ctl.signal.aborted) return;
+          setPlaces(null);
+          setSearchError('Could not search (no internet?). Drag and zoom the map, or type the latitude and longitude.');
+        } finally {
+          if (!ctl.signal.aborted) setSearching(false);
+        }
+      })();
+    }, 400);
+    return () => {
+      clearTimeout(t);
+      ctl.abort();
+    };
+  }, [query]);
   const choose = (p: Place) => {
+    skip.current = true; // showing the chosen name in the box is not a new search
+    setQuery(p.name);
     setCentre(p);
     setZoom(16);
     setPlaces(null);
@@ -91,24 +114,27 @@ export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { lo
 
   return (
     <div className="mt-3">
-      <div className="mb-2 flex gap-2">
+      <div className="relative mb-2">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input
-          className="input flex-1"
+          className="input w-full pl-9"
           maxLength={120}
-          placeholder="Area name, like Marathahalli, Bengaluru"
+          placeholder="Type an area name, like Marathahalli, Bengaluru"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              e.preventDefault();
-              void search();
+              e.preventDefault(); // Enter takes the first match
+              if (places?.[0]) choose(places[0]);
+            } else if (e.key === 'Escape' && places?.length) {
+              e.stopPropagation();
+              setPlaces(null);
             }
           }}
           aria-label="Search area name"
+          autoComplete="off"
         />
-        <button type="button" className="btn" disabled={searching || query.trim().length < 3} onClick={() => void search()}>
-          <Search className="h-4 w-4" /> {searching ? 'Searching…' : 'Find'}
-        </button>
+        {searching ? <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">Searching…</span> : null}
       </div>
       {searchError ? <p className="mb-2 text-sm text-danger">{searchError}</p> : null}
       {places?.length ? (

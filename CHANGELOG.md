@@ -70,3 +70,4 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-07 Settings › Online orders › Delivery: map to set the store location by clicking (drag, zoom), with a ring per delivery band; desktop 0.1.2
 - 2026-11-07 Settings › Online orders › Delivery: area name search above the store map (OpenStreetMap Nominatim, India) jumps the map and puts the store pin there; desktop 0.1.3
 - 2026-11-07 Online orders (ODS): channel badge on each order card next to the order number (Swiggy orange, Zomato red, Website globe, App phone; our own lettering); desktop 0.1.4
+- 2026-11-07 Settings › Online orders › Delivery: area search on the store map searches as you type (Photon, OpenStreetMap data; Enter takes the first match), Find button removed; desktop 0.1.5

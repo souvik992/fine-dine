@@ -55,9 +55,19 @@ describe('delivery map', () => {
     expect(pxPerKm(60, 10)).toBeCloseTo(2 * pxPerKm(0, 10), 6);
   });
 
-  it('searches places in India by name and reads the matches', () => {
-    expect(placeSearchUrl(' Marathahalli, Bengaluru ')).toBe('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&countrycodes=in&accept-language=en&q=Marathahalli%2C%20Bengaluru');
-    expect(parsePlaces([{ display_name: 'Marathahalli, Bengaluru', lat: '12.9561239', lon: '77.7019487' }, { lat: 'x' }, null])).toEqual([{ name: 'Marathahalli, Bengaluru', lat: 12.956124, lng: 77.701949 }]);
-    expect(parsePlaces({ error: 'busy' })).toEqual([]);
+  it('searches places in India by name as you type and reads the matches', () => {
+    expect(placeSearchUrl(' marathah ')).toBe('https://photon.komoot.io/api/?q=marathah&limit=6&lang=en&bbox=68,6,98,38');
+    const pt = (lng: number, lat: number) => ({ type: 'Point', coordinates: [lng, lat] });
+    const body = {
+      features: [
+        { properties: { name: 'Marathahalli', county: 'Bangalore East', state: 'Karnataka', countrycode: 'IN' }, geometry: pt(77.6984163, 12.9552572) },
+        { properties: { name: 'Marathahalli', county: 'Bangalore East', state: 'Karnataka', countrycode: 'IN' }, geometry: pt(77.7, 12.9) }, // same name: once
+        { properties: { name: 'Kathmandu', countrycode: 'NP' }, geometry: pt(85.3, 27.7) }, // not India
+        { properties: { name: 'Broken', countrycode: 'IN' } },
+        null,
+      ],
+    };
+    expect(parsePlaces(body)).toEqual([{ name: 'Marathahalli, Bangalore East, Karnataka', lat: 12.955257, lng: 77.698416 }]);
+    expect(parsePlaces({ message: 'busy' })).toEqual([]);
   });
 });
