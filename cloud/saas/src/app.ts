@@ -23,6 +23,13 @@ const addressSchema = z.object({
   stateCode: z.string().trim().max(3).optional(),
   postalCode: z.string().trim().min(3).max(12),
   countryCode: z.string().trim().length(2).default("IN").transform((value) => value.toUpperCase()),
+}).superRefine((address, context) => {
+  if (address.countryCode === "IN" && !/^\\d{6}$/.test(address.postalCode)) {
+    context.addIssue({ code: "custom", path: ["postalCode"], message: "Indian PIN codes must contain six digits." });
+  }
+  if (address.countryCode === "IN" && address.stateCode && !/^\\d{2}$/.test(address.stateCode)) {
+    context.addIssue({ code: "custom", path: ["stateCode"], message: "Indian state codes must contain two digits." });
+  }
 });
 
 const registerSchema = z.object({
@@ -56,6 +63,16 @@ const registerSchema = z.object({
   }),
   acceptedTerms: z.literal(true),
   termsVersion: z.string().trim().min(1).max(40),
+}).superRefine((data, context) => {
+  const registrations = [
+    { gstin: data.business.gstin, stateCode: data.business.address.stateCode, path: ["business", "gstin"] },
+    { gstin: data.outlet.gstin, stateCode: data.outlet.address.stateCode, path: ["outlet", "gstin"] },
+  ];
+  for (const registration of registrations) {
+    if (registration.gstin && registration.stateCode && registration.gstin.slice(0, 2) !== registration.stateCode) {
+      context.addIssue({ code: "custom", path: registration.path, message: "GSTIN state prefix must match the address state code." });
+    }
+  }
 });
 
 type SessionUser = { id: string; full_name: string; email: string; phone: string | null; organization_id: string; role: string };
@@ -341,7 +358,11 @@ export function buildSaasApp(): FastifyInstance {
       businessEmail: EMAIL.nullable().optional(),
       businessPhone: phone.nullable().optional(),
       address: addressSchema,
-    }).strict();
+    }).strict().superRefine((data, context) => {
+      if (data.gstin && data.address.stateCode && data.gstin.slice(0, 2) !== data.address.stateCode) {
+        context.addIssue({ code: "custom", path: ["gstin"], message: "GSTIN state prefix must match the registered address state code." });
+      }
+    });
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send(failure("VALIDATION_ERROR", "Please check the business profile fields."));
     const b = parsed.data;
