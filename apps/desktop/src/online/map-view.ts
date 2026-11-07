@@ -95,3 +95,26 @@ export function directionsUrl(to: LatLng, from: LatLng | null): string {
 export function openStreetMapUrl(p: LatLng): string {
   return `https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lng}#map=17/${p.lat}/${p.lng}`;
 }
+
+// ---------------------------------------------------------------- place search (OpenStreetMap Nominatim)
+
+export interface Place extends LatLng {
+  name: string;
+}
+
+/** Search for an area or address in India by name (Nominatim; one search per press, as its usage policy asks). */
+export function placeSearchUrl(query: string): string {
+  return `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&countrycodes=in&accept-language=en&q=${encodeURIComponent(query.trim())}`;
+}
+
+/** The matches from a Nominatim answer, skipping anything malformed. */
+export function parsePlaces(body: unknown): Place[] {
+  if (!Array.isArray(body)) return [];
+  const out: Place[] = [];
+  for (const r of body as Array<Record<string, unknown>>) {
+    const lat = Number(r?.lat);
+    const lng = Number(r?.lon);
+    if (typeof r?.display_name === 'string' && Number.isFinite(lat) && Number.isFinite(lng)) out.push({ name: r.display_name, lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 });
+  }
+  return out;
+}

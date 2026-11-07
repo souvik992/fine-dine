@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { directionsUrl, mapView, pointAt, project, pxPerKm, TILE, unproject, viewAt } from './map-view.js';
+import { directionsUrl, mapView, parsePlaces, placeSearchUrl, pointAt, project, pxPerKm, TILE, unproject, viewAt } from './map-view.js';
 
 const store = { lat: 22.5726, lng: 88.3639 };
 const customer = { lat: 22.5535, lng: 88.3517 };
@@ -53,5 +53,11 @@ describe('delivery map', () => {
   it('sizes band rings in pixels per kilometre', () => {
     expect(pxPerKm(0, 0)).toBeCloseTo(256 / 40_075, 6);
     expect(pxPerKm(60, 10)).toBeCloseTo(2 * pxPerKm(0, 10), 6);
+  });
+
+  it('searches places in India by name and reads the matches', () => {
+    expect(placeSearchUrl(' Marathahalli, Bengaluru ')).toBe('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&countrycodes=in&accept-language=en&q=Marathahalli%2C%20Bengaluru');
+    expect(parsePlaces([{ display_name: 'Marathahalli, Bengaluru', lat: '12.9561239', lon: '77.7019487' }, { lat: 'x' }, null])).toEqual([{ name: 'Marathahalli, Bengaluru', lat: 12.956124, lng: 77.701949 }]);
+    expect(parsePlaces({ error: 'busy' })).toEqual([]);
   });
 });

@@ -67,3 +67,4 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-07 DinePOS Server window (DinePOS.exe --server, the DinePOS Server shortcut): runs the outlet server and shows its status, business day, licence, backups, cloud, LAN addresses with QR codes for captain phones and kitchen screens, devices, printers and the live log; Start/Stop/Restart, restarts it if it stops; tray icon (closing keeps the server running)
 - 2026-11-07 Online orders: Map button on delivery cards (customer and store pins on OpenStreetMap tiles, directions link); CSP allows OSM tile images
 - 2026-11-07 Settings › Online orders › Delivery: map to set the store location by clicking (drag, zoom), with a ring per delivery band; desktop 0.1.2
+- 2026-11-07 Settings › Online orders › Delivery: area name search above the store map (OpenStreetMap Nominatim, India) jumps the map and puts the store pin there; desktop 0.1.3
