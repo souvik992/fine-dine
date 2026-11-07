@@ -1,0 +1,29 @@
+name: SaaS API
+
+on:
+  pull_request:
+    paths:
+      - "cloud/saas/**"
+      - "packages/saas-db/migrations/**"
+      - ".github/workflows/saas-api.yml"
+  push:
+    branches: [feature/saas-foundation]
+    paths:
+      - "cloud/saas/**"
+      - "packages/saas-db/migrations/**"
+      - ".github/workflows/saas-api.yml"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud/saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-package-lock
+      - run: npm run build
+      - run: npm test
