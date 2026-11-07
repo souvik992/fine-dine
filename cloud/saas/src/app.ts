@@ -24,10 +24,10 @@ const addressSchema = z.object({
   postalCode: z.string().trim().min(3).max(12),
   countryCode: z.string().trim().length(2).default("IN").transform((value) => value.toUpperCase()),
 }).superRefine((address, context) => {
-  if (address.countryCode === "IN" && !/^\\d{6}$/.test(address.postalCode)) {
+  if (address.countryCode === "IN" && !/^\d{6}$/.test(address.postalCode)) {
     context.addIssue({ code: "custom", path: ["postalCode"], message: "Indian PIN codes must contain six digits." });
   }
-  if (address.countryCode === "IN" && address.stateCode && !/^\\d{2}$/.test(address.stateCode)) {
+  if (address.countryCode === "IN" && address.stateCode && !/^\d{2}$/.test(address.stateCode)) {
     context.addIssue({ code: "custom", path: ["stateCode"], message: "Indian state codes must contain two digits." });
   }
 });
