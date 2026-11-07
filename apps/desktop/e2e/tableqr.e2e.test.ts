@@ -1,5 +1,5 @@
 // P5-01 / P5-02 in the real apps: the signed Table QR package (built and signed exactly as shipped) is loaded by the
-// outlet server; the terminal checks its signature itself and shows its screens (floor button, Settings › Table QR,
+// outlet server; the terminal checks its signature itself and shows its screens (Settings › Table QR,
 // alerts). A guest's phone opens the table's code, orders and calls a waiter; the cashier accepts on the terminal.
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
 import { cpSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
@@ -74,7 +74,7 @@ describe('Table QR add-on', () => {
     await page.keyboard.type('1234');
     await page.keyboard.press('Enter');
     await page.waitForSelector('[data-table="T1"]', { timeout: 10_000 });
-    await page.locator('[data-addon-nav="tableqr"]').waitFor({ timeout: 15_000 }); // the screens ran: signature checked by the terminal
+    await expect.poll(() => page.locator('[data-addon-nav="tableqr"]').count()).toBe(0); // its screen is kept off the floor header
     await page.getByRole('button', { name: 'Settings' }).click();
     const nav = page.getByRole('navigation', { name: 'Settings sections' });
     await nav.getByRole('button', { name: /^Add-ons/ }).click();
@@ -139,13 +139,5 @@ describe('Table QR add-on', () => {
     await page.locator('[data-table="T2"] [data-badge="tableqr:waiter"]').waitFor({ timeout: 15_000 });
     await page.locator('[data-qr-alerts]').getByRole('button', { name: 'On my way · done' }).click();
     await expect.poll(() => page.locator('[data-table="T2"] [data-badge="tableqr:waiter"]').count(), { timeout: 10_000 }).toBe(0);
-  });
-
-  it('the Table QR screen lists what happened, with who handled it', async () => {
-    const page = await app.firstWindow();
-    await page.locator('[data-addon-nav="tableqr"]').click();
-    await page.getByRole('heading', { name: 'Table QR' }).waitFor();
-    await page.getByText(/Accepted by Asha/).waitFor({ timeout: 10_000 });
-    await page.getByText(/Done by Asha/).waitFor();
   });
 });

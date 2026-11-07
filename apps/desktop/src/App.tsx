@@ -20,6 +20,9 @@ import { ReportsScreen } from './reports/ReportsScreen.js';
 import { StockScreen } from './stock/StockScreen.js';
 import { AddonView, useAddonLoader, useAddonRegistrations } from './addons/runtime.js';
 
+/** Add-ons whose screen button is kept off the floor header (their settings and alerts still show). */
+const HIDDEN_HEADER_ADDONS = new Set(['tableqr']);
+
 type Screen = { kind: 'floor' } | { kind: 'settings'; section?: string } | { kind: 'stock' } | { kind: 'reports' } | { kind: 'bookings' } | { kind: 'online' } | { kind: 'order'; orderId: string } | { kind: 'addon'; id: string };
 
 export function App() {
@@ -87,7 +90,7 @@ export function App() {
       ) : screen.kind === 'bookings' ? (
         <BookingsScreen onBack={toFloor} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} />
       ) : (
-        <FloorScreen onSettings={() => setScreen({ kind: 'settings' })} onStock={() => setScreen({ kind: 'stock' })} onReports={() => setScreen({ kind: 'reports' })} onBookings={() => setScreen({ kind: 'bookings' })} onOnline={() => setScreen({ kind: 'online' })} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} addonNav={addonRegs.flatMap(([id, r]) => (r.nav && (!r.nav.right || can(r.nav.right)) ? [{ id, label: r.nav.label, title: r.nav.title, open: () => setScreen({ kind: 'addon', id }) }] : []))} />
+        <FloorScreen onSettings={() => setScreen({ kind: 'settings' })} onStock={() => setScreen({ kind: 'stock' })} onReports={() => setScreen({ kind: 'reports' })} onBookings={() => setScreen({ kind: 'bookings' })} onOnline={() => setScreen({ kind: 'online' })} onOpenOrder={(orderId) => setScreen({ kind: 'order', orderId })} addonNav={addonRegs.flatMap(([id, r]) => (r.nav && !HIDDEN_HEADER_ADDONS.has(id) && (!r.nav.right || can(r.nav.right)) ? [{ id, label: r.nav.label, title: r.nav.title, open: () => setScreen({ kind: 'addon', id }) }] : []))} />
       )}
       {addonRegs.map(([id, r]) => (r.overlay ? <AddonView key={id} id={id} reg={r} Comp={r.overlay} nav={addonNav} /> : null))}
       <OnlineAlerts onOpen={() => setScreen({ kind: 'online' })} hidden={screen.kind === 'online'} />

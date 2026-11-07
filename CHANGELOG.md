@@ -71,4 +71,6 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-07 Settings › Online orders › Delivery: area name search above the store map (OpenStreetMap Nominatim, India) jumps the map and puts the store pin there; desktop 0.1.3
 - 2026-11-07 Online orders (ODS): channel badge on each order card next to the order number (Swiggy orange, Zomato red, Website globe, App phone; our own lettering); desktop 0.1.4
 - 2026-11-07 Settings › Online orders › Delivery: area search on the store map searches as you type (Photon, OpenStreetMap data; Enter takes the first match), Find button removed; desktop 0.1.5
+- 2026-11-07 UI Floor header: Reservation (to-come count), Online Orders (globe, unaccepted count, blink on auto-accept), Table QR button hidden; search in Bills; desktop 0.1.6
+- 2026-11-07 UI New desktop app icon (orange tile, fork and knife): build/icon.ico + icon.png
 - 2026-11-07 P6-06 Swiggy / Zomato orders in DinePOS: Settings › Online orders › Swiggy and Zomato (menu published for them with DinePOS item ids); accepting a platform order uses the platform's charges instead of a distance band (fixes "outside the delivery area"); bill settled as Other with the platform's order number, except cash the outlet's own rider collects

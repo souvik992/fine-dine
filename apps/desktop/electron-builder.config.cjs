@@ -30,6 +30,8 @@ module.exports = {
   win: {
     target: [{ target: 'nsis', arch: ['x64'] }],
     executableName: 'DinePOS',
+    // App, taskbar, installer and shortcut icon (orange tile, fork and knife), at 16–256 px.
+    icon: 'build/icon.ico',
     artifactName: 'DinePOS-Setup-${version}.${ext}',
   },
   nsis: {

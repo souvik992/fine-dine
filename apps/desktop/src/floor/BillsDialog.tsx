@@ -1,12 +1,11 @@
 import { formatINR, type DayBill } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Printer } from 'lucide-react';
+import { Ban, Printer, Search } from 'lucide-react';
 import { useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { Modal } from '../components/Modal.js';
-
-const STATE: Record<DayBill['state'], string> = { printed: 'Unpaid', superseded: 'Replaced', settled: 'Paid', void: 'VOID' };
+import { BILL_STATE as STATE, billMatches } from './bills-search.js';
 
 /** Today's bills (P2-06): reprint any, void one (reason; manager PIN when the role needs it). VOID bills keep their number. */
 export function BillsDialog({ onClose }: { onClose: () => void }) {
@@ -17,6 +16,8 @@ export function BillsDialog({ onClose }: { onClose: () => void }) {
   const [reason, setReason] = useState('');
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState('');
+  const shown = (bills.data?.bills ?? []).filter((b) => b.state !== 'superseded' && billMatches(b, query));
 
   const act = async (send: () => Promise<unknown>, ok: string) => {
     setBusy(true);
@@ -41,13 +42,31 @@ export function BillsDialog({ onClose }: { onClose: () => void }) {
           {message.text}
         </p>
       ) : null}
+      {bills.data?.bills.length ? (
+        <div className="relative mb-3">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <input
+            data-autofocus
+            className="input w-full pl-9"
+            placeholder="Search bill no, table, amount, UPI/cash, paid/unpaid"
+            aria-label="Search bills"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && query) {
+                e.stopPropagation();
+                setQuery('');
+              }
+            }}
+          />
+        </div>
+      ) : null}
       {bills.data?.bills.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">No bills yet today.</p> : null}
+      {!!bills.data?.bills.length && shown.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">No bill matches “{query.trim()}”.</p> : null}
       <div className="max-h-[60vh] overflow-y-auto">
         <table className="w-full text-sm" aria-label="Today's bills">
           <tbody>
-            {bills.data?.bills
-              .filter((b) => b.state !== 'superseded')
-              .map((b) => (
+            {shown.map((b) => (
                 <tr key={b.billId} className={`border-b border-border last:border-0 ${b.state === 'void' ? 'text-muted-foreground' : ''}`}>
                   <td className="py-2 pr-2 font-mono font-semibold">{b.billNo}</td>
                   <td className="pr-2">

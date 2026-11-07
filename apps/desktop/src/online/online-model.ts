@@ -75,3 +75,12 @@ export function timeLeft(acceptBy: number | null, nowMs: number): { text: string
 
 /** New orders waiting for an answer (the header badge). */
 export const waitingCount = (orders: readonly OnlineOrderView[]) => orders.filter((o) => o.state === 'SENT_TO_STORE' || o.state === 'RECEIVED').length;
+
+/**
+ * Orders seen for the first time already accepted (in the kitchen column): the server accepted them automatically.
+ * `seen` holds every id shown before; the first load (seen === null) reports none.
+ */
+export function autoAcceptedSince(seen: ReadonlySet<string> | null, orders: readonly OnlineOrderView[]): string[] {
+  if (!seen) return [];
+  return orders.filter((o) => !seen.has(o.id) && COLUMN[o.state] === 'kitchen').map((o) => o.id);
+}

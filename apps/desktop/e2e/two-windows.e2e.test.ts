@@ -951,7 +951,7 @@ describe('desktop app', () => {
     const hhmm = `${String(soon.getHours()).padStart(2, '0')}:${String(soon.getMinutes()).padStart(2, '0')}`;
     const ymd = `${soon.getFullYear()}-${String(soon.getMonth() + 1).padStart(2, '0')}-${String(soon.getDate()).padStart(2, '0')}`;
 
-    await page!.getByRole('button', { name: /^Bookings/ }).click();
+    await page!.getByRole('button', { name: /^Reservation/ }).click();
     await page!.getByRole('button', { name: 'New booking' }).click();
     const dlg = page!.getByRole('dialog', { name: 'New booking' });
     await dlg.getByLabel('Guest name').fill('Sharma');
@@ -978,7 +978,7 @@ describe('desktop app', () => {
     const tile = page!.locator(`[data-table="${booked.label}"]`);
     await page!.locator(`[data-table="${booked.label}"][data-state="RESERVED"]`).waitFor({ timeout: 5_000 });
     await tile.getByTestId('booking').getByText(`${hhmm} · Sharma (4)`).waitFor();
-    expect(await page!.getByRole('button', { name: /^Bookings/ }).getAttribute('title')).toContain('waitlist: 1');
+    expect(await page!.getByRole('button', { name: /^Reservation/ }).getAttribute('title')).toContain('waitlist: 1');
 
     // Seating the held table: these are Sharma's guests → the booking is seated, 4 covers.
     await tile.click();
@@ -991,7 +991,7 @@ describe('desktop app', () => {
 
     // Gupta is seated from the waitlist at another free table.
     await page!.getByRole('button', { name: 'Floor', exact: true }).click();
-    await page!.getByRole('button', { name: /^Bookings/ }).click();
+    await page!.getByRole('button', { name: /^Reservation/ }).click();
     await waiting.getByRole('button', { name: 'Seat' }).click();
     await page!.getByRole('dialog', { name: 'Seat Gupta (3)' }).getByRole('listitem', { name: `Table ${forWaitlist.label}` }).click();
     await page!.getByTestId('order-title').getByText(`Table ${forWaitlist.label}`).waitFor({ timeout: 5_000 });

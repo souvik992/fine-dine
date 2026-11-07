@@ -1,6 +1,6 @@
 import type { FloorSnapshot, FloorTable } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Banknote, ChartColumn, MoonStar, Puzzle, ReceiptText, RefreshCw, Search, Settings, ShoppingBag } from 'lucide-react';
+import { Banknote, ChartColumn, MoonStar, Puzzle, ReceiptText, RefreshCw, Search, Settings } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
@@ -9,6 +9,7 @@ import { UserBadge } from '../components/UserBadge.js';
 import { canvasSize, hasLayout, TILE_H, TILE_W } from '../settings/layout-model.js';
 import { findTable, moveFocus, STATE_META, stateCounts, tablesInArea, type Arrow } from './floor-model.js';
 import { BookingsButton } from '../bookings/BookingsButton.js';
+import { OnlineButton } from '../online/OnlineButton.js';
 import { StockButton } from '../stock/StockButton.js';
 import { BillsDialog } from './BillsDialog.js';
 import { CashDialog } from './CashDialog.js';
@@ -200,9 +201,7 @@ export function FloorScreen({
         </time>
         {can('reservation.manage') || can('order.create') ? <BookingsButton onClick={onBookings} /> : null}
         {can('online.orders') ? (
-          <button className="btn h-10" onClick={onOnline} title="Orders from the website and app">
-            <ShoppingBag className="h-4 w-4" /> Online
-          </button>
+          <OnlineButton onClick={onOnline} />
         ) : null}
         {addonNav.map((a) => (
           <button key={a.id} className="btn h-10" onClick={a.open} title={a.title ?? a.label} data-addon-nav={a.id}>

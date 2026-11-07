@@ -1,6 +1,6 @@
 import type { HubOrderState, OnlineOrderView } from '@dinepos/shared';
 import { describe, expect, it } from 'vitest';
-import { board, nextSteps, timeLeft, waitingCount } from './online-model.js';
+import { autoAcceptedSince, board, nextSteps, timeLeft, waitingCount } from './online-model.js';
 
 const o = (id: string, state: HubOrderState, receivedAt: string, fulfilment: 'PICKUP' | 'DELIVERY' = 'PICKUP') =>
   ({ id, state, receivedAt, order: { fulfilment } }) as unknown as OnlineOrderView;
@@ -10,6 +10,13 @@ describe('online orders screen', () => {
     const b = board([o('a', 'RECEIVED', '2'), o('b', 'SENT_TO_STORE', '1'), o('c', 'PREPARING', '3'), o('d', 'READY', '4'), o('e', 'OUT_FOR_DELIVERY', '5'), o('f', 'DELIVERED', '6'), o('g', 'CANCELLED', '7')]);
     expect(Object.fromEntries(Object.entries(b).map(([k, v]) => [k, v.map((x) => x.id)]))).toEqual({ new: ['b', 'a'], kitchen: ['c'], ready: ['d'], out: ['e'], done: ['g', 'f'] });
     expect(waitingCount([o('a', 'RECEIVED', '1'), o('b', 'SENT_TO_STORE', '1'), o('c', 'ACCEPTED', '1')])).toBe(2);
+  });
+
+  it('an order first seen already accepted was accepted automatically; the first load reports none', () => {
+    const list = [o('a', 'ACCEPTED', '1'), o('b', 'RECEIVED', '1')];
+    expect(autoAcceptedSince(null, list)).toEqual([]);
+    expect(autoAcceptedSince(new Set(['a']), [...list, o('c', 'ACCEPTED', '2'), o('d', 'REJECTED', '2')])).toEqual(['c']);
+    expect(autoAcceptedSince(new Set(['b']), [o('b', 'ACCEPTED', '1')])).toEqual([]);
   });
 
   it('next steps follow the contract: pickup ends collected, delivery goes out with a rider', () => {
