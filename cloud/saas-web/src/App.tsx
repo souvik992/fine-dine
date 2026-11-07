@@ -48,7 +48,7 @@ function Shell({ children, aside = true }: { children: ReactNode; aside?: boolea
     <footer className="footer"><span>© {new Date().getFullYear()} Fine Dine</span><span>Secure business access</span></footer>
   </main>;
 }
-function Field({ label, value, onChange, type = "text", required = false, placeholder = "", autoComplete, hint }: {
+function Field({ label, value, onChange, type = "text", required = false, placeholder = "", autoComplete, hint, minLength }: {
   label: string; value: string; onChange: (value: string) => void; type?: string;
   required?: boolean; placeholder?: string; autoComplete?: string; hint?: string; minLength?: number;
 }) {
