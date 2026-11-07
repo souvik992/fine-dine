@@ -17,6 +17,19 @@ export function project(p: LatLng, zoom: number): { x: number; y: number } {
   return { x: ((p.lng + 180) / 360) * size, y: (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * size };
 }
 
+/** The point at a world pixel position (inverse of `project`). */
+export function unproject(x: number, y: number, zoom: number): LatLng {
+  const size = TILE * 2 ** zoom;
+  const lng = (x / size) * 360 - 180;
+  const lat = (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / size))) * 180) / Math.PI;
+  return { lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 };
+}
+
+/** Pixels per kilometre on the ground at a latitude and zoom (for band rings). */
+export function pxPerKm(lat: number, zoom: number): number {
+  return (TILE * 2 ** zoom) / (40_075.016686 * Math.cos((lat * Math.PI) / 180));
+}
+
 export interface MapTile {
   key: string;
   src: string;
@@ -45,10 +58,15 @@ export function mapView(points: readonly LatLng[], width: number, height: number
     if (w <= width - 2 * margin && h <= height - 2 * margin) break;
   }
   const px = points.map((p) => project(p, zoom));
-  const cx = (Math.max(...px.map((p) => p.x)) + Math.min(...px.map((p) => p.x))) / 2;
-  const cy = (Math.max(...px.map((p) => p.y)) + Math.min(...px.map((p) => p.y))) / 2;
-  const ox = cx - width / 2;
-  const oy = cy - height / 2;
+  const centre = unproject((Math.max(...px.map((p) => p.x)) + Math.min(...px.map((p) => p.x))) / 2, (Math.max(...px.map((p) => p.y)) + Math.min(...px.map((p) => p.y))) / 2, zoom);
+  return viewAt(centre, zoom, width, height, points);
+}
+
+/** The tiles for a box centred on `centre` at `zoom`, and where `points` fall in it. */
+export function viewAt(centre: LatLng, zoom: number, width: number, height: number, points: readonly LatLng[] = []): MapView {
+  const c = project(centre, zoom);
+  const ox = c.x - width / 2;
+  const oy = c.y - height / 2;
   const n = 2 ** zoom;
   const tiles: MapTile[] = [];
   for (let ty = Math.floor(oy / TILE); ty * TILE < oy + height; ty++) {
@@ -58,7 +76,13 @@ export function mapView(points: readonly LatLng[], width: number, height: number
       tiles.push({ key: `${zoom}/${tx}/${ty}`, src: `${TILE_HOST}/${zoom}/${wx}/${ty}.png`, left: Math.round(tx * TILE - ox), top: Math.round(ty * TILE - oy) });
     }
   }
-  return { zoom, tiles, pins: px.map((p) => ({ x: Math.round(p.x - ox), y: Math.round(p.y - oy) })) };
+  return { zoom, tiles, pins: points.map((p) => project(p, zoom)).map((p) => ({ x: Math.round(p.x - ox), y: Math.round(p.y - oy) })) };
+}
+
+/** The point under a pixel of a box centred on `centre` at `zoom` (a click on the map). */
+export function pointAt(centre: LatLng, zoom: number, width: number, height: number, x: number, y: number): LatLng {
+  const c = project(centre, zoom);
+  return unproject(c.x - width / 2 + x, c.y - height / 2 + y, zoom);
 }
 
 const ll = (p: LatLng) => `${p.lat},${p.lng}`;

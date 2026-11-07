@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { directionsUrl, mapView, project, TILE } from './map-view.js';
+import { directionsUrl, mapView, pointAt, project, pxPerKm, TILE, unproject, viewAt } from './map-view.js';
 
 const store = { lat: 22.5726, lng: 88.3639 };
 const customer = { lat: 22.5535, lng: 88.3517 };
@@ -39,5 +39,19 @@ describe('delivery map', () => {
   it('gives directions from the store when its location is set', () => {
     expect(directionsUrl(customer, store)).toBe('https://www.google.com/maps/dir/?api=1&origin=22.5726,88.3639&destination=22.5535,88.3517&travelmode=driving');
     expect(directionsUrl(customer, null)).not.toContain('origin');
+  });
+
+  it('turns a click on the map back into the point under it', () => {
+    expect(unproject(project(store, 15).x, project(store, 15).y, 15)).toEqual(store);
+    expect(pointAt(store, 15, 600, 400, 300, 200)).toEqual(store);
+    const v = viewAt(store, 15, 600, 400, [customer]);
+    const back = pointAt(store, 15, 600, 400, v.pins[0]!.x, v.pins[0]!.y);
+    expect(back.lat).toBeCloseTo(customer.lat, 4);
+    expect(back.lng).toBeCloseTo(customer.lng, 4);
+  });
+
+  it('sizes band rings in pixels per kilometre', () => {
+    expect(pxPerKm(0, 0)).toBeCloseTo(256 / 40_075, 6);
+    expect(pxPerKm(60, 10)).toBeCloseTo(2 * pxPerKm(0, 10), 6);
   });
 });

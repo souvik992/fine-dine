@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { ErrorText, Field, SectionHeader, Toggle, useSave } from './common.js';
+import { StoreLocationMap } from './StoreLocationMap.js';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const rupees = (paise: number) => String(paise / 100);
@@ -175,6 +176,12 @@ export function OnlineSettings() {
             <input className="input" maxLength={200} value={svc.location?.label ?? ''} onChange={(e) => setSvc({ location: { lat: svc.location?.lat ?? 0, lng: svc.location?.lng ?? 0, label: e.target.value } })} aria-label="Store address" />
           </Field>
         </div>
+        <StoreLocationMap
+          location={svc.location}
+          bandsKm={svc.zones.map((z) => z.upToKm)}
+          roadFactor={svc.roadFactor}
+          onPick={(p) => setSvc({ location: { lat: p.lat, lng: p.lng, label: svc.location?.label ?? '' } })}
+        />
         <table className="mt-3 w-full text-sm" aria-label="Delivery bands">
           <thead className="text-left text-muted-foreground">
             <tr>
