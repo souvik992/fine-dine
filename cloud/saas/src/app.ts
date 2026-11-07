@@ -277,6 +277,10 @@ export function buildSaasApp(): FastifyInstance {
         return reply.code(400).send(failure("TOKEN_INVALID", "This verification link is invalid or expired."));
       }
       await client.query("UPDATE users SET email_verified_at=now(),status='active',updated_at=now() WHERE id=$1", [token.rows[0].user_id]);
+      await client.query(
+        "UPDATE user_auth_tokens SET consumed_at=COALESCE(consumed_at,now()) WHERE user_id=$1 AND purpose='email_verification' AND consumed_at IS NULL",
+        [token.rows[0].user_id],
+      );
       await client.query("COMMIT");
       return success({ verified: true, message: "Email verified. You can now sign in." });
     } catch (error) {
