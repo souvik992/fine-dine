@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { apiRequest } from "./api";
 import { buildRegistrationPayload, newRegistrationKey, type RegistrationFields } from "./registration";
 
@@ -50,12 +50,12 @@ function Shell({ children, aside = true }: { children: ReactNode; aside?: boolea
 }
 function Field({ label, value, onChange, type = "text", required = false, placeholder = "", autoComplete, hint }: {
   label: string; value: string; onChange: (value: string) => void; type?: string;
-  required?: boolean; placeholder?: string; autoComplete?: string; hint?: string;
+  required?: boolean; placeholder?: string; autoComplete?: string; hint?: string; minLength?: number;
 }) {
-  const id = useMemo(() => `field-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, [label]);
+  const id = useId();
   return <label className="field" htmlFor={id}><span>{label}{required && <i> *</i>}</span>
     <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)} required={required}
-      placeholder={placeholder} autoComplete={autoComplete} />
+      placeholder={placeholder} autoComplete={autoComplete} minLength={minLength} />
     {hint && <small>{hint}</small>}
   </label>;
 }
@@ -115,7 +115,7 @@ function RegisterPage() {
         <Field label="Full name" value={fields.fullName} onChange={set("fullName")} required autoComplete="name" />
         <Field label="Email address" type="email" value={fields.email} onChange={set("email")} required autoComplete="email" />
         <Field label="Phone number" type="tel" value={fields.phone} onChange={set("phone")} placeholder="+91 98765 43210" autoComplete="tel" />
-        <Field label="Password" type="password" value={fields.password} onChange={set("password")} required autoComplete="new-password" hint="Use at least 12 characters." />
+        <Field label="Password" type="password" value={fields.password} onChange={set("password")} required autoComplete="new-password" minLength={12} hint="Use at least 12 characters." />
       </div>
       <div className="section-heading"><span>02</span><div><b>Business information</b><small>Tell us about your business entity.</small></div></div>
       <div className="form-grid">
@@ -221,8 +221,8 @@ function ResetPage() {
     {error&&<Notice>{error}</Notice>}
     {done?<><Notice kind="success">Your password has been updated. Sign in with your new password.</Notice><Button onClick={()=>routeTo("/login")}>Go to sign in</Button></>:
       <form onSubmit={submit} className="form-stack compact">
-        <Field label="New password" type="password" value={password} onChange={setPassword} required hint="Use at least 12 characters."/>
-        <Field label="Confirm new password" type="password" value={confirm} onChange={setConfirm} required/>
+        <Field label="New password" type="password" value={password} onChange={setPassword} required minLength={12} hint="Use at least 12 characters."/>
+        <Field label="Confirm new password" type="password" value={confirm} onChange={setConfirm} required minLength={12}/>
         <Button loading={busy} disabled={!token}>Update password</Button>
       </form>}
     <LinkRow><a href="/login">Back to sign in</a></LinkRow>
