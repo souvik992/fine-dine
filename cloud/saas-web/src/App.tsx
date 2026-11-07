@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { apiRequest } from "./api";
 import { buildRegistrationPayload, newRegistrationKey, type RegistrationFields } from "./registration";
 
@@ -186,8 +186,7 @@ function VerifyPage() {
   const token = new URLSearchParams(window.location.search).get("token") || "";
   const [state,setState]=useState<"loading"|"success"|"error">(token?"loading":"error");
   const [error,setError]=useState(token?"":"This verification link is missing its token.");
-  const started = useRef(false);
-  useEffect(()=>{if(!token || started.current)return;started.current=true;let active=true;apiRequest<{verified:boolean;message:string}>("/api/v1/auth/verify-email",{method:"POST",body:JSON.stringify({token})})
+  useEffect(()=>{if(!token)return;let active=true;apiRequest<{verified:boolean;message:string}>("/api/v1/auth/verify-email",{method:"POST",body:JSON.stringify({token})})
     .then(()=>{if(active)setState("success");}).catch(e=>{if(active){setError(messageOf(e));setState("error");}});
     return()=>{active=false;};},[token]);
   return <Shell><div className="eyebrow">EMAIL VERIFICATION</div>
