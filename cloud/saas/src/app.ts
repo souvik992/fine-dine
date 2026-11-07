@@ -313,7 +313,13 @@ export function buildSaasApp(): FastifyInstance {
     const user = await requireUser(request, reply);
     if (!user) return;
     const business = await pool.query(
-      "SELECT * FROM organization_business_profiles WHERE organization_id=$1", [user.organization_id],
+      `SELECT organization_id,registered_business_name,trade_name,business_type,industry,
+        CASE WHEN pan IS NULL THEN NULL ELSE left(pan,2) || '******' || right(pan,2) END AS pan,
+        CASE WHEN gstin IS NULL THEN NULL ELSE left(gstin,2) || '***********' || right(gstin,2) END AS gstin,
+        cin,fssai_license,website_url,business_email,business_phone,address_line1,address_line2,locality,
+        city,district,state,state_code,postal_code,country_code
+       FROM organization_business_profiles WHERE organization_id=$1`,
+      [user.organization_id],
     );
     return success({ user: { id: user.id, fullName: user.full_name, email: user.email, phone: user.phone, role: user.role }, business: business.rows[0] ?? null });
   });
@@ -334,15 +340,20 @@ export function buildSaasApp(): FastifyInstance {
       websiteUrl: z.string().url().max(300).nullable().optional(),
       businessEmail: EMAIL.nullable().optional(),
       businessPhone: phone.nullable().optional(),
+      address: addressSchema,
     }).strict();
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send(failure("VALIDATION_ERROR", "Please check the business profile fields."));
     const b = parsed.data;
     await pool.query(
       `UPDATE organization_business_profiles SET trade_name=$2,registered_business_name=$3,business_type=$4,industry=$5,
-       pan=$6,gstin=$7,cin=$8,fssai_license=$9,website_url=$10,business_email=$11,business_phone=$12,updated_at=now()
-       WHERE organization_id=$1`,
-      [user.organization_id,b.tradeName,b.registeredBusinessName ?? null,b.businessType,b.industry,b.pan ?? null,b.gstin ?? null,b.cin ?? null,b.fssaiLicense ?? null,b.websiteUrl ?? null,b.businessEmail ?? null,b.businessPhone ?? null],
+       pan=$6,gstin=$7,cin=$8,fssai_license=$9,website_url=$10,business_email=$11,business_phone=$12,
+       address_line1=$13,address_line2=$14,locality=$15,city=$16,district=$17,state=$18,state_code=$19,
+       postal_code=$20,country_code=$21,updated_at=now() WHERE organization_id=$1`,
+      [user.organization_id,b.tradeName,b.registeredBusinessName ?? null,b.businessType,b.industry,b.pan ?? null,b.gstin ?? null,
+       b.cin ?? null,b.fssaiLicense ?? null,b.websiteUrl ?? null,b.businessEmail ?? null,b.businessPhone ?? null,
+       b.address.addressLine1,b.address.addressLine2 ?? null,b.address.locality ?? null,b.address.city,b.address.district ?? null,
+       b.address.state,b.address.stateCode ?? null,b.address.postalCode,b.address.countryCode],
     );
     await pool.query(
       "INSERT INTO audit_logs(organization_id,actor_user_id,action,entity_type,metadata) VALUES($1,$2,'business_profile.updated','organization_business_profile',$3)",
