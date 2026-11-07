@@ -3,7 +3,7 @@
 Base path: `/api/v1`. Keep this separate from outlet POS `/v1` and hub `/v1` APIs. All JSON responses use `{ success, data }` or `{ success:false, error:{code,message,details?} }`. Validate all inputs with Zod.
 
 ## Authentication
-- POST `/auth/register`
+- POST `/auth/register` (requires `Idempotency-Key` header)
 - POST `/auth/login`
 - POST `/auth/verify-email`
 - POST `/auth/resend-verification`
