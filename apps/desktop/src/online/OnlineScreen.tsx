@@ -6,6 +6,7 @@ import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { Modal } from '../components/Modal.js';
 import { SettleDialog } from '../billing/SettleDialog.js';
+import { ChannelBadge } from './ChannelBadge.js';
 import { DeliveryMap } from './DeliveryMap.js';
 import { board, nextSteps, REJECT_LABEL, STATE_LABEL, timeLeft, type Column } from './online-model.js';
 
@@ -72,11 +73,13 @@ export function OnlineScreen({ onBack, onOpenOrder }: { onBack: () => void; onOp
       <li key={o.id} className="rounded-xl border border-border bg-card shadow-sm" data-online={o.number}>
         <div className="flex items-start justify-between gap-2 border-b border-border px-3 py-2">
           <div>
-            <p className="font-display text-xl font-semibold">{o.number}</p>
+            <p className="flex items-center gap-2">
+              <ChannelBadge channel={ord.channel} />
+              <span className="font-display text-xl font-semibold">{o.number}</span>
+            </p>
             <p className="flex flex-wrap gap-1 text-xs font-bold">
               <span className="rounded bg-secondary px-1.5 py-0.5">{ord.fulfilment === 'DELIVERY' ? 'DELIVERY' : 'PICKUP'}</span>
               <span className={`rounded px-1.5 py-0.5 ${ord.payment === 'COD' ? 'bg-warn text-black' : 'bg-ok text-white'}`}>{ord.payment === 'COD' ? (ord.fulfilment === 'PICKUP' ? 'PAY AT PICKUP' : 'CASH ON DELIVERY') : ord.paid ? 'PAID ONLINE' : 'NOT PAID'}</span>
-              <span className="rounded bg-secondary px-1.5 py-0.5">{ord.channel === 'app' ? 'APP' : 'WEBSITE'}</span>
             </p>
           </div>
           <div className="text-right text-sm">
