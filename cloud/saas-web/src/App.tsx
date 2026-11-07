@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { apiRequest } from "./api";
 import { buildRegistrationPayload, newRegistrationKey, type RegistrationFields } from "./registration";
 
@@ -80,6 +80,8 @@ function RegisterPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
   const [key, setKey] = useState("");
   const set = (name: keyof RegistrationFields) => (value: string) => {
     setFields(old => ({ ...old, [name]: value }));
@@ -97,10 +99,12 @@ function RegisterPage() {
       setDone(true);
     } catch (e) { setError(messageOf(e)); } finally { setBusy(false); }
   }
+  async function resendVerification() { setResending(true); setResendMessage(""); try { await apiRequest("/api/v1/auth/resend-verification", { method: "POST", body: JSON.stringify({ email: fields.email }) }); setResendMessage("If this account still needs verification, a fresh link has been sent."); } catch (e) { setResendMessage(messageOf(e)); } finally { setResending(false); } }
   if (done) return <Shell><div className="success-icon">✓</div><div className="eyebrow">REGISTRATION RECEIVED</div>
     <h2>Check your inbox.</h2><p className="muted">We’ve sent a verification link to <b>{fields.email}</b>. Verify your email to activate your account and continue.</p>
-    <Notice kind="info">If you don’t see the email, check your spam folder. You can request another verification link from the sign-in flow.</Notice>
-    <Button onClick={() => routeTo("/login")}>Go to sign in</Button>
+    <Notice kind="info">If you don’t see the email, check your spam folder.</Notice>
+    {resendMessage && <Notice kind="success">{resendMessage}</Notice>}
+    <div className="button-stack"><button className="secondary-button" type="button" disabled={resending} onClick={resendVerification}>{resending ? "Sending…" : "Resend verification email"}</button><Button onClick={() => routeTo("/login")}>Go to sign in</Button></div>
   </Shell>;
   return <Shell><div className="eyebrow">GET STARTED · 14-DAY TRIAL</div><h2>Create your account</h2>
     <p className="muted">Set up your owner login, business profile and first outlet.</p>
@@ -182,7 +186,8 @@ function VerifyPage() {
   const token = new URLSearchParams(window.location.search).get("token") || "";
   const [state,setState]=useState<"loading"|"success"|"error">(token?"loading":"error");
   const [error,setError]=useState(token?"":"This verification link is missing its token.");
-  useEffect(()=>{if(!token)return;let active=true;apiRequest<{verified:boolean;message:string}>("/api/v1/auth/verify-email",{method:"POST",body:JSON.stringify({token})})
+  const started = useRef(false);
+  useEffect(()=>{if(!token || started.current)return;started.current=true;let active=true;apiRequest<{verified:boolean;message:string}>("/api/v1/auth/verify-email",{method:"POST",body:JSON.stringify({token})})
     .then(()=>{if(active)setState("success");}).catch(e=>{if(active){setError(messageOf(e));setState("error");}});
     return()=>{active=false;};},[token]);
   return <Shell><div className="eyebrow">EMAIL VERIFICATION</div>
