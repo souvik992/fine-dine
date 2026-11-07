@@ -104,6 +104,10 @@ async function requireUser(request: FastifyRequest, reply: FastifyReply): Promis
 async function issueAuthToken(userId: string, purpose: "email_verification" | "password_reset", ttlHours: number): Promise<string> {
   const token = randomToken(32);
   await pool.query(
+    "UPDATE user_auth_tokens SET consumed_at=now() WHERE user_id=$1 AND purpose=$2 AND consumed_at IS NULL",
+    [userId, purpose],
+  );
+  await pool.query(
     "INSERT INTO user_auth_tokens(user_id, purpose, token_hash, expires_at) VALUES ($1,$2,$3,now() + ($4 * interval '1 hour'))",
     [userId, purpose, hashToken(token), ttlHours],
   );
@@ -134,11 +138,38 @@ export function buildSaasApp(): FastifyInstance {
     const parsed = registerSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send(failure("VALIDATION_ERROR", "Please check the registration details."));
     const body = parsed.data;
+    const idempotencyKey = request.headers["idempotency-key"];
+    if (typeof idempotencyKey !== "string" || !/^[A-Za-z0-9._:-]{8,128}$/.test(idempotencyKey)) {
+      return reply.code(400).send(failure("IDEMPOTENCY_KEY_REQUIRED", "Send a valid Idempotency-Key header."));
+    }
+    const requestHash = hashToken(JSON.stringify(body));
     const client = await pool.connect();
     let userId: string;
     let verifyToken: string;
+    const registrationResponse = success({ message: "Registration received. Check your inbox for the verification link." });
     try {
       await client.query("BEGIN");
+      const reservation = await client.query<{ id: string }>(
+        "INSERT INTO idempotency_records(scope,idempotency_key,request_hash,expires_at) VALUES('auth.register',$1,$2,now()+interval '24 hours') ON CONFLICT(scope,idempotency_key) DO NOTHING RETURNING id",
+        [idempotencyKey, requestHash],
+      );
+      if (!reservation.rows[0]) {
+        const previous = await client.query<{ request_hash: string; response_status: number | null; response_body: unknown }>(
+          "SELECT request_hash,response_status,response_body FROM idempotency_records WHERE scope='auth.register' AND idempotency_key=$1 FOR UPDATE",
+          [idempotencyKey],
+        );
+        const saved = previous.rows[0];
+        if (!saved || saved.request_hash !== requestHash) {
+          await client.query("ROLLBACK");
+          return reply.code(409).send(failure("IDEMPOTENCY_CONFLICT", "This Idempotency-Key was already used for a different request."));
+        }
+        if (saved.response_status === 202 && saved.response_body) {
+          await client.query("COMMIT");
+          return reply.code(202).send(saved.response_body);
+        }
+        await client.query("ROLLBACK");
+        return reply.code(409).send(failure("REQUEST_IN_PROGRESS", "This registration request is already being processed."));
+      }
       const user = await client.query<{ id: string }>(
         "INSERT INTO users(full_name,email,phone,password_hash,status) VALUES($1,$2,$3,$4,'pending') RETURNING id",
         [body.fullName, body.email, body.phone ?? null, await hashPassword(body.password)],
@@ -189,6 +220,10 @@ export function buildSaasApp(): FastifyInstance {
         "INSERT INTO user_auth_tokens(user_id,purpose,token_hash,expires_at) VALUES($1,'email_verification',$2,now() + interval '24 hours')",
         [userId, hashToken(verifyToken)],
       );
+      await client.query(
+        "UPDATE idempotency_records SET response_status=202,response_body=$3,completed_at=now() WHERE scope='auth.register' AND idempotency_key=$1 AND request_hash=$2",
+        [idempotencyKey, requestHash, JSON.stringify(registrationResponse)],
+      );
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK");
@@ -207,7 +242,7 @@ export function buildSaasApp(): FastifyInstance {
     } catch (error) {
       request.log.error({ err: error, userId: userId! }, "Verification email delivery failed");
     }
-    return reply.code(202).send(success({ message: "Registration received. Check your inbox for the verification link." }));
+    return reply.code(202).send(registrationResponse);
   });
 
   app.post("/api/v1/auth/verify-email", { config: { rateLimit: { max: 10, timeWindow: "1 hour" } } }, async (request, reply) => {
