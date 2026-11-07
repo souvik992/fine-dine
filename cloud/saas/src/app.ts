@@ -137,7 +137,7 @@ export function buildSaasApp(): FastifyInstance {
     origin: (origin, callback) => callback(null, !origin || config.allowedOrigins.includes(origin)),
     credentials: true,
     methods: ["GET", "POST", "PATCH", "OPTIONS"],
-    allowedHeaders: ["content-type"],
+    allowedHeaders: ["content-type", "idempotency-key"],
   });
   app.register(rateLimit, { max: 100, timeWindow: "1 minute" });
 
@@ -372,7 +372,7 @@ export function buildSaasApp(): FastifyInstance {
     const b = parsed.data;
     await pool.query(
       `UPDATE organization_business_profiles SET trade_name=$2,registered_business_name=$3,business_type=$4,industry=$5,
-       pan=$6,gstin=$7,cin=$8,fssai_license=$9,website_url=$10,business_email=$11,business_phone=$12,
+       pan=COALESCE($6,pan),gstin=COALESCE($7,gstin),cin=$8,fssai_license=$9,website_url=$10,business_email=$11,business_phone=$12,
        address_line1=$13,address_line2=$14,locality=$15,city=$16,district=$17,state=$18,state_code=$19,
        postal_code=$20,country_code=$21,updated_at=now() WHERE organization_id=$1`,
       [user.organization_id,b.tradeName,b.registeredBusinessName ?? null,b.businessType,b.industry,b.pan ?? null,b.gstin ?? null,

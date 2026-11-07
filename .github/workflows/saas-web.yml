@@ -1,0 +1,27 @@
+name: SaaS Web
+
+on:
+  pull_request:
+    paths:
+      - "cloud/saas-web/**"
+      - ".github/workflows/saas-web.yml"
+  push:
+    branches: [feature/saas-foundation]
+    paths:
+      - "cloud/saas-web/**"
+      - ".github/workflows/saas-web.yml"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud/saas-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-package-lock
+      - run: npm run build
+      - run: npm test
