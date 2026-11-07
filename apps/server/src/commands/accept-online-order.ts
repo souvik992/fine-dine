@@ -1,4 +1,4 @@
-import { acceptOnlineOrderSchema, fireKotSchema, formatINR, newId, printBillSchema } from '@dinepos/shared';
+import { acceptOnlineOrderSchema, cashAtDoor, fireKotSchema, formatINR, isPlatformOrder, newId, printBillSchema } from '@dinepos/shared';
 import { defineCommand, type OrderRow } from '../core/command-handler.js';
 import { PosError } from '../core/errors.js';
 import { getConfig } from '../core/outlet-config.js';
@@ -81,10 +81,15 @@ export const acceptOnlineOrder = defineCommand({
     // 3. Charges: on the bill, never on a KOT.
     for (const f of priced.fees) insert.run(newId(), orderId, `fee:${f.kind}`, null, f.name, 1, f.pricePaise, f.taxRateBp, null, 1, 'fired', ctx.actor.userId, ctx.nowIso);
 
-    // 4. The GST bill, then payment when it was paid online.
+    // 4. The GST bill, then payment when it was paid online, or by Swiggy / Zomato.
     const billed = printBill.apply(ctx, printBillSchema.parse({ customer: { name: order.customer.name?.slice(0, 60) ?? null, phone: order.customer.mobile } }), reload(db, orderId)) as { result: { billId: string; billNo: string; totalPaise: number } };
     const { billId, billNo, totalPaise } = billed.result;
-    if (order.payment === 'ONLINE' && order.paid) {
+    if (isPlatformOrder(order) && !cashAtDoor(order)) {
+      // P6-06: the platform pays the outlet later (payment mode `other`, reference = the platform's order number);
+      // a cash order the outlet's own rider delivers is settled in cash when delivered, like any cash order
+      const name = order.channel === 'swiggy' ? 'Swiggy' : 'Zomato';
+      settleBill(ctx, reload(db, orderId), billId, [{ mode: 'other', amountPaise: totalPaise, ref: `${name} ${order.external?.orderId ?? oo.number}`.slice(0, 60) }]);
+    } else if (order.payment === 'ONLINE' && order.paid) {
       const ref = `${oo.number}${totalPaise !== order.total ? ` (customer paid ${formatINR(order.total)})` : ''}`.slice(0, 60);
       settleBill(ctx, reload(db, orderId), billId, [{ mode: 'online', amountPaise: totalPaise, ref }]);
     }

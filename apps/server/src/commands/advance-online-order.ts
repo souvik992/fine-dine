@@ -1,4 +1,4 @@
-import { advanceOnlineOrderSchema, type HubOrderState } from '@dinepos/shared';
+import { advanceOnlineOrderSchema, cashAtDoor, type HubOrderState } from '@dinepos/shared';
 import { defineCommand } from '../core/command-handler.js';
 import { PosError } from '../core/errors.js';
 import { loadOrderRow } from '../queries/order-snapshot.js';
@@ -33,16 +33,17 @@ export const advanceOnlineOrder = defineCommand({
     if (p.to === 'OUT_FOR_DELIVERY' && !p.rider) throw new PosError('VALIDATION', 'Enter the rider’s name.', { field: 'rider' });
 
     const finishing = p.to === 'DELIVERED' || p.to === 'PICKED_UP';
-    if (p.tenders && !(finishing && order.payment === 'COD')) {
+    if (p.tenders && !(finishing && cashAtDoor(order))) {
       throw new PosError('VALIDATION', 'A payment is taken only when a cash-on-delivery order is delivered or collected.', { field: 'tenders' });
     }
     if (p.tenders?.some((t) => t.mode === 'due' || t.mode === 'complimentary')) {
       throw new PosError('VALIDATION', 'Take the payment as cash, card, UPI or other. If the customer did not pay, cancel the order instead.', { field: 'tenders' });
     }
     // COD: the bill is settled with what the customer paid (as Settle checks it: covered in full, change only from cash);
-    // given no payment, all in cash
+    // given no payment, all in cash. A Swiggy / Zomato order was settled when accepted, unless the outlet's own rider
+    // collects the cash (P6-06).
     let changePaise = 0;
-    if (finishing && order.payment === 'COD' && oo.local_order_id && oo.bill_id) {
+    if (finishing && cashAtDoor(order) && oo.local_order_id && oo.bill_id) {
       const local = loadOrderRow(ctx.db, oo.local_order_id);
       const bill = ctx.db.prepare('SELECT state, total_paise FROM bill WHERE id = ?').get(oo.bill_id) as { state: string; total_paise: number } | undefined;
       if (local && bill?.state === 'printed') {

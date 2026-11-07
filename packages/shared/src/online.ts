@@ -24,7 +24,24 @@ export interface HubOrderLine {
   lineTotal: number;
 }
 
-/** An order as the hub sends it (contract `Order`; Swiggy/Zomato fields not used here). */
+/** A Swiggy / Zomato order's own details, as the hub sends them (contract `ExternalOrder`, P6-06). Paise. */
+export interface HubExternalOrder {
+  platform: 'swiggy' | 'zomato';
+  /** The platform's own order number (what its rider and the customer quote). */
+  orderId: string;
+  /** Who delivers: the platform's riders, or the store's own (self-delivery). */
+  deliveredBy: 'platform' | 'store';
+  /** The OTP the platform's rider gives at pickup, when the platform sends one. */
+  otp: string | null;
+  /** What the platform charged the customer, with its own discounts and charges. */
+  platformTotal: number;
+  charges: Array<{ title: string; amount: number }>;
+  discounts: Array<{ title: string; amount: number; byStore: boolean }>;
+  /** Things the store should know before accepting (an item not on the menu, cash the rider collects, ...). */
+  notes: string[];
+}
+
+/** An order as the hub sends it (contract `Order`). */
 export interface HubOrder {
   id: string;
   number: string;
@@ -53,7 +70,20 @@ export interface HubOrder {
   posBillNo: string | null;
   rejectReason: RejectReason | null;
   reasonText: string | null;
+  /** Swiggy / Zomato orders only (P6-06). */
+  external?: HubExternalOrder | null;
 }
+
+/** A Swiggy / Zomato order (the platform arranges the customer, the price shown and usually the delivery). */
+export const isPlatformOrder = (o: Pick<HubOrder, 'channel'>): boolean => o.channel === 'swiggy' || o.channel === 'zomato';
+
+/**
+ * Is the money collected at the door (cash on delivery or at pickup, settled when the order is finished)? Website/app
+ * cash orders, and Swiggy/Zomato cash orders the store's own rider delivers. Every other Swiggy/Zomato order is paid by
+ * the platform later: settled as `other` when accepted (product owner, 2026-11-07).
+ */
+export const cashAtDoor = (o: Pick<HubOrder, 'channel' | 'payment' | 'external'>): boolean =>
+  o.payment === 'COD' && (!isPlatformOrder(o) || o.external?.deliveredBy === 'store');
 
 /** Events down the POS's stream (contract `PosEvent`; rider/notice events are for Swiggy/Zomato and are ignored). */
 export type HubEvent =
@@ -108,7 +138,8 @@ export const onlineSettingsSchema = z
     enabled: z.boolean(),
     acceptMode: z.enum(['manual', 'auto']),
     acceptTimeoutMin: z.number().int().min(2).max(15),
-    channels: z.object({ app: z.boolean(), website: z.boolean() }).strict(),
+    /** Swiggy / Zomato (P6-06, through UrbanPiper on the hub): off unless switched on; settings saved before keep loading. */
+    channels: z.object({ app: z.boolean(), website: z.boolean(), swiggy: z.boolean().default(false), zomato: z.boolean().default(false) }).strict(),
     fulfilment: z.object({ pickup: z.boolean(), delivery: z.boolean() }).strict(),
     payments: z.object({ online: z.boolean(), cod: z.boolean() }).strict(),
     /** GST on delivery and packaging charges (basis points). Null: no fees can be charged (the hub refuses them). */
@@ -124,7 +155,7 @@ export const DEFAULT_ONLINE_SETTINGS: OnlineSettings = {
   enabled: false,
   acceptMode: 'manual',
   acceptTimeoutMin: 5,
-  channels: { app: true, website: true },
+  channels: { app: true, website: true, swiggy: false, zomato: false },
   fulfilment: { pickup: true, delivery: false },
   payments: { online: true, cod: true },
   feeTaxBp: null,

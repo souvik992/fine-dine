@@ -144,7 +144,7 @@ The button shows how many materials are low or need a count. Tabs:
   Collected, Bill (opens the order), Cancel order (voids the bill).
 - On every other screen: "N new online orders" with a chime when one arrives.
 - Settings › Online orders: the hub link (paste the connection link / Disconnect, live status), take online orders,
-  accepting by hand or automatically, the hub's reject-after minutes, kitchen time, website/app, pickup/delivery, pay
+  accepting by hand or automatically, the hub's reject-after minutes, kitchen time, website/app/Swiggy/Zomato (P6-06), pickup/delivery, pay
   online / cash, GST on charges, pickup minimum and time, packaging charge, store location and address, up to six
   delivery bands (km, charge, minimum, free above, time) and opening hours per day (up to two times).
 

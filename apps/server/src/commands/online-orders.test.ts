@@ -224,6 +224,67 @@ describe('online orders', () => {
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  // ---------------------------------------------------------------- P6-06: Swiggy / Zomato orders
+  const zomato = (over: Partial<HubOrder> = {}, ext: Partial<NonNullable<HubOrder['external']>> = {}) =>
+    hubOrder({
+      number: 'Z-1004', channel: 'zomato', fulfilment: 'DELIVERY', payment: 'ONLINE', paid: true, distanceKm: null, location: { lat: 21.785, lng: 87.75 },
+      address: { line1: 'Flat 4', line2: null, landmark: null, city: 'Contai', pincode: '721401' }, packagingFee: 1_500,
+      external: { platform: 'zomato', orderId: 'ZO-10020', deliveredBy: 'platform', otp: null, platformTotal: 21_500, charges: [{ title: 'Packaging Charge', amount: 1_500 }], discounts: [], notes: [], ...ext },
+      ...over,
+    });
+  const payments = (billId: string | null) => h.db.prepare('SELECT mode, amount_paise AS amount, ref FROM payment WHERE bill_id = ?').all(billId);
+
+  it('Swiggy / Zomato: a delivery order has no distance and is accepted anyway, with the platform’s own charges', () => {
+    const o = receive(zomato());
+    h.run('AcceptOnlineOrder', { onlineOrderId: o.id });
+    const r = row(o.id);
+    expect(r).toMatchObject({ state: 'ACCEPTED', alert: null, pos_total_paise: o.total });
+    expect(h.db.prepare("SELECT item_id, unit_price_paise, tax_rate_bp FROM order_item WHERE item_id LIKE 'fee:%'").all()).toEqual([{ item_id: 'fee:packaging', unit_price_paise: 1_500, tax_rate_bp: 1800 }]);
+    // a website delivery order without a distance is still refused: the outlet's bands decide there
+    const w = receive(hubOrder({ id: 'ord_w', fulfilment: 'DELIVERY', payment: 'COD', paid: false, distanceKm: null, total: 1 }));
+    expect(h.fail('AcceptOnlineOrder', { onlineOrderId: w.id }, 'INVALID_STATE').message).toMatch(/outside the delivery area/);
+  });
+
+  it('Swiggy / Zomato: the platform pays later, so the bill is settled as Other with the platform’s order number', () => {
+    const o = receive(zomato());
+    h.run('AcceptOnlineOrder', { onlineOrderId: o.id });
+    const r = row(o.id);
+    expect(payments(r.bill_id)).toEqual([{ mode: 'other', amount: o.total, ref: 'Zomato ZO-10020' }]);
+    expect(h.db.prepare('SELECT state FROM bill WHERE id = ?').pluck().get(r.bill_id)).toBe('settled');
+    // cash the platform's rider collects is the platform's: settled as Other too, and nothing more is taken at the door
+    const cash = receive(zomato({ id: 'ord_cash', payment: 'COD', paid: false }, { orderId: 'ZO-10021' }));
+    h.run('AcceptOnlineOrder', { onlineOrderId: cash.id });
+    expect(payments(row(cash.id).bill_id)).toEqual([{ mode: 'other', amount: cash.total, ref: 'Zomato ZO-10021' }]);
+    h.run('AdvanceOnlineOrder', { onlineOrderId: cash.id, to: 'READY' });
+    h.run('AdvanceOnlineOrder', { onlineOrderId: cash.id, to: 'OUT_FOR_DELIVERY', rider: { name: 'Zomato rider' } });
+    expect(h.fail('AdvanceOnlineOrder', { onlineOrderId: cash.id, to: 'DELIVERED', tenders: [{ mode: 'cash', amountPaise: cash.total, ref: null }] }, 'VALIDATION').message).toMatch(/payment is taken only/);
+    h.run('AdvanceOnlineOrder', { onlineOrderId: cash.id, to: 'DELIVERED' });
+    expect(payments(row(cash.id).bill_id)).toHaveLength(1);
+  });
+
+  it('Swiggy / Zomato: cash the outlet’s own rider collects is settled in cash when delivered, like any cash order', () => {
+    const o = receive(zomato({ channel: 'swiggy', number: 'S-1001', payment: 'COD', paid: false }, { platform: 'swiggy', orderId: 'SW-77', deliveredBy: 'store' }));
+    h.run('AcceptOnlineOrder', { onlineOrderId: o.id });
+    const r = row(o.id);
+    expect(payments(r.bill_id)).toEqual([]);
+    h.run('AdvanceOnlineOrder', { onlineOrderId: o.id, to: 'READY' });
+    h.run('AdvanceOnlineOrder', { onlineOrderId: o.id, to: 'OUT_FOR_DELIVERY', rider: { name: 'Raju' } });
+    h.run('AdvanceOnlineOrder', { onlineOrderId: o.id, to: 'DELIVERED' });
+    expect(payments(r.bill_id)).toEqual([{ mode: 'cash', amount: o.total, ref: null }]);
+  });
+
+  it('Swiggy / Zomato switched on: every dish is listed for them, with DinePOS’s own item ids; settings saved before still load', () => {
+    h.run('SetConfig', { values: { 'online.settings': { ...settings, channels: { app: true, website: true, swiggy: true, zomato: true } } } });
+    const { body } = publishedMenu(h.db, getConfig(h.db)['online.settings'], getConfig(h.db));
+    expect(body.items.find((i) => i.id === S.dalMakhani)!.channels).toEqual(['app', 'website', 'swiggy', 'zomato']);
+    expect(body.items.some((i) => i.id === onlineItemId(BC, BC_FULL))).toBe(true);
+    expect(body.options.channels).toEqual({ app: true, website: true, swiggy: true, zomato: true });
+    // saved by a DinePOS without Swiggy / Zomato: read with both off, nothing else lost
+    const old = { ...settings, channels: { app: false, website: true } };
+    h.db.prepare("UPDATE config SET value = ? WHERE key = 'online.settings'").run(JSON.stringify(old));
+    expect(getConfig(h.db)['online.settings']).toMatchObject({ enabled: true, feeTaxBp: 1800, channels: { app: false, website: true, swiggy: false, zomato: false } });
+  });
+
   it('payment table rebuilt for "online": rows kept, still append-only', () => {
     const o = receive(hubOrder());
     h.run('AcceptOnlineOrder', { onlineOrderId: o.id });

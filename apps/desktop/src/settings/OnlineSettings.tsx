@@ -129,6 +129,12 @@ export function OnlineSettings() {
             <p className="text-sm font-semibold">Channels</p>
             <Toggle checked={s.channels.website} onChange={(v) => set({ channels: { ...s.channels, website: v } })} label="Website" />
             <Toggle checked={s.channels.app} onChange={(v) => set({ channels: { ...s.channels, app: v } })} label="App" />
+            {/* P6-06: through UrbanPiper on the order hub (the hub admin links the outlet there) */}
+            <Toggle checked={s.channels.swiggy} onChange={(v) => set({ channels: { ...s.channels, swiggy: v } })} label="Swiggy" />
+            <Toggle checked={s.channels.zomato} onChange={(v) => set({ channels: { ...s.channels, zomato: v } })} label="Zomato" />
+            {(s.channels.swiggy || s.channels.zomato) && (
+              <p className="text-xs text-muted-foreground">Every dish is listed there at the DinePOS price. Swiggy and Zomato bills are paid as “Other” (the platform pays later), except cash your own rider collects.</p>
+            )}
           </div>
           <div className="space-y-1">
             <p className="text-sm font-semibold">Orders</p>

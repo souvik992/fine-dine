@@ -106,6 +106,11 @@ Decided 2026-11-02 with the product owner:
 - Delivery and packaging charges are bill lines taxed at the outlet's setting (Settings › Online orders › GST on
   charges); with no rate set, no charges can be added (the hub then refuses them too). Delivery charge by distance band
   (free above the band's amount), from the outlet's own settings.
+- Swiggy / Zomato (P6-06; product owner 2026-11-07): the same DinePOS bill at DinePOS prices. Packaging and delivery
+  charges are the platform's own as the hub sends them (no distance band: the platform's rider delivers, or it already
+  checked the address), taxed at the outlet's charge rate. The platform pays the outlet later, so the bill is settled
+  when accepted as payment mode `other` (reference = "Zomato <platform order no.>"); only cash the outlet's own rider
+  collects (self-delivery, cash) is settled in cash when delivered, like any cash order.
 - Paid online: settled at once as payment mode `online` (reference = the hub's order number). Cash at pickup / on
   delivery: settled in cash when marked collected / delivered. Cancelling after acceptance voids the bill (keeps its
   number; payments reversed), with the bill.void right and its PIN rule.

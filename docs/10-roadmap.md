@@ -190,4 +190,16 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
   now" and an `order_attempt` row; pickup goes to the nearest open outlet; a store outside the brand is never chosen;
   the outlet shown at checkout is the one that gets the order; the admin page lists each brand's outlets and their
   state; `/order/<store>` still works unchanged.
+- [x] **P6-06 Swiggy / Zomato orders in DinePOS** (added 2026-11-07 at the product owner's request: Zomato orders could
+  not be accepted, "outside the delivery area", because platform orders come without a distance). Read first:
+  `docs/08-billing-gst.md` (Online orders), `apps/server/src/online/menu.ts`, `cloud/hub/src/urbanpiper.ts`. Settings â€º
+  Online orders gets Swiggy and Zomato (off by default; settings saved before still load); the published menu lists
+  every dish for the platforms switched on, with DinePOS's own item ids (UrbanPiper's menu, so platform orders carry
+  them). Accepting a platform order skips the distance band and bills the platform's own charges; the bill is settled
+  as `other` (reference = the platform's order number) except cash the outlet's own rider collects (settled in cash
+  when delivered). Accept: a Zomato delivery order without a distance is accepted with its packaging charge; a website
+  delivery order without a distance is still refused; platform orders are settled as Other, a cash order the platform's
+  rider collects takes no payment at the door; a self-delivery cash order is settled in cash when delivered; with the
+  platforms on, each dish lists them; old settings load with both off. Not yet: the platform's OTP and rider on the
+  order card, platform requests (items out of stock, rider check), per-platform menu and prices.
 

@@ -1,7 +1,7 @@
 // What DinePOS publishes to the order hub (PUT /v1/pos/menu, contract `PublishedMenu`) and how it prices an online
 // order itself before accepting (P4-06). Pure apart from reading the menu and settings.
 import { createHash } from 'node:crypto';
-import { calculateBill, type HubOrder, type MenuSnapshot, type OnlineSettings, type OutletConfig, type Serviceability } from '@dinepos/shared';
+import { calculateBill, isPlatformOrder, type HubOrder, type MenuSnapshot, type OnlineSettings, type OutletConfig, type Serviceability } from '@dinepos/shared';
 import { PosError } from '../core/errors.js';
 import type { Db } from '../db/connection.js';
 import { getMenu } from '../queries/menu.js';
@@ -28,7 +28,7 @@ export interface PublishedMenuBody {
     priceIncludesTax: boolean;
     modifierGroupIds: string[];
     available: boolean;
-    channels: Array<'app' | 'website'>;
+    channels: Array<'app' | 'website' | 'swiggy' | 'zomato'>;
     /** The dish's photo ("<sha256>.webp"), served by the hub once the connector uploaded it. */
     image: string | null;
   }>;
@@ -48,7 +48,9 @@ export interface PublishedMenuBody {
 /** The base menu (no area price list: online orders have no table) as the hub wants it, and its hash. */
 export function publishedMenu(db: Db, settings: OnlineSettings, cfg: OutletConfig): { body: PublishedMenuBody; hash: string } {
   const menu = getMenu(db) as MenuSnapshot;
-  const channels = (['app', 'website'] as const).filter((c) => settings.channels[c]);
+  // every dish is sold on every channel switched on (Swiggy / Zomato too, P6-06: the hub sends this menu to UrbanPiper,
+  // so platform orders come back with these ids)
+  const channels = (['app', 'website', 'swiggy', 'zomato'] as const).filter((c) => settings.channels[c]);
   const items: PublishedMenuBody['items'] = [];
   for (const i of menu.items) {
     const base = { categoryId: i.categoryId, unit: 'nos', isVeg: i.veg, rateBp: i.taxRateBp, cessBp: 0, priceIncludesTax: false, modifierGroupIds: i.addonGroupIds, available: i.available, channels: [...channels], image: i.image ?? null };
@@ -65,7 +67,7 @@ export function publishedMenu(db: Db, settings: OnlineSettings, cfg: OutletConfi
     options: {
       acceptMode: settings.acceptMode,
       acceptTimeoutMin: settings.acceptTimeoutMin,
-      channels: { app: settings.channels.app, website: settings.channels.website, swiggy: false, zomato: false },
+      channels: { app: settings.channels.app, website: settings.channels.website, swiggy: settings.channels.swiggy, zomato: settings.channels.zomato },
       fulfilment: settings.fulfilment,
       payments: settings.payments,
     },
@@ -74,8 +76,13 @@ export function publishedMenu(db: Db, settings: OnlineSettings, cfg: OutletConfi
   return { body, hash: createHash('sha256').update(JSON.stringify(body)).digest('hex') };
 }
 
-/** Delivery and packaging charges for an order, from this store's own settings (contract `quote`, by the hub's distance). */
-export function feesFor(order: Pick<HubOrder, 'fulfilment' | 'distanceKm'>, itemsTotal: number, s: Serviceability): { deliveryFee: number; packagingFee: number; problem: string | null } {
+/**
+ * Delivery and packaging charges for an order. Website / app: from this store's own settings (contract `quote`, by the
+ * hub's distance). Swiggy / Zomato (P6-06): the platform's own charges as the hub sent them; there is no distance (the
+ * platform's rider delivers, or it already checked the address), so no band is looked up.
+ */
+export function feesFor(order: Pick<HubOrder, 'channel' | 'fulfilment' | 'distanceKm' | 'deliveryFee' | 'packagingFee'>, itemsTotal: number, s: Serviceability): { deliveryFee: number; packagingFee: number; problem: string | null } {
+  if (isPlatformOrder(order)) return { deliveryFee: order.deliveryFee, packagingFee: order.packagingFee, problem: null };
   if (order.fulfilment === 'PICKUP') return { deliveryFee: 0, packagingFee: s.packagingFee, problem: null };
   const km = order.distanceKm;
   const zone = km === null ? undefined : s.zones.find((z) => km <= z.upToKm);
