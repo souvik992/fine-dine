@@ -171,4 +171,23 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria â
   admin page: run in the cloud, first step (outlet, owner, PIN), approve the first device's pairing code. Accept: the
   proxy never makes a device the master (no token: 401, even with the host key sent from outside); a device pairs and
   works; the master PC takes no licence seat; each hosted outlet has its own hardware id.
+- [x] **P6-05 Brand website: orders go to the nearest outlet** (added 2026-11-07 at the product owner's request; before
+  it, every website order went to the one store in the URL, `/order/<store>`, and the address only checked that store's
+  delivery areas). Read first: `cloud/hub/README.md`, `cloud/hub/src/hub.ts` (`storePublic`, `quote`, `placeOrder`),
+  `cloud/hub/src/site.ts`, `packages/shared/src/online.ts`. The cloud admin page makes a **brand** (slug, name) and adds
+  stores to it (a store is in at most one brand); the brand has its own website at `/order/<brand>`, and the store
+  pages keep working. (Built: the brand website shows the published design of the brand's **main outlet**, made in
+  that outlet's website builder, instead of a separate brand builder and password.) The customer gives their location first. **Delivery:** the
+  outlets of the brand that can take the order right now (POS online, shift open, accepting, delivery on, the address in
+  its delivery areas) are tried nearest first, by road distance when the routing server is set, otherwise straight line
+  Ã— road factor; the first that can take it gets the order. **Pickup:** the nearest open outlet that takes pickup, chosen
+  automatically and named on screen before checkout. The menu, prices, GST and fees shown are that outlet's own (from
+  its published menu); if the address changes, the outlet is chosen again and the cart is checked against the new
+  menu. The order is created in the chosen store exactly as a store-page order (same `placeOrder` checks; the hub never
+  moves it to another outlet after it is placed). Cloud schema: new tables in the hub database (`brand`, `brand_store`)
+  made the same way as the existing ones. Accept: two outlets of one brand, a delivery address nearer to B goes to B; B
+  closed (or the address outside B's areas) goes to A; neither can take it gives a clear "no outlet delivers here right
+  now" and an `order_attempt` row; pickup goes to the nearest open outlet; a store outside the brand is never chosen;
+  the outlet shown at checkout is the one that gets the order; the admin page lists each brand's outlets and their
+  state; `/order/<store>` still works unchanged.
 
