@@ -51,10 +51,12 @@ export interface HttpOptions {
   monitor?: Monitor;
   /** P7-04: the browser demo: the sample outlet (demo-seed.json path or data), how many at once; host defaults to `hosted`. */
   demo?: { seed: string | DemoSeed | null; max?: number; hours?: number; host?: DemoHost };
-  /** P8-04: the Windows downloads (newest GitHub Release of each product). Not given: one is made here. */
+  /** P8-04: the Windows downloads (uploaded installers, else the newest GitHub Release). Not given: one is made here. */
   downloads?: Downloads;
   /** P8-04: the GitHub API client for the downloads made here (tests). */
   githubFetch?: typeof fetch;
+  /** P8-11: where the downloads made here keep uploaded installers (tests). */
+  downloadsDir?: string;
   /** P8-09: the customer portal, served on its own address (src/portal.ts). */
   portal?: Portal;
 }
@@ -225,16 +227,35 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
   const activations = new Activations(hub);
 
   // ---- P8-04: Windows downloads (src/downloads.ts). The list is public; a download needs a signed-in account (recorded).
-  const downloads = o.downloads ?? new Downloads(hub.db, { log: console, now: () => hub.now(), ...(o.githubFetch ? { fetch: o.githubFetch } : {}) });
+  const downloads = o.downloads ?? new Downloads(hub.db, { log: console, now: () => hub.now(), ...(o.githubFetch ? { fetch: o.githubFetch } : {}), ...(o.downloadsDir ? { dir: o.downloadsDir } : {}) });
   add('GET', '/v1/downloads', async () => ({ downloads: await downloads.list() }));
   add('GET', '/v1/account/downloads/:id', async (c) => {
     const user = hub.accounts.session(accountToken(c));
     const d = await downloads.start(user.id, user.account_id, c.params.id!);
-    c.res.writeHead(302, { Location: d.url, 'Cache-Control': 'no-store' });
-    c.res.end();
+    if (d.kind === 'url') {
+      c.res.writeHead(302, { Location: d.url, 'Cache-Control': 'no-store' });
+      c.res.end();
+      return Symbol.for('handled');
+    }
+    // P8-11: an installer uploaded to this server
+    const stream = downloads.open(d);
+    if (!stream) throw new HubError('NOT_AVAILABLE', 'This download is missing on the server. Please try again later or open a support ticket.', 503);
+    c.res.writeHead(200, {
+      'Content-Type': 'application/vnd.microsoft.portable-executable', 'Content-Length': d.size, 'Cache-Control': 'no-store',
+      'Content-Disposition': `attachment; filename="${d.fileName}"`, 'X-Content-Type-Options': 'nosniff', 'X-Content-SHA256': d.sha256,
+    });
+    stream.pipe(c.res);
+    c.res.on('close', () => stream.destroy());
     return Symbol.for('handled');
   });
-  add('GET', '/v1/admin/downloads', (c) => { admin(c); return { stats: downloads.stats() }; });
+  add('GET', '/v1/admin/downloads', (c) => { admin(c); return { stats: downloads.stats(), files: downloads.files() }; });
+  // P8-11: installers built on the vendor's PC (npm run release): streamed to disk, checked against X-Content-SHA256
+  add('PUT', '/v1/admin/downloads/:item/:file', async (c) => {
+    admin(c);
+    const declared = c.req.headers['content-length'] ? Number(c.req.headers['content-length']) : undefined;
+    return { file: await downloads.upload(c.params.item!, decodeURIComponent(c.params.file!), c.req, String(c.req.headers['x-content-sha256'] ?? '').toLowerCase(), declared) };
+  }, { raw: true });
+  add('DELETE', '/v1/admin/downloads/:item/:version', (c) => { admin(c); downloads.remove(c.params.item!, decodeURIComponent(c.params.version!)); return { ok: true }; });
 
   // ---- P8-08: support tickets, announcements, knowledge base, service status (src/support.ts)
   const support = new Support(hub);
@@ -657,6 +678,9 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
     relay.close();
     tunnels.close();
   });
+  // Node ends a request that takes longer than 5 minutes to arrive; an installer (150 MB) over a slow upload link can
+  // take longer (P8-11). Headers must still arrive within headersTimeout (60 s), so a slow-headers client gains nothing.
+  server.requestTimeout = 60 * 60_000;
   return Object.assign(server, { demos });
 }
 

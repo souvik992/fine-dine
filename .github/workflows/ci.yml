@@ -1,8 +1,8 @@
 name: CI
 
-# Every push and pull request: typecheck, lint and test on Windows and Linux, then build the Windows installers.
-# Every push to main also publishes them as a GitHub Release (P8-03, ADR-0007): DinePOS Cloud's download catalogue
-# (GET /v1/downloads) offers the newest release's files in the customer portal.
+# Every push and pull request: typecheck, lint and test on Windows and Linux.
+# The Windows installers are built on the vendor's PC and uploaded to DinePOS Cloud with `npm run release` (P8-11),
+# which offers them in the customer portal. CI does not build or publish them.
 on:
   push:
     branches: [main]
@@ -28,63 +28,3 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test
-
-  installer:
-    needs: check
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      # Bundles the server, verifies node.exe against its pinned SHA-256, builds the NSIS installer and
-      # checks the release contents (scripts/inspect-release.mjs).
-      - run: npm run dist -w @dinepos/desktop
-      # The Table QR add-on is signed with the vendor's add-on key (packages/shared/src/addons.ts trusts its public
-      # half). Add the private key's PEM text as the repository secret DINEPOS_ADDON_SIGNING_KEY; without it this
-      # step is skipped and the release has the DinePOS installer only.
-      - name: Table QR add-on installer
-        shell: bash
-        env:
-          ADDON_KEY: ${{ secrets.DINEPOS_ADDON_SIGNING_KEY }}
-        run: |
-          if [ -z "$ADDON_KEY" ]; then
-            echo "::warning title=Table QR not built::Add the DINEPOS_ADDON_SIGNING_KEY secret to build and publish the Table QR installer."
-            exit 0
-          fi
-          printf '%s\n' "$ADDON_KEY" > "$RUNNER_TEMP/addon-signing.pem"
-          DINEPOS_ADDON_SIGNING_KEY="$RUNNER_TEMP/addon-signing.pem" npm run installer -w @dinepos/addon-tableqr
-          rm -f "$RUNNER_TEMP/addon-signing.pem"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: DinePOS-Windows
-          path: |
-            apps/desktop/release/DinePOS-Setup-*.exe
-            addons/dist/installers/DinePOS-TableQR-Setup-*.exe
-          if-no-files-found: error
-
-  release:
-    # Pushes to main only (never pull requests): one release per build, marked latest.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: installer
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: DinePOS-Windows
-          path: out
-      - name: Publish the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          files=$(find out -name '*.exe' | sort)
-          version=$(basename "$(find out -name 'DinePOS-Setup-*.exe' | head -1)" .exe | sed 's/^DinePOS-Setup-//')
-          tag="dinepos-build-${{ github.run_number }}"
-          notes="DinePOS ${version}, build ${{ github.run_number }} from ${GITHUB_SHA::7}. Windows installers are not code-signed yet: Windows SmartScreen may warn."
-          gh release create "$tag" $files --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "DinePOS ${version} (build ${{ github.run_number }})" --notes "$notes" --latest

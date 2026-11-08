@@ -15,7 +15,7 @@ const hub = new Hub({ dbPath: join(dir, 'hub.db'), devOtp: true, allowLogMailer:
 const port = Number(process.env.HUB_PORT ?? 4900);
 const adminKey = process.env.HUB_ADMIN_KEY ?? randomBytes(12).toString('base64url'); // a new one each run unless set
 const urbanpiper = new UrbanPiper(hub, { log: { info: (m, d) => console.log(m, d ?? ''), warn: (m, d) => console.warn(m, d ?? '') } });
-const server = createHubServer(hub, { adminKey, urbanpiper });
+const server = createHubServer(hub, { adminKey, urbanpiper, downloadsDir: join(dir, 'downloads') }); // P8-11: npm run release uploads here
 setInterval(() => { hub.sweep(); void urbanpiper.pump(); }, 5000).unref();
 server.listen(port, '0.0.0.0', () => {
   const exists = one(hub.db, "SELECT 1 FROM store WHERE slug = 'sample'");

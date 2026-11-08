@@ -1,5 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash, randomBytes } from 'node:crypto';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { cleanup, startHub } from './helpers.ts';
 import type { TestHub } from './helpers.ts';
 
@@ -100,6 +104,86 @@ test('downloads: a signed-in account gets the installer (recorded); without sign
     assert.deepEqual((stats.json.stats as Array<{ item: string; version: string; downloads: number }>).map((s) => [s.item, s.version, s.downloads]).sort(), [['dinepos', '0.1.7', 1], ['tiffin-ods', '1.0.13', 1]]);
     assert.equal((await h.call('GET', '/v1/admin/downloads')).status, 403);
   } finally { await h.close(); cleanup(h.dir); }
+});
+
+// ---- P8-11: installers built on the vendor's PC and uploaded to the cloud
+const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
+const upload = (h: TestHub, item: string, name: string, bytes: Buffer, o: { admin?: boolean; sha?: string } = {}) =>
+  fetch(`${h.base}/v1/admin/downloads/${item}/${encodeURIComponent(name)}`, {
+    method: 'PUT', body: new Uint8Array(bytes),
+    headers: { 'content-type': 'application/octet-stream', 'x-content-sha256': o.sha ?? sha(bytes), ...(o.admin === false ? {} : { 'x-admin-key': 'admin-test-key' }) },
+  }).then(async (r) => ({ status: r.status, json: (await r.json()) as Record<string, any> }));
+
+test('P8-11: an uploaded installer is offered instead of GitHub and streamed from the cloud (byte for byte, recorded)', async () => {
+  const gh = fakeGitHub();
+  const files = mkdtempSync(join(tmpdir(), 'hub-dl-'));
+  const h = await startHub(undefined, undefined, undefined, { githubFetch: gh.f, downloadsDir: files });
+  try {
+    const exe = randomBytes(300_000);
+    const up = await upload(h, 'dinepos', 'DinePOS-Setup-0.1.8.exe', exe);
+    assert.equal(up.status, 200, JSON.stringify(up.json));
+    assert.deepEqual([up.json.file.item, up.json.file.version, up.json.file.size, up.json.file.sha256], ['dinepos', '0.1.8', exe.length, sha(exe)]);
+    const list = (await h.call('GET', '/v1/downloads')).json.downloads as Array<Record<string, unknown>>;
+    const d = list.find((x) => x.id === 'dinepos')!;
+    assert.deepEqual([d.available, d.version, d.fileName, d.size, d.build], [true, '0.1.8', 'DinePOS-Setup-0.1.8.exe', exe.length, null]);
+    assert.equal(list.find((x) => x.id === 'tiffin')!.version, '0.3.12', 'an item with no upload still comes from GitHub');
+
+    const cookie = await signedIn(h);
+    const res = await fetch(`${h.base}/v1/account/downloads/dinepos`, { redirect: 'manual', headers: { cookie } });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-disposition'), 'attachment; filename="DinePOS-Setup-0.1.8.exe"');
+    assert.equal(res.headers.get('x-content-sha256'), sha(exe));
+    assert.ok(Buffer.from(await res.arrayBuffer()).equals(exe));
+    const stats = await h.call('GET', '/v1/admin/downloads', { admin: true });
+    assert.deepEqual((stats.json.stats as Array<{ item: string; version: string }>).map((s) => [s.item, s.version]), [['dinepos', '0.1.8']]);
+    assert.deepEqual((stats.json.files as Array<{ fileName: string }>).map((f) => f.fileName), ['DinePOS-Setup-0.1.8.exe']);
+
+    // the file gone from the disk: a clear answer, not a broken download
+    rmSync(join(files, 'dinepos', 'DinePOS-Setup-0.1.8.exe'));
+    const gone = await fetch(`${h.base}/v1/account/downloads/dinepos`, { headers: { cookie } });
+    assert.equal(gone.status, 503);
+  } finally { await h.close(); cleanup(h.dir); cleanup(files); }
+});
+
+test('P8-11: uploads need the admin key, the right file name and an intact file; nothing is kept otherwise', async () => {
+  const files = mkdtempSync(join(tmpdir(), 'hub-dl-'));
+  const h = await startHub(undefined, undefined, undefined, { githubFetch: fakeGitHub().f, downloadsDir: files });
+  try {
+    const exe = randomBytes(10_000);
+    assert.equal((await upload(h, 'dinepos', 'DinePOS-Setup-0.1.8.exe', exe, { admin: false })).status, 403);
+    assert.equal((await upload(h, 'dinepos', 'TiffinPOS-Setup-0.3.13.exe', exe)).status, 400, 'another product\'s installer');
+    assert.equal((await upload(h, 'dinepos', 'DinePOS-Setup-../x.exe', exe)).status, 400, 'a path in the version');
+    assert.equal((await upload(h, 'pizza', 'DinePOS-Setup-0.1.8.exe', exe)).status, 404);
+    const bad = await upload(h, 'dinepos', 'DinePOS-Setup-0.1.8.exe', exe, { sha: sha(randomBytes(8)) });
+    assert.equal(bad.status, 400);
+    assert.match(String(bad.json.error.message), /damaged/);
+    assert.deepEqual(readdirSync(join(files, 'dinepos')), [], 'a damaged upload leaves nothing behind');
+    assert.equal(((await h.call('GET', '/v1/admin/downloads', { admin: true })).json.files as unknown[]).length, 0);
+  } finally { await h.close(); cleanup(h.dir); cleanup(files); }
+});
+
+test('P8-11: the newest 3 versions are kept; deleting the newest offers the one before; the same version again replaces it', async () => {
+  const files = mkdtempSync(join(tmpdir(), 'hub-dl-'));
+  const h = await startHub(undefined, undefined, undefined, { githubFetch: fakeGitHub().f, downloadsDir: files });
+  try {
+    for (const v of ['1.0.0', '1.0.1', '1.0.2', '1.0.3']) {
+      h.clock.t += 60_000;
+      assert.equal((await upload(h, 'tiffin-ods', `TiffinPOS-ODS-Setup-${v}.exe`, randomBytes(1000))).status, 200);
+    }
+    assert.deepEqual(readdirSync(join(files, 'tiffin-ods')).sort(), ['TiffinPOS-ODS-Setup-1.0.1.exe', 'TiffinPOS-ODS-Setup-1.0.2.exe', 'TiffinPOS-ODS-Setup-1.0.3.exe']);
+    const version = async () => ((await h.call('GET', '/v1/downloads')).json.downloads as Array<{ id: string; version: string }>).find((d) => d.id === 'tiffin-ods')!.version;
+    assert.equal(await version(), '1.0.3');
+    assert.equal((await h.call('DELETE', '/v1/admin/downloads/tiffin-ods/1.0.3')).status, 403);
+    assert.equal((await h.call('DELETE', '/v1/admin/downloads/tiffin-ods/1.0.3', { admin: true })).status, 200);
+    assert.equal(await version(), '1.0.2');
+    assert.equal(existsSync(join(files, 'tiffin-ods', 'TiffinPOS-ODS-Setup-1.0.3.exe')), false);
+    // a rebuilt 1.0.1 uploaded again replaces the file and becomes the newest
+    h.clock.t += 60_000;
+    const again = randomBytes(2000);
+    assert.equal((await upload(h, 'tiffin-ods', 'TiffinPOS-ODS-Setup-1.0.1.exe', again)).status, 200);
+    assert.equal(await version(), '1.0.1');
+    assert.ok(readFileSync(join(files, 'tiffin-ods', 'TiffinPOS-ODS-Setup-1.0.1.exe')).equals(again));
+  } finally { await h.close(); cleanup(h.dir); cleanup(files); }
 });
 
 test('P8-05: no browser demo unless the cloud is started with one; the answer points to the Windows trial', async () => {

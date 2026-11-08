@@ -23,7 +23,8 @@ The product owner's decisions (2026-11-08):
    made at download time, because it is bound to a PC whose hardware id is not known yet.
 6. **Tiffin POS gets licensing** (in the tiffin repository), the same as DinePOS.
 7. **New builds on every push**: installers and the portal are built by CI and published; the portal's downloads
-   always offer the newest build.
+   always offer the newest build. *Amended 2026-11-08 (P8-11): installers are built on the vendor's PC and uploaded to
+   the cloud; see Downloads below.*
 
 ## Decision
 
@@ -33,10 +34,15 @@ The product owner's decisions (2026-11-08):
 - **Licensing library** in `packages/licensing` (this repository): the key format, signing, checking, status and hardware
   ids. The hub imports its source (no build step); the DinePOS app keeps its own checks for now. The
   `vendor/saas-portal` submodule is removed.
-- **Downloads** are GitHub Releases of the public repositories: fine-dine publishes `DinePOS-Setup-<v>.exe` and
-  `DinePOS-TableQR-Setup-<v>.exe`, tiffin publishes `TiffinPOS-Setup-<v>.exe` and `TiffinPOS-ODS-Setup-<v>.exe`, on
-  every push to main. The hub keeps a catalogue (`GET /v1/downloads`, refreshed from the GitHub API) and records
-  each download by a signed-in account.
+- **Downloads** (amended 2026-11-08, P8-11): the installers (`DinePOS-Setup-<v>.exe`, `DinePOS-TableQR-Setup-<v>.exe`,
+  `TiffinPOS-Setup-<v>.exe`, `TiffinPOS-ODS-Setup-<v>.exe`) are built on the vendor's PC with `npm run release` in each
+  repository and uploaded to the cloud (admin key, SHA-256 checked). The hub keeps them on its disk, offers the newest
+  in its catalogue (`GET /v1/downloads`) and streams it to signed-in accounts, recording each download. Reasons: CI
+  builds depended on GitHub's release downloads (Electron, NSIS), which failed for hours on 2026-11-08; the add-on
+  signing keys stay on the vendor's PC instead of in repository secrets; and customer downloads no longer depend on
+  GitHub. An item never uploaded falls back to the GitHub Releases CI published before. The price: releasing needs
+  the vendor's Windows PC, and installers use the cloud server's disk (about 150 MB a version, 3 kept) and
+  bandwidth.
 - **Portal hosting:** the built portal is published by saas-portal's CI; the cloud server fetches it on update and the
   hub serves it on the `portal.` host, with the API on the same origin (the HttpOnly session cookie needs no
   cross-site rules). portal.posinext.com is pointed at the cloud server when the new portal is ready.

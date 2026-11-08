@@ -16,7 +16,8 @@
 //   HUB_DEV_MAIL=1     P7-01: development only: no email provider, codes go to this log and sign-up is open
 //   HUB_ALERT_WEBHOOK  Slack / Discord / Google Chat webhook for alerts (hosted outlet down, backups failing)
 //   HUB_PORTAL_DIR     P8-09: the built customer portal (deploy/portal.sh fetches it); HUB_PORTAL_DOMAIN: its address
-//   GITHUB_TOKEN       P8-04: optional; the downloads list reads GitHub Releases (60 requests an hour without it, 10-minute cache)
+//   GITHUB_TOKEN       P8-04: optional; downloads not uploaded yet come from GitHub Releases (60 requests an hour without it)
+// Installers uploaded with `npm run release` (P8-11) are kept in <HUB_DATA_DIR>/downloads (the newest 3 of each).
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hub } from './hub.ts';
@@ -56,8 +57,9 @@ const monitor = new Monitor(hub, { hosted, backupStatusFile: join(dir, 'backup-s
 const watcher = setInterval(() => void monitor.tick().catch((e) => log.warn('monitor failed', String(e))), 30_000);
 watcher.unref();
 const outletServerDir = join(import.meta.dirname, '..', '..', 'outlet-server');
-// P8-04: Windows downloads from the newest GitHub Releases (GITHUB_TOKEN optional: more API requests an hour)
-const downloads = new Downloads(hub.db, { githubToken: process.env.GITHUB_TOKEN || undefined, log });
+// P8-04 / P8-11: Windows downloads: installers uploaded by `npm run release` (kept in <HUB_DATA_DIR>/downloads), else the
+// newest GitHub Release (GITHUB_TOKEN optional: more API requests an hour)
+const downloads = new Downloads(hub.db, { dir: join(dir, 'downloads'), githubToken: process.env.GITHUB_TOKEN || undefined, log });
 const browserDemo = process.env.HUB_BROWSER_DEMO === '1' ? { seed: process.env.HUB_DEMO_SEED ?? join(outletServerDir, 'demo-seed.json'), max: Number(process.env.HUB_MAX_DEMOS ?? 10) || 10 } : undefined;
 // P8-09: the customer portal on its own address (HUB_PORTAL_DOMAIN; else any portal.<host>)
 const portal = process.env.HUB_PORTAL_DIR ? new Portal({ dir: process.env.HUB_PORTAL_DIR, hosts: (process.env.HUB_PORTAL_DOMAIN ?? '').split(',') }) : undefined;

@@ -259,9 +259,10 @@ Added 2026-11-08 at the product owner's request. Read first for every task: `doc
   `/v1/activate` takes the product; trial 30 days; one trial per product per account, PC and mobile; the DinePOS app
   sends `fine_dine` and refuses keys for another product. Accept: a Tiffin trial on a PC does not use up its DinePOS
   trial; a `tiffin_qsr` key does not install in DinePOS.
-- [ ] **P8-03 Builds on every push.** fine-dine CI builds and tests, then publishes `DinePOS-Setup-<v>.exe` and
-  `DinePOS-TableQR-Setup-<v>.exe` to a GitHub Release on every push to main; tiffin CI publishes its installer and the
-  ODS add-on the same way. Accept: a push to main produces a release with the installers attached.
+- [x] **P8-03 Builds on every push.** *Replaced by P8-11 (2026-11-08): CI only tests; installers are built on the
+  vendor's PC.* (Was: CI publishes the installers to a GitHub Release on every push to main. Dropped because CI
+  builds depended on GitHub's release downloads, which failed for hours, and needed the add-on signing keys as
+  repository secrets.)
 - [x] **P8-04 Download catalogue in the hub.** `GET /v1/downloads` (products and add-ons, newest version, size, date)
   from the GitHub Releases API (cached; works when GitHub is down with the last list); signed-in download links
   record who downloaded what. Accept: the newest release appears within the cache time; a download is recorded.
@@ -280,6 +281,12 @@ Added 2026-11-08 at the product owner's request. Read first for every task: `doc
 - [x] **P8-09 Portal deployment.** saas-portal CI builds and publishes the portal on every push; the cloud server's
   update fetches it; the hub serves it on the `portal.` host with the API on the same origin; steps to point
   portal.posinext.com at the server. Accept: after an update the server serves the newest portal build.
+- [x] **P8-11 Installers built locally, served by the cloud.** `npm run release` (fine-dine: DinePOS + Table QR;
+  tiffin: Tiffin POS + ODS) builds on the vendor's PC, signs add-ons with the keys on that PC, and uploads each file
+  to `PUT /v1/admin/downloads/<item>/<file>` (admin key, SHA-256 checked, streamed to `<HUB_DATA_DIR>/downloads`,
+  newest 3 versions kept). The hub offers the newest upload and streams it to signed-in accounts; an item never
+  uploaded still comes from GitHub Releases. CI no longer builds or publishes installers. Accept: an uploaded
+  installer is listed and downloads byte for byte; a damaged or misnamed upload is refused and leaves nothing.
 - [x] **P8-10 Licensing in Tiffin POS** (tiffin repository): hardware id, Settings › Licence with sign-in to DinePOS
   Cloud (`tiffin_qsr`, 30-day trial), warnings, grace, no new business day without a valid key, renewals. Accept:
   as P2-09 and P7-03, for Tiffin POS.
