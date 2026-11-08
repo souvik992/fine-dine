@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchRuntime } from './fetch-runtime.mjs';
 
@@ -18,6 +19,9 @@ run(['run', 'build']);
 run(['run', 'bundle', '-w', '@dinepos/server']);
 run(['run', 'build', '-w', '@dinepos/desktop']);
 await fetchRuntime();
+// Electron's own binary (node_modules/electron/dist): electron has no install script, so a fresh `npm ci` (CI) has
+// none until something runs it. Its install.js downloads it (checksum-verified) and exits at once if it is there.
+execFileSync(process.execPath, [path.join(path.dirname(createRequire(import.meta.url).resolve('electron/package.json')), 'install.js')], { stdio: 'inherit' });
 
 // Stage the app: only the bundled outputs and a dependency-free package.json.
 const pkg = JSON.parse(readFileSync(`${here}package.json`, 'utf8'));
