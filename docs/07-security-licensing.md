@@ -78,6 +78,9 @@ active person must be able to manage staff; changing a PIN, role or active flag 
   shared by every product. DinePOS Cloud (`cloud/hub`) signs with it; the app keeps its own copy of the checks
   (`apps/server/src/licence/`), and the library's tests prove both directions match. Keys may carry `product`
   (`fine_dine`, `tiffin_qsr`).
+- Tiffin POS (souvik992/tiffin, P8-10) uses the same keys and DinePOS Cloud for activation and renewals (product
+  `tiffin_qsr`). Unlike DinePOS, it locks the whole POS behind a lock screen when there is no usable licence (the
+  owner's decision); installs that already had bills got 30 days to activate.
 
 Built in P2-09 (product owner's decisions 2026-11-03: **no key → billing cannot start**; keygen in a separate folder):
 - Key = `base64url(payload JSON).base64url(Ed25519 signature)`; payload `{ v: 1, licensee, hardwareId, issuedAt,

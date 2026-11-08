@@ -280,6 +280,6 @@ Added 2026-11-08 at the product owner's request. Read first for every task: `doc
 - [x] **P8-09 Portal deployment.** saas-portal CI builds and publishes the portal on every push; the cloud server's
   update fetches it; the hub serves it on the `portal.` host with the API on the same origin; steps to point
   portal.posinext.com at the server. Accept: after an update the server serves the newest portal build.
-- [ ] **P8-10 Licensing in Tiffin POS** (tiffin repository): hardware id, Settings › Licence with sign-in to DinePOS
+- [x] **P8-10 Licensing in Tiffin POS** (tiffin repository): hardware id, Settings › Licence with sign-in to DinePOS
   Cloud (`tiffin_qsr`, 30-day trial), warnings, grace, no new business day without a valid key, renewals. Accept:
   as P2-09 and P7-03, for Tiffin POS.
