@@ -41,11 +41,14 @@ Send JSON matching the registration contract in `docs/saas/03-api-contracts.md`,
 
 The first outlet is always on-premise Windows for this initial trial flow. Hosted provisioning is deliberately not exposed yet. The API creates a queued `windows_trial` job; no 14-day period begins until a future worker confirms provisioning success.
 
+## Customer portal implementation
+The separate `cloud/saas-web` package provides the registration flow (owner, business and first outlet), login, token-based email verification, forgot/reset password, and an account/business dashboard. It uses `VITE_SAAS_API_URL`, credentialed fetch requests and an `Idempotency-Key` for registration. Business-profile edits omit blank PAN/GSTIN fields and discard masked values, relying on the API's `COALESCE` behavior to preserve stored tax IDs. Its dedicated GitHub Actions workflow installs dependencies, runs the TypeScript/Vite production build and executes Vitest tests.
+
 ## Operational limitations before production
 - Configure a durable email queue/retry strategy; SMTP sends currently happen after the database transaction and failures are logged for manual resend.
 - Replace in-memory rate-limit storage with a shared Redis store before running multiple API instances.
 - Deploy behind HTTPS with a deliberate trusted-proxy configuration. Use the same registrable site for portal and API to retain the Lax session cookie policy.
 - Add PostgreSQL-backed integration tests and validate migrations against a clean PostgreSQL instance.
 - Add a distributed worker and a narrow authenticated hub adapter before marking trials active.
-- Terms text and privacy text must be published and reviewed; the API records the supplied terms version but the web consent UI is not included in this service commit.
+- The customer portal includes a required Terms/Privacy consent checkbox and sends a versioned acceptance value. Publish and legally review the actual Terms and Privacy Policy content before collecting real customer registrations.
 - Business PAN/GSTIN checks validate syntax only, not government registration status.

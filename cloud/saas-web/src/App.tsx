@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { apiRequest } from "./api";
 import { buildRegistrationPayload, newRegistrationKey, type RegistrationFields } from "./registration";
+import { buildBusinessProfilePayload, type ProfileFields } from "./profile";
 
 type Account = {
   user: { id: string; fullName: string; email: string; phone: string | null; role: string };
@@ -68,7 +69,7 @@ function SelectField({ label, value, onChange, options }: {
   </select></label>;
 }
 function Notice({ kind = "error", children }: { kind?: "error" | "success" | "info"; children: ReactNode }) {
-  return <div className={`notice notice-${kind}`} role="status">{children}</div>;
+  return <div className={`notice notice-${kind}`} role={kind === "error" ? "alert" : "status"} aria-live={kind === "error" ? "assertive" : "polite"}>{children}</div>;
 }
 function Button({ children, loading = false, disabled = false, onClick }: { children: ReactNode; loading?: boolean; disabled?: boolean; onClick?: () => void }) {
   return <button className="primary-button" type={onClick ? "button" : "submit"} onClick={onClick} disabled={disabled || loading}>{loading ? <><span className="spinner" /> Please wait…</> : children}</button>;
@@ -103,7 +104,7 @@ function RegisterPage() {
   if (done) return <Shell><div className="success-icon">✓</div><div className="eyebrow">REGISTRATION RECEIVED</div>
     <h2>Check your inbox.</h2><p className="muted">We’ve sent a verification link to <b>{fields.email}</b>. Verify your email to activate your account and continue.</p>
     <Notice kind="info">If you don’t see the email, check your spam folder.</Notice>
-    {resendMessage && <Notice kind="success">{resendMessage}</Notice>}
+    {resendMessage && <Notice kind="info">{resendMessage}</Notice>}
     <div className="button-stack"><button className="secondary-button" type="button" disabled={resending} onClick={resendVerification}>{resending ? "Sending…" : "Resend verification email"}</button><Button onClick={() => routeTo("/login")}>Go to sign in</Button></div>
   </Shell>;
   return <Shell><div className="eyebrow">GET STARTED · 14-DAY TRIAL</div><h2>Create your account</h2>
@@ -229,12 +230,6 @@ function ResetPage() {
   </Shell>;
 }
 
-type ProfileFields = {
-  tradeName:string;registeredBusinessName:string;businessType:string;industry:string;cin:string;
-  fssaiLicense:string;websiteUrl:string;businessEmail:string;businessPhone:string;
-  addressLine1:string;addressLine2:string;locality:string;city:string;district:string;
-  state:string;stateCode:string;postalCode:string;countryCode:string;pan:string;gstin:string;
-};
 function DashboardPage() {
   const [account,setAccount]=useState<Account|null>(null);const [profile,setProfile]=useState<ProfileFields|null>(null);
   const [busy,setBusy]=useState(true);const [saving,setSaving]=useState(false);const [error,setError]=useState("");const [notice,setNotice]=useState("");
@@ -247,13 +242,7 @@ function DashboardPage() {
   }).catch(e=>{if(active)setError(messageOf(e));}).finally(()=>{if(active)setBusy(false);});return()=>{active=false;};},[]);
   const set=(name:keyof ProfileFields)=>(value:string)=>setProfile(old=>old?({...old,[name]:value}):old);
   async function save(e:FormEvent){e.preventDefault();if(!profile)return;setSaving(true);setError("");setNotice("");
-    const address={addressLine1:profile.addressLine1,addressLine2:profile.addressLine2||undefined,locality:profile.locality||undefined,
-      city:profile.city,district:profile.district||undefined,state:profile.state,stateCode:profile.stateCode||undefined,
-      postalCode:profile.postalCode,countryCode:profile.countryCode};
-    const body={tradeName:profile.tradeName,registeredBusinessName:profile.registeredBusinessName||null,businessType:profile.businessType,
-      industry:profile.industry,cin:profile.cin||null,fssaiLicense:profile.fssaiLicense||null,websiteUrl:profile.websiteUrl||null,
-      businessEmail:profile.businessEmail||null,businessPhone:profile.businessPhone||null,address,
-      ...(profile.pan.trim()?{pan:profile.pan.trim().toUpperCase()}:{}),...(profile.gstin.trim()?{gstin:profile.gstin.trim().toUpperCase()}:{})};
+    const body=buildBusinessProfilePayload(profile);
     try{await apiRequest("/api/v1/business-profile",{method:"PATCH",body:JSON.stringify(body)});setNotice("Business profile saved.");setProfile({...profile,pan:"",gstin:""});}
     catch(err){setError(messageOf(err));}finally{setSaving(false);}}
   async function logout(){try{await apiRequest("/api/v1/auth/logout",{method:"POST"});}finally{routeTo("/login");}}

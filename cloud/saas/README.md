@@ -21,6 +21,9 @@ npm run dev
 
 The migration runner reads the SQL files in `packages/saas-db/migrations` and records applied filenames in `saas_schema_migrations`. It takes a PostgreSQL advisory lock and applies each migration in its own transaction. Never point it at an outlet SQLite database.
 
+## Customer portal
+The separate React + TypeScript + Vite customer portal lives in [`cloud/saas-web`](../saas-web/README.md). It provides registration, login, email verification, password recovery and a basic account/business dashboard. It is intentionally outside the root npm workspaces and does not modify the outlet POS or hub runtime. Set `VITE_SAAS_API_URL` to the API origin and include the portal origin in `SAAS_ALLOWED_ORIGINS`.
+
 In local development, email links are written to the API logger. Configure SMTP variables to test real delivery. Production startup refuses to run without SMTP credentials and an HTTPS portal URL.
 
 ## Implemented endpoints
@@ -49,7 +52,6 @@ Registration creates a pending owner account, organization, business profile, fi
 - Terms acceptance version is recorded in the registration audit event.
 
 ## Not yet implemented
-- Customer-facing React signup/login/verification screens.
 - Distributed rate-limit store and CSRF token strategy for cross-site deployments.
 - Email delivery queue/retry and provider-specific templates.
 - Organization team invitations and multi-organization switching.
