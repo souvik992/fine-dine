@@ -5,3 +5,8 @@
 # DinePOS Cloud runs on Linux: its scripts and sources keep LF line endings on every checkout
 cloud/** text eol=lf
 *.node binary
+# ...but binary files under cloud/ stay binary (the rule above must not rewrite their bytes)
+*.png binary
+*.ico binary
+*.woff2 binary
+*.node binary
