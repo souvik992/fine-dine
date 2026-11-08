@@ -82,3 +82,4 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-08 Licensing module: DinePOS Cloud signs keys with the platform's packages/licensing (souvik992/saas-portal, git submodule vendor/saas-portal; keys say product fine_dine); server install/update scripts fetch the submodule
 - 2026-11-08 P8-01 Licensing library in packages/licensing (@dinepos/licensing, vitest); hub imports it by source; vendor/saas-portal submodule removed; saas-portal keeps only the portal UI (ADR-0007, roadmap Phase 8)
 - 2026-11-08 P8-02 Two products (fine_dine, tiffin_qsr): product on licence grants and trial claims, /v1/activate takes it, 30-day trials, one per product per PC/email/mobile; DinePOS sends fine_dine and refuses Tiffin POS keys
+- 2026-11-08 P8-03 CI publishes a GitHub Release with the Windows installers on every push to main (DinePOS + Table QR here; Tiffin POS + ODS in the tiffin repo); add-ons signed when the signing-key secrets are set
