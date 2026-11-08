@@ -14,6 +14,7 @@
 //   HUB_MAX_DEMOS      P7-04: browser demos running at once (default 10); HUB_DEMO_SEED: the sample outlet (default ../../outlet-server/demo-seed.json)
 //   HUB_DEV_MAIL=1     P7-01: development only: no email provider, codes go to this log and sign-up is open
 //   HUB_ALERT_WEBHOOK  Slack / Discord / Google Chat webhook for alerts (hosted outlet down, backups failing)
+//   GITHUB_TOKEN       P8-04: optional; the downloads list reads GitHub Releases (60 requests an hour without it, 10-minute cache)
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hub } from './hub.ts';
@@ -22,6 +23,7 @@ import { UrbanPiper } from './urbanpiper.ts';
 import { HostedOutlets } from './hosted.ts';
 import { Monitor } from './monitor.ts';
 import { mailerFromEnv } from './mailer.ts';
+import { Downloads } from './downloads.ts';
 
 const dir = process.env.HUB_DATA_DIR ?? './hub-data';
 mkdirSync(dir, { recursive: true });
@@ -51,7 +53,9 @@ const monitor = new Monitor(hub, { hosted, backupStatusFile: join(dir, 'backup-s
 const watcher = setInterval(() => void monitor.tick().catch((e) => log.warn('monitor failed', String(e))), 30_000);
 watcher.unref();
 const outletServerDir = join(import.meta.dirname, '..', '..', 'outlet-server');
-const server = createHubServer(hub, { demo: { seed: process.env.HUB_DEMO_SEED ?? join(outletServerDir, 'demo-seed.json'), max: Number(process.env.HUB_MAX_DEMOS ?? 10) || 10 }, hosted, monitor, adminKey: process.env.HUB_ADMIN_KEY, publicUrl: process.env.HUB_PUBLIC_URL || undefined, deviceDomain: process.env.HUB_DEVICE_DOMAIN || undefined, urbanpiper });
+// P8-04: Windows downloads from the newest GitHub Releases (GITHUB_TOKEN optional: more API requests an hour)
+const downloads = new Downloads(hub.db, { githubToken: process.env.GITHUB_TOKEN || undefined, log });
+const server = createHubServer(hub, { downloads, demo: { seed: process.env.HUB_DEMO_SEED ?? join(outletServerDir, 'demo-seed.json'), max: Number(process.env.HUB_MAX_DEMOS ?? 10) || 10 }, hosted, monitor, adminKey: process.env.HUB_ADMIN_KEY, publicUrl: process.env.HUB_PUBLIC_URL || undefined, deviceDomain: process.env.HUB_DEVICE_DOMAIN || undefined, urbanpiper });
 const sweeper = setInterval(() => { try { hub.sweep(); } catch (e) { log.warn('sweep failed', String(e)); } void urbanpiper.pump().catch((e) => log.warn('urbanpiper outbox failed', String(e))); }, 5000);
 // P7-04: browser demos past their 72 hours are stopped and deleted
 const demoSweeper = setInterval(() => void server.demos?.sweep().catch((e) => log.warn('demo sweep failed', String(e))), 60_000);

@@ -17,6 +17,7 @@ import { Demos } from './demos.ts';
 import { Activations } from './activation.ts';
 import type { ActivateInput } from './activation.ts';
 import { productOf } from './products.ts';
+import { Downloads } from './downloads.ts';
 import type { DemoHost, DemoSeed } from './demos.ts';
 import type { PublishedMenu } from '../../contract/src/menu.ts';
 
@@ -48,6 +49,10 @@ export interface HttpOptions {
   monitor?: Monitor;
   /** P7-04: the browser demo: the sample outlet (demo-seed.json path or data), how many at once; host defaults to `hosted`. */
   demo?: { seed: string | DemoSeed | null; max?: number; hours?: number; host?: DemoHost };
+  /** P8-04: the Windows downloads (newest GitHub Release of each product). Not given: one is made here. */
+  downloads?: Downloads;
+  /** P8-04: the GitHub API client for the downloads made here (tests). */
+  githubFetch?: typeof fetch;
 }
 
 interface Ctx { req: IncomingMessage; res: ServerResponse; params: Record<string, string>; query: URLSearchParams; body: unknown; ip: string }
@@ -209,6 +214,18 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
   add('GET', '/v1/account/status', () => ({ signupOpen: hub.accounts.open }));
   // P7-03: the Windows app activating on a PC (its outlet server calls this with the account's email and password)
   const activations = new Activations(hub);
+
+  // ---- P8-04: Windows downloads (src/downloads.ts). The list is public; a download needs a signed-in account (recorded).
+  const downloads = o.downloads ?? new Downloads(hub.db, { log: console, now: () => hub.now(), ...(o.githubFetch ? { fetch: o.githubFetch } : {}) });
+  add('GET', '/v1/downloads', async () => ({ downloads: await downloads.list() }));
+  add('GET', '/v1/account/downloads/:id', async (c) => {
+    const user = hub.accounts.session(accountToken(c));
+    const d = await downloads.start(user.id, user.account_id, c.params.id!);
+    c.res.writeHead(302, { Location: d.url, 'Cache-Control': 'no-store' });
+    c.res.end();
+    return Symbol.for('handled');
+  });
+  add('GET', '/v1/admin/downloads', (c) => { admin(c); return { stats: downloads.stats() }; });
   const activateLimit = limiter(() => 10);
   add('POST', '/v1/activate', async (c) => { activateLimit(c.ip); return activations.activate((c.body ?? {}) as ActivateInput); });
   // P7-04: the browser demo (src/demos.ts), for a signed-in person

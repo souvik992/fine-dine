@@ -220,6 +220,18 @@ missing = `fine_dine`, for DinePOS builds before P8-02):
 - The same password check as the portal (wrong passwords lock the email for 15 minutes; an unverified email gets a
   new code).
 
+## Windows downloads (P8-04)
+
+The portal's downloads (`src/downloads.ts`; ADR-0007): for **Fine Dine** the DinePOS installer and the Table QR add-on,
+for **QSR** the Tiffin POS installer and the ODS add-on, always the newest build. CI publishes a GitHub Release on every
+push to main (fine-dine `dinepos-build-<n>`, tiffin `tiffin-build-<n>`); the hub reads them from the GitHub API.
+- `GET /v1/downloads`: the list (version, build, size, date, product), cached 10 minutes. When GitHub cannot be reached
+  the last list is used, also after a restart (kept in `setting`). An add-on missing from the newest build (its
+  signing secret was not set) comes from the newest build that has it.
+- `GET /v1/account/downloads/<id>` (signed in): records the download (`download_log`) and redirects to the installer.
+- `GET /v1/admin/downloads` (admin key): downloads per file and version.
+- `GITHUB_TOKEN` (optional): GitHub allows 60 API requests an hour per server without it; the cache needs at most 12.
+
 ## Browser demo (P7-04)
 
 A signed-in portal user presses **Start the browser demo** (portal › account page). In about 3 to 30 seconds they get a

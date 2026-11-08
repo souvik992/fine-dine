@@ -262,7 +262,7 @@ Added 2026-11-08 at the product owner's request. Read first for every task: `doc
 - [ ] **P8-03 Builds on every push.** fine-dine CI builds and tests, then publishes `DinePOS-Setup-<v>.exe` and
   `DinePOS-TableQR-Setup-<v>.exe` to a GitHub Release on every push to main; tiffin CI publishes its installer and the
   ODS add-on the same way. Accept: a push to main produces a release with the installers attached.
-- [ ] **P8-04 Download catalogue in the hub.** `GET /v1/downloads` (products and add-ons, newest version, size, date)
+- [x] **P8-04 Download catalogue in the hub.** `GET /v1/downloads` (products and add-ons, newest version, size, date)
   from the GitHub Releases API (cached; works when GitHub is down with the last list); signed-in download links
   record who downloaded what. Accept: the newest release appears within the cache time; a download is recorded.
 - [ ] **P8-05 Browser demo off.** Portal no longer offers it; `/v1/account/demo` answers "not available" unless
