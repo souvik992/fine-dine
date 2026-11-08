@@ -58,6 +58,23 @@ IPv4 address is charged after that), so Oracle above is the free-for-good choice
 Set a billing alert (Billing > Budgets) so the end of the free period is not a surprise. Everything under "Later"
 works the same.
 
+## On a server that already runs the Tiffin order hub
+
+DinePOS Cloud can share the Tiffin hub's server. The installer finds the Tiffin hub (`tiffin-hub.service`) and goes
+alongside it: DinePOS Cloud listens on port **4910** (Tiffin keeps 4900) and its Caddy sites live in
+`/etc/caddy/dinepos-cloud.caddy`, which Tiffin's `/etc/caddy/Caddyfile` only imports (one line added at the end).
+Tiffin's sites are never rewritten, and `deploy/domain.sh` checks the combined config with `caddy validate` before
+reloading; if Caddy does not accept it, everything is put back as it was.
+
+1. Over SSH: `curl -fsSL https://raw.githubusercontent.com/souvik992/fine-dine/main/cloud/hub/deploy/install.sh | sudo bash`
+2. It prints the admin key (keep it) and the addresses: `https://cloud.<ip-with-dashes>.sslip.io` (admin, API, uploads)
+   and `https://portal.<ip-with-dashes>.sslip.io` (the customer portal).
+3. Own domains later: set `HUB_DOMAIN=` and `HUB_PORTAL_DOMAIN=` in `/etc/dinepos-cloud.env` (DNS pointing at the
+   server), then `sudo dinepos-cloud-domain`.
+
+Not served alongside: outlet device addresses (`<store>.<domain>`, P6-02). If the Tiffin hub's Caddyfile is ever
+rewritten (e.g. `sudo tiffin-hub-domain`), run `sudo dinepos-cloud-domain` again to put the import line back.
+
 ## Later (over SSH: `ssh -i <key file> ubuntu@<ip>`)
 
 | Task | Command |
