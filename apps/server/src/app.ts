@@ -37,13 +37,14 @@ import { RealtimeHub, type HubOptions } from './realtime/hub.js';
 import { commandRoutes } from './routes/commands.js';
 import { healthRoutes } from './routes/health.js';
 import { licenceRoutes } from './routes/licence.js';
+import { licenceActivationRoutes } from './routes/licence-activation.js';
 import { queryRoutes } from './routes/queries.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { stockRoutes } from './routes/stock.js';
 import { cashierRoutes } from './routes/cashier.js';
 import { deviceRoutes } from './routes/devices.js';
 import { reportRoutes } from './routes/reports.js';
-import { defaultWebDir, webAppRoutes } from './routes/web-apps.js';
+import { defaultWebDir, isWebAppPath, webAppRoutes } from './routes/web-apps.js';
 import { deviceTokenOf, deviceUnpaired, isLoopback, MASTER_DEVICE_ID, resolveDevice, touchDevice } from './auth/devices.js';
 import { backupRoutes } from './routes/backups.js';
 import type { BackupScheduler } from './backup/scheduler.js';
@@ -72,6 +73,10 @@ export interface AppDeps {
   devices?: 'required' | 'off';
   /** Built captain app folder (P3-01); defaults to the repo build or the bundle's web/captain. */
   captainDir?: string;
+  /** P7-03: DinePOS Cloud for licence activation (default: the linked order hub, else portal.posinext.com). */
+  cloudUrl?: string;
+  /** P7-04: the billing terminal's built screens for a browser (/pos); defaults like captainDir. */
+  posDir?: string;
   /** Built kitchen display app folder (P4-02); defaults like captainDir. */
   kdsDir?: string;
   trustLoopback?: boolean;
@@ -146,7 +151,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
       // Public: health, pairing itself, CORS preflight; the stream checks its hello instead.
       if (req.method === 'OPTIONS' || url === '/v1/health' || url === '/v1/stream' || url.startsWith('/v1/pairing-requests')) return done();
       // The apps' files; their API calls carry a token.
-      if (url === '/captain' || url.startsWith('/captain/') || url === '/kds' || url.startsWith('/kds/')) return done();
+      if (isWebAppPath(url)) return done();
       // P5-01: add-ons' guest pages and guest API (public, rate limited) and their signed screens
       if (url.startsWith('/a/')) return done();
       // P6-03: print agents carry their own key (routes/print-agent.ts)
@@ -310,6 +315,9 @@ export function buildApp(deps: AppDeps): DinePosApp {
     agents.close();
   });
   onlineRoutes(app, { db, now, connector: online, execute, ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}) });
+  // P7-03: trial / sign-in activation through DinePOS Cloud (DINEPOS_CLOUD_URL for a test cloud)
+  const cloudUrl = deps.cloudUrl ?? process.env.DINEPOS_CLOUD_URL;
+  licenceActivationRoutes(app, { db, now, licence: licenceGate, execute, connector: online, ...(cloudUrl ? { cloudUrl } : {}), ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}) });
   syncRoutes(app, { db, now, agent: sync });
   sessionRoutes(app, { db, now, timeZone });
   stockRoutes(app, { db, now });
@@ -318,6 +326,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
   reportRoutes(app, { db, now, timeZone });
   webAppRoutes(app, 'captain', deps.captainDir ?? defaultWebDir('captain'));
   webAppRoutes(app, 'kds', deps.kdsDir ?? defaultWebDir('kds'));
+  webAppRoutes(app, 'pos', deps.posDir ?? defaultWebDir('pos'));
   if (deps.backups) backupRoutes(app, { db, now, timeZone, dataDir: deps.backups.dataDir, backups: deps.backups.scheduler, requestRestart: deps.backups.requestRestart });
   streamRoutes(app, hub, allowedOrigins);
   return Object.assign(app, { realtime: hub, online, sync, guestRelay, cloud });

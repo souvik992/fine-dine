@@ -3393,7 +3393,7 @@ var require_websocket = __commonJS({
     var http = __require("http");
     var net2 = __require("net");
     var tls = __require("tls");
-    var { randomBytes: randomBytes6, createHash: createHash12 } = __require("crypto");
+    var { randomBytes: randomBytes6, createHash: createHash13 } = __require("crypto");
     var { Duplex, Readable } = __require("stream");
     var { URL: URL2 } = __require("url");
     var PerMessageDeflate = require_permessage_deflate();
@@ -4079,7 +4079,7 @@ var require_websocket = __commonJS({
           abortHandshake(websocket, socket, "Invalid Upgrade header");
           return;
         }
-        const digest = createHash12("sha1").update(key + GUID).digest("base64");
+        const digest = createHash13("sha1").update(key + GUID).digest("base64");
         if (res.headers["sec-websocket-accept"] !== digest) {
           abortHandshake(websocket, socket, "Invalid Sec-WebSocket-Accept header");
           return;
@@ -4448,7 +4448,7 @@ var require_websocket_server = __commonJS({
     var EventEmitter2 = __require("events");
     var http = __require("http");
     var { Duplex } = __require("stream");
-    var { createHash: createHash12 } = __require("crypto");
+    var { createHash: createHash13 } = __require("crypto");
     var extension = require_extension();
     var PerMessageDeflate = require_permessage_deflate();
     var subprotocol = require_subprotocol();
@@ -4528,12 +4528,12 @@ var require_websocket_server = __commonJS({
         }
         if (options.port != null) {
           this._server = http.createServer((req, res) => {
-            const body = http.STATUS_CODES[426];
+            const body2 = http.STATUS_CODES[426];
             res.writeHead(426, {
-              "Content-Length": body.length,
+              "Content-Length": body2.length,
               "Content-Type": "text/plain"
             });
-            res.end(body);
+            res.end(body2);
           });
           this._server.listen(
             options.port,
@@ -4755,7 +4755,7 @@ var require_websocket_server = __commonJS({
           );
         }
         if (this._state > RUNNING) return abortHandshake(socket, 503);
-        const digest = createHash12("sha1").update(key + GUID).digest("base64");
+        const digest = createHash13("sha1").update(key + GUID).digest("base64");
         const headers = [
           "HTTP/1.1 101 Switching Protocols",
           "Upgrade: websocket",
@@ -11570,12 +11570,12 @@ var require_validation2 = __commonJS({
             validatorFunction = contentSchema;
           }
         }
-        const body = validateParam(validatorFunction, request, "body");
-        if (body) {
-          if (typeof body.then !== "function") {
-            return wrapValidationError(body, "body", context.schemaErrorFormatter);
+        const body2 = validateParam(validatorFunction, request, "body");
+        if (body2) {
+          if (typeof body2.then !== "function") {
+            return wrapValidationError(body2, "body", context.schemaErrorFormatter);
           } else {
-            return validateAsyncBody(body, context, request);
+            return validateAsyncBody(body2, context, request);
           }
         }
       }
@@ -21508,8 +21508,8 @@ var require_content_type_parser = __commonJS({
         return;
       }
       const resource = new AsyncResource("content-type-parser:run", request);
-      function done(error62, body) {
-        resource.runInAsyncScope(onDone, void 0, error62, body);
+      function done(error62, body2) {
+        resource.runInAsyncScope(onDone, void 0, error62, body2);
       }
       if (parser.asString === true || parser.asBuffer === true) {
         rawBody(
@@ -21523,11 +21523,11 @@ var require_content_type_parser = __commonJS({
       }
       const result = parser.fn(request, request[kRequestPayloadStream], done);
       if (result && typeof result.then === "function") {
-        result.then((body) => {
-          done(null, body);
+        result.then((body2) => {
+          done(null, body2);
         }, done);
       }
-      function onDone(error62, body) {
+      function onDone(error62, body2) {
         resource.emitDestroy();
         if (error62 != null) {
           reply.header("connection", "close");
@@ -21535,7 +21535,7 @@ var require_content_type_parser = __commonJS({
           reply.send(error62);
           return;
         }
-        request.body = body;
+        request.body = body2;
         handler(request, reply);
       }
     };
@@ -21584,16 +21584,16 @@ var require_content_type_parser = __commonJS({
           done(new FST_ERR_CTP_INVALID_CONTENT_LENGTH(), void 0);
           return;
         }
-        let body;
+        let body2;
         if (asString) {
-          body = chunks.length === 1 ? chunks[0].toString("utf8") : Buffer.concat(chunks, receivedLength).toString("utf8");
+          body2 = chunks.length === 1 ? chunks[0].toString("utf8") : Buffer.concat(chunks, receivedLength).toString("utf8");
         } else {
-          body = Buffer.concat(chunks, receivedLength);
+          body2 = Buffer.concat(chunks, receivedLength);
         }
-        const result = parser.fn(request, body, done);
+        const result = parser.fn(request, body2, done);
         if (result && typeof result.then === "function") {
-          result.then((body2) => {
-            done(null, body2);
+          result.then((body3) => {
+            done(null, body3);
           }, done);
         }
       }
@@ -21601,20 +21601,20 @@ var require_content_type_parser = __commonJS({
     function getDefaultJsonParser(onProtoPoisoning, onConstructorPoisoning) {
       const parseOptions = { protoAction: onProtoPoisoning, constructorAction: onConstructorPoisoning };
       return defaultJsonParser;
-      function defaultJsonParser(req, body, done) {
-        if (body.length === 0) {
+      function defaultJsonParser(req, body2, done) {
+        if (body2.length === 0) {
           done(new FST_ERR_CTP_EMPTY_JSON_BODY(), void 0);
           return;
         }
         try {
-          done(null, secureJsonParse(body, parseOptions));
+          done(null, secureJsonParse(body2, parseOptions));
         } catch {
           done(new FST_ERR_CTP_INVALID_JSON_BODY(), void 0);
         }
       }
     }
-    function defaultPlainTextParser(req, body, done) {
-      done(null, body);
+    function defaultPlainTextParser(req, body2, done) {
+      done(null, body2);
     }
     function Parser(asString, asBuffer, bodyLimit, fn) {
       this.asString = asString;
@@ -22576,10 +22576,10 @@ var require_codegen = __commonJS({
         return this._leafNode(new Throw(error62));
       }
       // start self-balancing block
-      block(body, nodeCount) {
+      block(body2, nodeCount) {
         this._blockStarts.push(this._nodes.length);
-        if (body)
-          this.code(body).endBlock(nodeCount);
+        if (body2)
+          this.code(body2).endBlock(nodeCount);
         return this;
       }
       // end the current self-balancing block
@@ -24004,15 +24004,15 @@ var require_validate = __commonJS({
       validateFunction(it, () => (0, boolSchema_1.topBoolOrEmptySchema)(it));
     }
     exports.validateFunctionCode = validateFunctionCode;
-    function validateFunction({ gen, validateName, schema, schemaEnv, opts }, body) {
+    function validateFunction({ gen, validateName, schema, schemaEnv, opts }, body2) {
       if (opts.code.es5) {
         gen.func(validateName, (0, codegen_1._)`${names_1.default.data}, ${names_1.default.valCxt}`, schemaEnv.$async, () => {
           gen.code((0, codegen_1._)`"use strict"; ${funcSourceUrl(schema, opts)}`);
           destructureValCxtES5(gen, opts);
-          gen.code(body);
+          gen.code(body2);
         });
       } else {
-        gen.func(validateName, (0, codegen_1._)`${names_1.default.data}, ${destructureValCxt(opts)}`, schemaEnv.$async, () => gen.code(funcSourceUrl(schema, opts)).code(body));
+        gen.func(validateName, (0, codegen_1._)`${names_1.default.data}, ${destructureValCxt(opts)}`, schemaEnv.$async, () => gen.code(funcSourceUrl(schema, opts)).code(body2));
       }
     }
     function destructureValCxt(opts) {
@@ -32906,10 +32906,10 @@ var require_codegen2 = __commonJS({
         return this._leafNode(new Throw(error62));
       }
       // start self-balancing block
-      block(body, nodeCount) {
+      block(body2, nodeCount) {
         this._blockStarts.push(this._nodes.length);
-        if (body)
-          this.code(body).endBlock(nodeCount);
+        if (body2)
+          this.code(body2).endBlock(nodeCount);
         return this;
       }
       // end the current self-balancing block
@@ -34299,15 +34299,15 @@ var require_validate2 = __commonJS({
       validateFunction(it, () => (0, boolSchema_1.topBoolOrEmptySchema)(it));
     }
     exports.validateFunctionCode = validateFunctionCode;
-    function validateFunction({ gen, validateName, schema, schemaEnv, opts }, body) {
+    function validateFunction({ gen, validateName, schema, schemaEnv, opts }, body2) {
       if (opts.code.es5) {
         gen.func(validateName, (0, codegen_1._)`${names_1.default.data}, ${names_1.default.valCxt}`, schemaEnv.$async, () => {
           gen.code((0, codegen_1._)`"use strict"; ${funcSourceUrl(schema, opts)}`);
           destructureValCxtES5(gen, opts);
-          gen.code(body);
+          gen.code(body2);
         });
       } else {
-        gen.func(validateName, (0, codegen_1._)`${names_1.default.data}, ${destructureValCxt(opts)}`, schemaEnv.$async, () => gen.code(funcSourceUrl(schema, opts)).code(body));
+        gen.func(validateName, (0, codegen_1._)`${names_1.default.data}, ${destructureValCxt(opts)}`, schemaEnv.$async, () => gen.code(funcSourceUrl(schema, opts)).code(body2));
       }
     }
     function destructureValCxt(opts) {
@@ -40914,10 +40914,10 @@ var require_codegen3 = __commonJS({
         return this._leafNode(new Throw(error62));
       }
       // start self-balancing block
-      block(body, nodeCount) {
+      block(body2, nodeCount) {
         this._blockStarts.push(this._nodes.length);
-        if (body)
-          this.code(body).endBlock(nodeCount);
+        if (body2)
+          this.code(body2).endBlock(nodeCount);
         return this;
       }
       // end the current self-balancing block
@@ -42307,15 +42307,15 @@ var require_validate3 = __commonJS({
       validateFunction(it, () => (0, boolSchema_1.topBoolOrEmptySchema)(it));
     }
     exports.validateFunctionCode = validateFunctionCode;
-    function validateFunction({ gen, validateName, schema, schemaEnv, opts }, body) {
+    function validateFunction({ gen, validateName, schema, schemaEnv, opts }, body2) {
       if (opts.code.es5) {
         gen.func(validateName, (0, codegen_1._)`${names_1.default.data}, ${names_1.default.valCxt}`, schemaEnv.$async, () => {
           gen.code((0, codegen_1._)`"use strict"; ${funcSourceUrl(schema, opts)}`);
           destructureValCxtES5(gen, opts);
-          gen.code(body);
+          gen.code(body2);
         });
       } else {
-        gen.func(validateName, (0, codegen_1._)`${names_1.default.data}, ${destructureValCxt(opts)}`, schemaEnv.$async, () => gen.code(funcSourceUrl(schema, opts)).code(body));
+        gen.func(validateName, (0, codegen_1._)`${names_1.default.data}, ${destructureValCxt(opts)}`, schemaEnv.$async, () => gen.code(funcSourceUrl(schema, opts)).code(body2));
       }
     }
     function destructureValCxt(opts) {
@@ -59718,7 +59718,7 @@ var require_fastify = __commonJS({
           routeEventContext.server[kLogController].incomingRequest(request, reply);
           return options.frameworkErrors(new FST_ERR_BAD_URL(path13), request, reply);
         }
-        const body = JSON.stringify({
+        const body2 = JSON.stringify({
           error: "Bad Request",
           code: "FST_ERR_BAD_URL",
           message: `'${path13}' is not a valid url component`,
@@ -59726,9 +59726,9 @@ var require_fastify = __commonJS({
         });
         res.writeHead(400, {
           "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(body)
+          "Content-Length": Buffer.byteLength(body2)
         });
-        res.end(body);
+        res.end(body2);
       }
       function onMaxParamLength(path13, req, res) {
         if (options.frameworkErrors) {
@@ -59739,7 +59739,7 @@ var require_fastify = __commonJS({
           routeEventContext.server[kLogController].incomingRequest(request, reply);
           return options.frameworkErrors(new FST_ERR_MAX_PARAM_LENGTH(path13), request, reply);
         }
-        const body = JSON.stringify({
+        const body2 = JSON.stringify({
           error: "Bad Request",
           code: "FST_ERR_MAX_PARAM_LENGTH",
           message: `'${path13}' is exceeding the max param length`,
@@ -59747,9 +59747,9 @@ var require_fastify = __commonJS({
         });
         res.writeHead(414, {
           "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(body)
+          "Content-Length": Buffer.byteLength(body2)
         });
-        res.end(body);
+        res.end(body2);
       }
       function buildAsyncConstraintCallback(isAsync, req, res) {
         if (isAsync === false) return void 0;
@@ -59763,12 +59763,12 @@ var require_fastify = __commonJS({
               routeEventContext.server[kLogController].incomingRequest(request, reply);
               return options.frameworkErrors(new FST_ERR_ASYNC_CONSTRAINT(), request, reply);
             }
-            const body = '{"error":"Internal Server Error","message":"Unexpected error from async constraint","statusCode":500}';
+            const body2 = '{"error":"Internal Server Error","message":"Unexpected error from async constraint","statusCode":500}';
             res.writeHead(500, {
               "Content-Type": "application/json",
-              "Content-Length": body.length
+              "Content-Length": body2.length
             });
-            res.end(body);
+            res.end(body2);
           }
         };
       }
@@ -59956,30 +59956,30 @@ var require_fastify = __commonJS({
       if (err.code === "ECONNRESET" || socket.destroyed) {
         return;
       }
-      let body, errorCode, errorStatus, errorLabel;
+      let body2, errorCode, errorStatus, errorLabel;
       if (err.code === "ERR_HTTP_REQUEST_TIMEOUT") {
         errorCode = "408";
         errorStatus = http.STATUS_CODES[errorCode];
-        body = `{"error":"${errorStatus}","message":"Client Timeout","statusCode":408}`;
+        body2 = `{"error":"${errorStatus}","message":"Client Timeout","statusCode":408}`;
         errorLabel = "timeout";
       } else if (err.code === "HPE_HEADER_OVERFLOW") {
         errorCode = "431";
         errorStatus = http.STATUS_CODES[errorCode];
-        body = `{"error":"${errorStatus}","message":"Exceeded maximum allowed HTTP header size","statusCode":431}`;
+        body2 = `{"error":"${errorStatus}","message":"Exceeded maximum allowed HTTP header size","statusCode":431}`;
         errorLabel = "header_overflow";
       } else {
         errorCode = "400";
         errorStatus = http.STATUS_CODES[errorCode];
-        body = `{"error":"${errorStatus}","message":"Client Error","statusCode":400}`;
+        body2 = `{"error":"${errorStatus}","message":"Client Error","statusCode":400}`;
         errorLabel = "error";
       }
       this.log.trace({ err }, `client ${errorLabel}`);
       if (socket.writable) {
         socket.write(`HTTP/1.1 ${errorCode} ${errorStatus}\r
-Content-Length: ${body.length}\r
+Content-Length: ${body2.length}\r
 Content-Type: application/json\r
 \r
-${body}`);
+${body2}`);
       }
       socket.destroy(err);
     }
@@ -74917,7 +74917,7 @@ function generateRecordCheck(doc, ctx, schema, accessor) {
   }, `return INVALID;`);
   return outputVar;
 }
-function emitOwnKeys(doc, ctx, accessor, kVar, body, onSymbol) {
+function emitOwnKeys(doc, ctx, accessor, kVar, body2, onSymbol) {
   const propIsEnumerableConst = addConstant(ctx, Object.prototype.propertyIsEnumerable);
   const symsVar = newVar(ctx);
   const keysVar = newVar(ctx);
@@ -74928,7 +74928,7 @@ function emitOwnKeys(doc, ctx, accessor, kVar, body, onSymbol) {
   doc.indented((d) => {
     d.write(`const ${kVar} = ${keysVar}[${iVar}];`);
     d.write(`if (${kVar} === "__proto__" || !${propIsEnumerableConst}.call(${accessor}, ${kVar})) continue;`);
-    body(d);
+    body2(d);
   });
   doc.write(`}`);
   doc.write(`for (let ${iVar} = 0; ${iVar} < ${symsVar}.length; ${iVar}++) {`);
@@ -74938,7 +74938,7 @@ function emitOwnKeys(doc, ctx, accessor, kVar, body, onSymbol) {
     if (onSymbol)
       d.write(onSymbol);
     else
-      body(d);
+      body2(d);
   });
   doc.write(`}`);
 }
@@ -82048,7 +82048,7 @@ function publishedMenu(db, settings, cfg) {
     if (i.variants.length === 0) items2.push({ ...base, id: i.id, name: i.name, price: i.pricePaise });
     else for (const v of i.variants) items2.push({ ...base, id: onlineItemId(i.id, v.id), name: `${i.name} (${v.name})`, price: v.pricePaise });
   }
-  const body = {
+  const body2 = {
     storeName: cfg["outlet.name"],
     categories: menu.categories.map((c, i) => ({ id: c.id, name: c.name, sort: i })),
     items: items2,
@@ -82064,7 +82064,7 @@ function publishedMenu(db, settings, cfg) {
     },
     serviceability: { ...settings.serviceability, hours: Object.fromEntries(Object.entries(settings.serviceability.hours).map(([d, s]) => [d, s])) }
   };
-  return { body, hash: createHash2("sha256").update(JSON.stringify(body)).digest("hex") };
+  return { body: body2, hash: createHash2("sha256").update(JSON.stringify(body2)).digest("hex") };
 }
 function feesFor(order, itemsTotal, s) {
   if (order.fulfilment === "PICKUP") return { deliveryFee: 0, packagingFee: s.packagingFee, problem: null };
@@ -82135,8 +82135,8 @@ function setOnlineState(ctx, id, state, patch = {}) {
   ctx.db.prepare("UPDATE online_order SET state = ?, order_json = ?, updated_at = ?, alert = ?, prep_minutes = coalesce(?, prep_minutes) WHERE id = ?").run(state, JSON.stringify(next), ctx.nowIso, patch.alert === void 0 ? o.alert : patch.alert, patch.prepMinutes ?? null, id);
   onlineChanged(ctx, id);
 }
-function enqueueHubAction(ctx, orderId, action, body, idemKey) {
-  ctx.db.prepare("INSERT OR IGNORE INTO online_outbox (order_id, action, body_json, idem_key, created_at) VALUES (?, ?, ?, ?, ?)").run(orderId, action, JSON.stringify(body), idemKey, ctx.nowIso);
+function enqueueHubAction(ctx, orderId, action, body2, idemKey) {
+  ctx.db.prepare("INSERT OR IGNORE INTO online_outbox (order_id, action, body_json, idem_key, created_at) VALUES (?, ?, ?, ?, ?)").run(orderId, action, JSON.stringify(body2), idemKey, ctx.nowIso);
   ctx.emit("online", "online.outbox", { orderId, action });
 }
 function onlineChanged(ctx, orderId) {
@@ -82386,12 +82386,12 @@ var OnlineConnector = class {
   }
   async publishOnce(force) {
     const cfg = getConfig(this.o.db);
-    const { body, hash: hash2 } = publishedMenu(this.o.db, cfg["online.settings"], cfg);
+    const { body: body2, hash: hash2 } = publishedMenu(this.o.db, cfg["online.settings"], cfg);
     const link = linkRow(this.o.db);
     if (force || hash2 !== link.menu_hash) {
-      await this.sendPhotos(body.items.map((i) => i.image));
+      await this.sendPhotos(body2.items.map((i) => i.image));
       const version2 = link.menu_version + 1;
-      const r = await this.o.fetch(this.url("/v1/pos/menu"), { method: "PUT", headers: this.headers({ "content-type": "application/json" }), body: JSON.stringify({ ...body, version: version2 }), signal: AbortSignal.timeout(15e3) });
+      const r = await this.o.fetch(this.url("/v1/pos/menu"), { method: "PUT", headers: this.headers({ "content-type": "application/json" }), body: JSON.stringify({ ...body2, version: version2 }), signal: AbortSignal.timeout(15e3) });
       if (!r.ok) {
         const j = await r.json().catch(() => null);
         throw new Error(`publishing the menu failed: ${j?.error?.message ?? r.status}`);
@@ -82895,6 +82895,7 @@ var SyncAgent = class {
 // src/licence/licence.ts
 import { createPublicKey, verify } from "node:crypto";
 var WARN_DAYS = 15;
+var TRIAL_WARN_DAYS = 2;
 var GRACE_DAYS = 7;
 var DAY = 864e5;
 var b64url = (s) => Buffer.from(s, "base64url");
@@ -82916,10 +82917,20 @@ function parseKey(raw) {
 function publicKeyFrom(spkiBase64) {
   return createPublicKey({ key: Buffer.from(spkiBase64, "base64"), format: "der", type: "spki" });
 }
-function verifyKey(raw, publicKey, hardwareId2) {
+function verifyKey(raw, trusted, hardwareId2) {
   const parsed = parseKey(raw);
   if (!parsed) return { ok: false, reason: "This is not a DinePOS licence key. Paste the whole key you were sent." };
-  if (!verify(null, parsed.signed, publicKey, parsed.signature)) return { ok: false, reason: "This licence key is not genuine (its signature does not match)." };
+  const keys = "length" in trusted ? trusted : [{ id: "master", publicKey: trusted }];
+  const kid = parsed.payload.kid ?? "master";
+  const signer = keys.find((k) => k.id === kid);
+  if (!signer || !verify(null, parsed.signed, signer.publicKey, parsed.signature)) return { ok: false, reason: "This licence key is not genuine (its signature does not match)." };
+  if (signer.maxDays !== void 0) {
+    const issued = Date.parse(parsed.payload.issuedAt);
+    const span = Date.parse(parsed.payload.expiresAt) - issued;
+    if (Number.isNaN(issued) || span > signer.maxDays * DAY) {
+      return { ok: false, reason: `This licence key is not valid: keys from DinePOS Cloud last at most ${signer.maxDays} days. Ask for a new key.` };
+    }
+  }
   if (parsed.payload.hardwareId !== hardwareId2) {
     return { ok: false, reason: `This licence key is for another computer (${parsed.payload.hardwareId}); this one is ${hardwareId2}.` };
   }
@@ -82936,8 +82947,12 @@ function licenceStatus(verified, now, hardwareId2) {
   const daysLeft = Math.ceil((expires - now.getTime()) / DAY);
   const base = { licensee: p.licensee, expiresAt: p.expiresAt, daysLeft, seats: p.seats, hardwareId: hardwareId2 };
   if (now.getTime() < expires) {
-    if (daysLeft <= WARN_DAYS) return { ...base, state: "expiring", canOpenDay: true, message: `The licence ends on ${dateText(p.expiresAt)} (${daysLeft} day${daysLeft === 1 ? "" : "s"} left). Renew it in time.` };
-    return { ...base, state: "ok", canOpenDay: true, message: `Licensed to ${p.licensee} until ${dateText(p.expiresAt)}.` };
+    const trial = Array.isArray(p.features) && p.features.includes("trial");
+    const left = `${daysLeft} day${daysLeft === 1 ? "" : "s"} left`;
+    if (daysLeft <= (trial ? TRIAL_WARN_DAYS : WARN_DAYS)) {
+      return { ...base, state: "expiring", canOpenDay: true, message: trial ? `The free trial ends on ${dateText(p.expiresAt)} (${left}). Choose a plan in your DinePOS account to keep billing.` : `The licence ends on ${dateText(p.expiresAt)} (${left}). Renew it in time.` };
+    }
+    return { ...base, state: "ok", canOpenDay: true, message: trial ? `Free trial until ${dateText(p.expiresAt)} (${left}).` : `Licensed to ${p.licensee} until ${dateText(p.expiresAt)}.` };
   }
   const graceEnds = new Date(expires + GRACE_DAYS * DAY).toISOString();
   if (now.getTime() < Date.parse(graceEnds)) {
@@ -82966,8 +82981,10 @@ function effectiveNow(db, now) {
   return new Date(lastMs);
 }
 function createLicenceGate(opts) {
-  const key = typeof opts.publicKey === "string" ? publicKeyFrom(opts.publicKey) : opts.publicKey;
-  const verify3 = (raw) => verifyKey(raw, key, opts.hardwareId);
+  const configs = opts.keys ?? (opts.publicKey ? [{ id: "master", publicKey: opts.publicKey }] : []);
+  if (!configs.length) throw new Error("createLicenceGate: no trusted key");
+  const keys = configs.map((k) => ({ id: k.id, publicKey: typeof k.publicKey === "string" ? publicKeyFrom(k.publicKey) : k.publicKey, ...k.maxDays !== void 0 ? { maxDays: k.maxDays } : {} }));
+  const verify3 = (raw) => verifyKey(raw, keys, opts.hardwareId);
   const status = (db, now) => {
     const raw = stored(db).licence_key;
     return licenceStatus(raw ? verify3(raw) : null, effectiveNow(db, now), opts.hardwareId);
@@ -83157,8 +83174,8 @@ function billRequestOf(db, orderId) {
 }
 
 // src/core/execute-command.ts
-function executeCommand(deps, body, actor) {
-  const envelope = parseOrThrow(commandEnvelopeSchema, body, "Invalid command envelope.");
+function executeCommand(deps, body2, actor) {
+  const envelope = parseOrThrow(commandEnvelopeSchema, body2, "Invalid command envelope.");
   const handler = deps.registry.get(envelope.type);
   if (!handler) throw new PosError("VALIDATION", `Unknown command type "${envelope.type}".`, { type: envelope.type });
   if (handler.needsOrder && envelope.orderId === void 0) {
@@ -85562,8 +85579,8 @@ function seatsUsed(db) {
 }
 function licenceRoutes(app, deps) {
   app.get("/v1/licence", (_req, reply) => {
-    const body = { ...deps.licence.status(deps.db, deps.now()), enforced: deps.licence.enforced, used: seatsUsed(deps.db) };
-    void reply.header("cache-control", "no-store").send(body);
+    const body2 = { ...deps.licence.status(deps.db, deps.now()), enforced: deps.licence.enforced, used: seatsUsed(deps.db) };
+    void reply.header("cache-control", "no-store").send(body2);
     return reply;
   });
 }
@@ -87396,7 +87413,7 @@ var CloudTunnel = class {
         if (!this.running) break;
         this.lastError ??= "the cloud closed the connection";
       } catch (e) {
-        this.lastError = e instanceof Error ? e.message : String(e);
+        this.lastError = await this.whyRefused() ?? (e instanceof Error ? e.message : String(e));
       }
       for (const s of this.streams.values()) s.ended(1012);
       this.streams.clear();
@@ -87437,6 +87454,20 @@ var CloudTunnel = class {
         resolve();
       };
     });
+  }
+  /**
+   * After a failed connection: a hub that answers but has no relay (the Tiffin order hub, or an old DinePOS Cloud) is
+   * named as such, so the owner knows to link this outlet to a DinePOS Cloud server rather than wait for it to recover.
+   */
+  async whyRefused() {
+    const link = linkRow(this.o.db);
+    try {
+      const r = await this.o.fetch(`${String(link.hub_url).replace(/\/+$/, "")}/v1/pos/tunnel-info`, { headers: { authorization: `Bearer ${link.device_key ?? ""}` }, signal: AbortSignal.timeout(1e4) });
+      if (r.status === 404) return "this hub is not DinePOS Cloud (it has no device relay): link this outlet to a DinePOS Cloud server";
+      if (r.status === 401 || r.status === 403) return "DinePOS Cloud does not know this outlet: link it again in Cloud sync";
+    } catch {
+    }
+    return null;
   }
   /** The device address for this outlet, as the cloud names it. */
   async fetchInfo() {
@@ -87600,9 +87631,9 @@ function printAgentRoutes(app, deps) {
   });
   app.post("/v1/print-agent/jobs/:jobId", (req, reply) => {
     const agent = agentOf(req);
-    const body = resultSchema.safeParse(req.body);
-    if (!body.success) throw new PosError("VALIDATION", "Send { ok, error }.");
-    const known = deps.agents.result(agent.id, req.params.jobId, body.data.ok, body.data.error ?? null);
+    const body2 = resultSchema.safeParse(req.body);
+    if (!body2.success) throw new PosError("VALIDATION", "Send { ok, error }.");
+    const known = deps.agents.result(agent.id, req.params.jobId, body2.data.ok, body2.data.error ?? null);
     return reply.send({ ok: true, known });
   });
   app.get("/v1/print-agents", (_req, reply) => {
@@ -88170,6 +88201,55 @@ function healthRoutes(app, deps) {
   });
 }
 
+// src/routes/licence-activation.ts
+import { createHash as createHash11 } from "node:crypto";
+var DEFAULT_CLOUD_URL = "https://portal.posinext.com";
+var body = external_exports.object({
+  mode: external_exports.enum(["trial", "signin"]),
+  email: external_exports.string().trim().min(3).max(254),
+  password: external_exports.string().min(1).max(200)
+}).strict();
+function licenceActivationRoutes(app, deps) {
+  const { db, now } = deps;
+  app.post("/v1/licence/activate", async (req) => {
+    requireRight(db, req, "admin", now());
+    const parsed = body.safeParse(req.body);
+    if (!parsed.success) throw new PosError("VALIDATION", "Enter your DinePOS account email and password.");
+    if (!deps.licence.enforced) throw new PosError("INVALID_STATE", "Licences are not checked in a development run.");
+    const link = db.prepare("SELECT hub_url, device_key FROM online_link WHERE id = 1").get();
+    const linked = !!link?.hub_url && !!link.device_key;
+    const cloud = (deps.cloudUrl ?? (linked ? link.hub_url : DEFAULT_CLOUD_URL)).replace(/\/+$/, "");
+    const outlet = db.prepare("SELECT value FROM config WHERE key = 'outlet.name'").pluck().get();
+    const outletName = outlet ? JSON.parse(outlet) : "DinePOS outlet";
+    let res;
+    try {
+      res = await (deps.fetch ?? fetch)(`${cloud}/v1/activate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...parsed.data, hardwareId: deps.licence.hardwareId, outletName, link: !linked }),
+        signal: AbortSignal.timeout(2e4)
+      });
+    } catch {
+      throw new PosError("INVALID_STATE", "DinePOS Cloud could not be reached. Connect this PC to the internet to activate, or paste a licence key below.", { reason: "cloud_unreachable" });
+    }
+    const j = await res.json().catch(() => null);
+    if (!res.ok || !j?.key) {
+      const code = j?.error?.code ?? "CLOUD_ERROR";
+      const message = j?.error?.message ?? "DinePOS Cloud could not activate this PC. Please try again.";
+      throw new PosError(res.status === 401 || res.status === 400 ? "VALIDATION" : "INVALID_STATE", message, { reason: code.toLowerCase() });
+    }
+    const session = resolveSession(db, sessionToken(req), now());
+    const actor = { deviceId: req.deviceId, userId: session.user.id, sessionKey: createHash11("sha256").update(`approval:${sessionToken(req)}`).digest("hex").slice(0, 32) };
+    deps.execute("InstallLicence", { key: j.key }, actor);
+    if (!linked && j.deviceKey && j.store) {
+      deps.execute("SaveOnlineLink", { hubUrl: cloud, deviceKey: j.deviceKey, storeSlug: j.store.slug, storeName: j.store.name }, actor);
+      deps.connector.refresh();
+    }
+    const info = { ...deps.licence.status(db, now()), enforced: true, used: seatsUsed(db) };
+    return { kind: j.kind ?? null, store: j.store ?? null, linked: linked || !!j.deviceKey, licence: info };
+  });
+}
+
 // src/routes/queries.ts
 import { hostname as hostname3 } from "node:os";
 
@@ -88281,8 +88361,8 @@ function queryRoutes(app, deps) {
          WHERE u.active = 1 AND EXISTS (SELECT 1 FROM role_permission p WHERE p.role_id = u.role_id AND p.permission = 'order.create')
          ORDER BY u.name COLLATE NOCASE`
     ).all();
-    const body = { sections: [...byUser.values()], people };
-    void reply.header("cache-control", "no-store").send(body);
+    const body2 = { sections: [...byUser.values()], people };
+    void reply.header("cache-control", "no-store").send(body2);
     return reply;
   });
   app.get("/v1/network", (req, reply) => {
@@ -88412,9 +88492,9 @@ function sessionRoutes(app, deps) {
   const noStore = { "cache-control": "no-store" };
   app.get("/v1/setup-state", (_req, reply) => reply.headers(noStore).send(setupState(db)));
   app.post("/v1/sessions", (req, reply) => {
-    const body = loginSchema.safeParse(req.body);
-    if (!body.success) throw new PosError("VALIDATION", "Choose your name and type your PIN (4 to 6 digits).");
-    return reply.headers(noStore).send(login(db, body.data.userId, body.data.pin, now(), req.deviceId ?? void 0));
+    const body2 = loginSchema.safeParse(req.body);
+    if (!body2.success) throw new PosError("VALIDATION", "Choose your name and type your PIN (4 to 6 digits).");
+    return reply.headers(noStore).send(login(db, body2.data.userId, body2.data.pin, now(), req.deviceId ?? void 0));
   });
   app.get("/v1/session", (req, reply) => reply.headers(noStore).send(resolveSession(db, sessionToken(req), now())));
   app.delete("/v1/session", (req, reply) => {
@@ -88429,12 +88509,12 @@ function sessionRoutes(app, deps) {
   });
   app.post("/v1/bill-preview", (req, reply) => {
     requireRight2(req, "admin");
-    const body = billPreviewSchema.safeParse(req.body);
-    if (!body.success) {
-      throw new PosError("VALIDATION", "Invalid bill settings.", body.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })));
+    const body2 = billPreviewSchema.safeParse(req.body);
+    if (!body2.success) {
+      throw new PosError("VALIDATION", "Invalid bill settings.", body2.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })));
     }
-    const cfg = { ...getConfig(db), ...body.data.config };
-    const { preview } = renderBill(sampleBillDocument(cfg, now(), timeZone), { paper: body.data.widthMm, logo: billLogoBits(cfg) });
+    const cfg = { ...getConfig(db), ...body2.data.config };
+    const { preview } = renderBill(sampleBillDocument(cfg, now(), timeZone), { paper: body2.data.widthMm, logo: billLogoBits(cfg) });
     return reply.headers(noStore).send({ preview });
   });
   app.get("/v1/staff", (req, reply) => {
@@ -88671,14 +88751,14 @@ function deviceRoutes(app, deps) {
   const { db, now } = deps;
   const noStore = { "cache-control": "no-store" };
   app.post("/v1/pairing-requests", (req, reply) => {
-    const body = requestBody.safeParse(req.body);
-    if (!body.success) throw new PosError("VALIDATION", "Give this device a name (up to 40 characters).");
-    return reply.headers(noStore).send(createPairingRequest(db, body.data, req.ip ?? null, now()));
+    const body2 = requestBody.safeParse(req.body);
+    if (!body2.success) throw new PosError("VALIDATION", "Give this device a name (up to 40 characters).");
+    return reply.headers(noStore).send(createPairingRequest(db, body2.data, req.ip ?? null, now()));
   });
   app.post("/v1/pairing-requests/:id/collect", (req, reply) => {
-    const body = collectBody.safeParse(req.body);
-    if (!body.success) throw new PosError("VALIDATION", "Missing pairing secret.");
-    return reply.headers(noStore).send(pollPairingRequest(db, req.params.id, body.data.secret, now()));
+    const body2 = collectBody.safeParse(req.body);
+    if (!body2.success) throw new PosError("VALIDATION", "Missing pairing secret.");
+    return reply.headers(noStore).send(pollPairingRequest(db, req.params.id, body2.data.secret, now()));
   });
   app.get("/v1/device", (req, reply) => {
     const id = req.deviceId ?? MASTER_DEVICE_ID;
@@ -89434,8 +89514,10 @@ var TYPES3 = {
 var CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:; font-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'";
 function defaultWebDir(name4) {
   const here = path8.dirname(fileURLToPath2(import.meta.url));
-  return IS_BUNDLED ? path8.join(here, "web", name4) : path8.resolve(here, "..", "..", "..", name4, "dist");
+  if (IS_BUNDLED) return path8.join(here, "web", name4);
+  return name4 === "pos" ? path8.resolve(here, "..", "..", "..", "desktop", "dist-renderer") : path8.resolve(here, "..", "..", "..", name4, "dist");
 }
+var isWebAppPath = (url2) => ["captain", "kds", "pos"].some((n2) => url2 === `/${n2}` || url2.startsWith(`/${n2}/`));
 function webAppRoutes(app, name4, dir) {
   const prefix = `/${name4}`;
   const send = (reply, file2, cache) => reply.header("content-type", TYPES3[path8.extname(file2).toLowerCase()] ?? "application/octet-stream").header("cache-control", cache).header("content-security-policy", CSP).header("x-content-type-options", "nosniff").header("referrer-policy", "no-referrer").send(readFileSync5(file2));
@@ -89443,9 +89525,10 @@ function webAppRoutes(app, name4, dir) {
   app.get(`${prefix}/*`, (req, reply) => {
     const index = path8.join(dir, "index.html");
     if (!existsSync2(index)) {
-      return reply.status(404).type("text/plain; charset=utf-8").send(`The ${name4} app is not built on this server (npm run build -w @dinepos/${name4}).`);
+      return reply.status(404).type("text/plain; charset=utf-8").send(`The ${name4} app is not built on this server (npm run build -w @dinepos/${name4 === "pos" ? "desktop" : name4}).`);
     }
     const rel = decodeURIComponent(req.params["*"] || "index.html");
+    if (name4 === "pos" && rel.startsWith("server.")) return reply.status(404).send();
     const file2 = path8.resolve(dir, rel);
     if (file2 !== dir && !file2.startsWith(dir + path8.sep)) return reply.status(404).send();
     if (existsSync2(file2) && statSync3(file2).isFile()) {
@@ -89486,15 +89569,15 @@ function backupRoutes(app, deps) {
   });
   app.post("/v1/admin/restore", async (req, reply) => {
     requireRight(db, req, "users.manage", now());
-    const body = restoreBody.safeParse(req.body);
-    if (!body.success) throw new PosError("VALIDATION", "Choose a backup to restore.");
+    const body2 = restoreBody.safeParse(req.body);
+    if (!body2.success) throw new PosError("VALIDATION", "Choose a backup to restore.");
     const pin = req.headers["x-manager-pin"];
     const token = sessionToken(req);
     const approver = approveWithPin(db, typeof pin === "string" ? pin : null, { right: "users.manage" }, token ? tokenHash(token) : "no-session", now().getTime(), "Restoring needs the Owner's PIN.");
     const safety = await backups.run("restore");
     let pending;
     try {
-      pending = stageRestore(deps.dataDir, backups.dir, body.data.file, approver, now());
+      pending = stageRestore(deps.dataDir, backups.dir, body2.data.file, approver, now());
     } catch (e) {
       throw new PosError("VALIDATION", e instanceof Error ? e.message : String(e));
     }
@@ -89574,7 +89657,7 @@ function buildApp(deps) {
     app.addHook("onRequest", (req, _reply, done) => {
       const url2 = req.url.split("?")[0];
       if (req.method === "OPTIONS" || url2 === "/v1/health" || url2 === "/v1/stream" || url2.startsWith("/v1/pairing-requests")) return done();
-      if (url2 === "/captain" || url2.startsWith("/captain/") || url2 === "/kds" || url2.startsWith("/kds/")) return done();
+      if (isWebAppPath(url2)) return done();
       if (url2.startsWith("/a/")) return done();
       if (url2.startsWith("/v1/print-agent/")) return done();
       if (hostKey && isHostKey(req.headers[HOST_KEY_HEADER], hostKey)) {
@@ -89651,8 +89734,8 @@ function buildApp(deps) {
   const guestRelay = async (r) => {
     const m = /^\/a\/([a-z][a-z0-9]{1,19})\//.exec(String(r.path));
     if (!m || r.path.includes("..") || r.path.includes("/_pkg/") || !addons?.hubAllowed(m[1])) {
-      const body = { ok: false, error: { code: "NOT_FOUND", message: "This page is not available through the internet. Please ask a member of staff." } };
-      return { status: 404, contentType: "application/json; charset=utf-8", cacheControl: "no-store", bodyBase64: Buffer.from(JSON.stringify(body)).toString("base64") };
+      const body2 = { ok: false, error: { code: "NOT_FOUND", message: "This page is not available through the internet. Please ask a member of staff." } };
+      return { status: 404, contentType: "application/json; charset=utf-8", cacheControl: "no-store", bodyBase64: Buffer.from(JSON.stringify(body2)).toString("base64") };
     }
     const headers = { [RELAY_HEADER]: `${relaySecret} ${String(r.ip).replace(/\s/g, "")}` };
     if (r.method === "POST") headers["content-type"] = "application/json";
@@ -89663,7 +89746,7 @@ function buildApp(deps) {
   commandRoutes(app, executeDeps, auth);
   if (addons) {
     addons.bind({
-      execute: (body, actor) => executeCommand(executeDeps, body, actor),
+      execute: (body2, actor) => executeCommand(executeDeps, body2, actor),
       floor: () => getFloor(db, now(), timeZone, () => addons.badges()),
       menu: () => getMenu(db),
       order: (orderId) => getOrderSnapshot(db, orderId) ?? null,
@@ -89717,6 +89800,8 @@ function buildApp(deps) {
     agents.close();
   });
   onlineRoutes(app, { db, now, connector: online, execute, ...deps.onlineFetch ? { fetch: deps.onlineFetch } : {} });
+  const cloudUrl = deps.cloudUrl ?? process.env.DINEPOS_CLOUD_URL;
+  licenceActivationRoutes(app, { db, now, licence: licenceGate, execute, connector: online, ...cloudUrl ? { cloudUrl } : {}, ...deps.onlineFetch ? { fetch: deps.onlineFetch } : {} });
   syncRoutes(app, { db, now, agent: sync });
   sessionRoutes(app, { db, now, timeZone });
   stockRoutes(app, { db, now });
@@ -89725,6 +89810,7 @@ function buildApp(deps) {
   reportRoutes(app, { db, now, timeZone });
   webAppRoutes(app, "captain", deps.captainDir ?? defaultWebDir("captain"));
   webAppRoutes(app, "kds", deps.kdsDir ?? defaultWebDir("kds"));
+  webAppRoutes(app, "pos", deps.posDir ?? defaultWebDir("pos"));
   if (deps.backups) backupRoutes(app, { db, now, timeZone, dataDir: deps.backups.dataDir, backups: deps.backups.scheduler, requestRestart: deps.backups.requestRestart });
   streamRoutes(app, hub, allowedOrigins);
   return Object.assign(app, { realtime: hub, online, sync, guestRelay, cloud });
@@ -89735,7 +89821,7 @@ function errorBody(code, message, details) {
 
 // src/licence/hardware.ts
 import { execFileSync } from "node:child_process";
-import { createHash as createHash11 } from "node:crypto";
+import { createHash as createHash12 } from "node:crypto";
 import { readFileSync as readFileSync6 } from "node:fs";
 import { hostname as hostname4, platform } from "node:os";
 var run = (file2, args) => {
@@ -89760,7 +89846,7 @@ function machineIdentifiers() {
   return [machineId || hostname4()];
 }
 function formatHardwareId(identifiers) {
-  const hex3 = createHash11("sha256").update(`dinepos-hw:${identifiers.join("|")}`).digest("hex").slice(0, 20).toUpperCase();
+  const hex3 = createHash12("sha256").update(`dinepos-hw:${identifiers.join("|")}`).digest("hex").slice(0, 20).toUpperCase();
   return hex3.match(/.{4}/g).join("-");
 }
 function hostedHardwareId(outletId, identifiers = machineIdentifiers()) {
@@ -89774,13 +89860,23 @@ function hardwareId() {
 
 // src/licence/public-key.ts
 var LICENCE_PUBLIC_KEY = "MCowBQYDK2VwAyEAopGT8UHDwerHs5P/WX78hWGdke5+r9pA/d4Qg611Ujc=";
+var CLOUD_LICENCE_PUBLIC_KEY = "MCowBQYDK2VwAyEAavKaSo70TYmFgYVeHHaqrNsT9+Jqd0cCyxGQv/2V/38=";
+var CLOUD_KEY_MAX_DAYS = 400;
+var TRUSTED_LICENCE_KEYS = [
+  { id: "master", publicKey: LICENCE_PUBLIC_KEY },
+  { id: "cloud", publicKey: CLOUD_LICENCE_PUBLIC_KEY, maxDays: CLOUD_KEY_MAX_DAYS }
+];
 
 // src/licence/from-env.ts
 function licenceGateFor(env = process.env, bundled = IS_BUNDLED) {
   const hosted = env.DINEPOS_HOST_KEY && env.DINEPOS_HOSTED_OUTLET ? hostedHardwareId(env.DINEPOS_HOSTED_OUTLET) : null;
-  if (bundled) return createLicenceGate({ publicKey: LICENCE_PUBLIC_KEY, hardwareId: hosted ?? hardwareId() });
+  if (bundled) return createLicenceGate({ keys: TRUSTED_LICENCE_KEYS, hardwareId: hosted ?? hardwareId() });
   const testKey = env.DINEPOS_LICENCE_PUBLIC_KEY;
-  if (testKey) return createLicenceGate({ publicKey: testKey, hardwareId: env.DINEPOS_HARDWARE_ID || hardwareId() });
+  const testCloud = env.DINEPOS_CLOUD_LICENCE_PUBLIC_KEY;
+  if (testKey || testCloud) {
+    const keys = [...testKey ? [{ id: "master", publicKey: testKey }] : [], ...testCloud ? [{ id: "cloud", publicKey: testCloud, maxDays: CLOUD_KEY_MAX_DAYS }] : []];
+    return createLicenceGate({ keys, hardwareId: env.DINEPOS_HARDWARE_ID || hosted || hardwareId() });
+  }
   return unenforcedGate(env.DINEPOS_HARDWARE_ID || "DEV");
 }
 

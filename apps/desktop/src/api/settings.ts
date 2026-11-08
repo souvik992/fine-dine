@@ -23,8 +23,23 @@ export interface SettingsStore {
   setItem(key: string, value: string): void;
 }
 
+/**
+ * P7-04: the terminal served by an outlet server at /pos/ (the browser demo): that server is the one to use, whatever
+ * was saved. Null in the Electron app (app://) and in development.
+ */
+export function servedByOutlet(loc: { protocol: string; pathname: string; origin: string }): string | null {
+  return /^https?:$/.test(loc.protocol) && (loc.pathname === '/pos' || loc.pathname.startsWith('/pos/')) ? loc.origin : null;
+}
+
+/** P7-04: a device token handed over in the address fragment (`#device=<token>`; never sent to any server). */
+export function deviceTokenFromHash(hash: string): string | null {
+  const t = new URLSearchParams(hash.replace(/^#/, '')).get('device');
+  return t && /^[A-Za-z0-9_-]{20,200}$/.test(t) ? t : null;
+}
+
 /** A `?server=` start parameter (installer, tests) wins for this session; otherwise the saved value. */
-export function loadServerUrl(store: SettingsStore | undefined, search: string): string {
+export function loadServerUrl(store: SettingsStore | undefined, search: string, servedBy?: string | null): string {
+  if (servedBy) return servedBy;
   const fromQuery = new URLSearchParams(search).get('server');
   if (fromQuery) {
     try {

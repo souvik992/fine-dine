@@ -17,6 +17,11 @@ import { checkSettings, SETTING_DEFAULTS } from './settings.ts';
 import type { HubSettings } from './settings.ts';
 import { checkSite, readSite } from './site.ts';
 import { osrmRoadKm } from './routing.ts';
+import { Accounts } from './accounts.ts';
+import { Licences, loadSigningKey } from './licences.ts';
+import type { KeyObject } from 'node:crypto';
+import { logMailer } from './mailer.ts';
+import type { Mailer } from './mailer.ts';
 
 /**
  * The online order hub: stores and their paired POS devices, published menus, customer orders, and the numbered event
@@ -48,6 +53,12 @@ export interface HubOptions {
   /** Backups kept per store (default 30) and the largest accepted upload in bytes (default 1 GB). */
   backupKeep?: number;
   backupMaxBytes?: number;
+  /** P7-01: email for customer accounts (default: the log; sign-up stays closed unless allowLogMailer). */
+  mailer?: Mailer;
+  /** Accept the log mailer for sign-up (development, HUB_DEV_MAIL=1). */
+  allowLogMailer?: boolean;
+  /** P7-02: the cloud's licence signing key (Ed25519 private: a KeyObject, PEM text or a file path). Not set: no keys signed here. */
+  licenceSigningKey?: KeyObject | string;
 }
 export interface DeviceRef { deviceId: string; storeId: string; slug: string }
 
@@ -56,6 +67,8 @@ export interface StoreRow { id: string; slug: string; name: string; menu_json: s
 interface OrderRow { id: string; store_id: string; number: string; state: OrderState; data_json: string; access_hash: string; accept_by: number | null }
 
 const SLUG = /^[a-z0-9][a-z0-9-]{2,40}$/;
+/** Never a store address: outlets are at <store>.<cloud>, and these names are the cloud's own (portal.posinext.com, …). */
+export const RESERVED_SLUGS = new Set(['portal', 'www', 'app', 'api', 'admin', 'mail', 'status', 'help', 'support', 'docs', 'blog', 'demo', 'cloud']);
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 /** A website builder sign-in lasts 30 days. */
 const SITE_SESSION_MS = 30 * 86_400_000;
@@ -100,6 +113,10 @@ export class Hub {
   backups: BackupStore;
   /** DinePOS outlets: sales sync up, licence renewals down */
   sync: SalesSync;
+  /** P7-01: customer accounts (the portal) */
+  accounts: Accounts;
+  /** P7-02: licence keys signed by this cloud */
+  licences: Licences;
   private opts: HubOptions;
   /** open POS event streams per store, and when the last one closed */
   private streams = new Map<string, number>();
@@ -114,6 +131,10 @@ export class Hub {
     this.bus.setMaxListeners(0);
     this.backups = new BackupStore({ dir: opts.backupDir ?? join(dirname(opts.dbPath), 'backups'), keep: opts.backupKeep, maxBytes: opts.backupMaxBytes, now: this.now });
     this.sync = new SalesSync(this.db, this.now);
+    const log = opts.log ?? { info: () => undefined, warn: () => undefined };
+    const signing = opts.licenceSigningKey === undefined ? null : typeof opts.licenceSigningKey === 'string' ? loadSigningKey(opts.licenceSigningKey) : opts.licenceSigningKey;
+    this.licences = new Licences(this.db, this.now, this.sync, signing);
+    this.accounts = new Accounts(this.db, this.now, { mailer: opts.mailer ?? logMailer(log), allowLogMailer: opts.allowLogMailer, log });
   }
   close() { this.db.close(); }
 
@@ -121,6 +142,7 @@ export class Hub {
 
   createStore(slug: string, name: string) {
     if (!SLUG.test(slug)) throw new HubError('VALIDATION', 'The store address must be 3-41 lowercase letters, digits or dashes.');
+    if (RESERVED_SLUGS.has(slug)) throw new HubError('SLUG_TAKEN', 'That address is kept for DinePOS itself. Choose another.', 409);
     if (!name.trim() || name.length > 80) throw new HubError('VALIDATION', 'Enter the store name.');
     if (one(this.db, 'SELECT 1 FROM store WHERE slug = ? UNION ALL SELECT 1 FROM brand WHERE slug = ?', slug, slug)) throw new HubError('SLUG_TAKEN', 'That address is already used by a store or a brand.', 409);
     const id = randomUUID();
@@ -769,6 +791,7 @@ export class Hub {
       try { this.move(r.store_id, r.id, 'PAYMENT_FAILED', 'hub', {}); n++; } catch { /* paid meanwhile */ }
     }
     exec(this.db, 'DELETE FROM order_attempt WHERE at < ?', now - ATTEMPT_DAYS * 86_400_000);
+    this.accounts.sweep();
     return n;
   }
 

@@ -100,6 +100,16 @@ Built in P2-09 (product owner's decisions 2026-11-03: **no key → billing canno
 - `/v1/health` carries `licence { state, canOpenDay, message, daysLeft }` (terminals show a warning on every screen,
   the sign-in screen included); `GET /v1/licence` the details, hardware id and seats in use.
 - Not tamper-proof (a determined person can patch a local program); it keeps honest outlets honest.
+- **Keys signed by DinePOS Cloud (P7-02, ADR-0006):** the app trusts two public keys (`public-key.ts`): `master` (the
+  vendor's offline key, no limit) and `cloud` (DinePOS Cloud's own key, only for keys of at most 400 days). The key
+  says which one signed it in `kid`; no `kid` means `master`, so every earlier key keeps working. An unknown `kid`, or a
+  cloud key over 400 days, is `invalid`. Development runs: `DINEPOS_CLOUD_LICENCE_PUBLIC_KEY` adds a test cloud key.
+- **Activation with a DinePOS account (P7-03):** Settings › Licence › Your DinePOS account: **Start 14-day free trial**
+  or **Sign in and get my licence** (`POST /v1/licence/activate`, right `admin`). The server asks DinePOS Cloud with the
+  email, password and this PC's hardware id, installs the key it gets (`InstallLicence`) and links the outlet to the
+  cloud for renewals (`SaveOnlineLink`). The password is never stored. Without internet the screen says so, and
+  pasting a key still works. Keys with the feature `trial` (cloud trials and browser demos) show as a free trial and
+  warn only in their last 2 days.
 
 ## Backups
 - SQLite online backup API (`db.backup()` in better-sqlite3) every 15 min to `backups/`; retain 7 days

@@ -203,3 +203,45 @@ Each task lists **Read first**, **Build**, and **Accept** (acceptance criteria �
   platforms on, each dish lists them; old settings load with both off. Not yet: the platform's OTP and rider on the
   order card, platform requests (items out of stock, rider check), per-platform menu and prices.
 
+
+## Phase 7 — Accounts, demos, automatic licences, billing (ADR-0006)
+
+Added 2026-11-07 at the product owner's request: the product website sells DinePOS with no manual steps. Read first
+for every task: `docs/adr/0006-accounts-trials-billing.md`, `docs/07-security-licensing.md` (Licence),
+`cloud/hub/README.md`, `cloud/hub/src/db.ts`, `cloud/hub/src/http.ts`.
+
+- [x] **P7-01 Customer accounts** (`cloud/hub/src/accounts.ts`, `src/mailer.ts`, `public/portal.html` served at `/signup`, `/login`, `/forgot`, `/app`; built 2026-11-07, billing address and state columns come with P7-05/P7-06).
+  Tables `account`, `account_user`, `account_session`, `email_code`, `account_store`. Sign up (business name, name,
+  email, phone, password) → verify the email with a 6-digit code → signed in. Log in, log out, forgot password,
+  change password. Mailer interface with a development driver (the code goes to the log). The portal shell shows the
+  account. The admin page lists accounts. Accept: duplicate email refused; an unverified user cannot reach the
+  portal; 5 wrong codes lock that code; a password reset ends all sessions; the password is never stored or logged in
+  clear; sign-up rate limited per IP.
+- [x] **P7-02 Cloud signing key + licence grants** (built 2026-11-07: `cloud/hub/src/licences.ts`; key pair in the keygen folder, imported on the server). The cloud key pair (`npm run admin -- cloud-key init`). DinePOS
+  server trusts `master` + `cloud` public keys (`kid`; cloud keys at most 400 days). Table `licence_grant`
+  (append-only). The admin page can issue or revoke a grant for an account's store, and the grant is put in the store's
+  licence slot. Accept: an existing key (no `kid`) still verifies; a cloud key over 400 days is `invalid`; a key
+  signed by an unknown `kid` is `invalid`; a grant reaches the outlet through the hourly renewal.
+- [x] **P7-03 Windows trial + activation** (built 2026-11-07: cloud `src/activation.ts`, server `POST /v1/licence/activate`, Settings › Licence › Your DinePOS account; trial and demo keys carry the feature `trial` and warn only in their last 2 days). `POST /v1/activate` (email + password or a one-time portal code,
+  hardware id, outlet name) links or creates the store, pairs the device key and returns a key. Table `trial_claim`.
+  Desktop: Settings › Licence and the no-licence screen get "Sign in to your account" and "Start free trial". Accept:
+  a 14-day key with trial seats installs and opens the day; a second trial for the same PC, email or phone is refused
+  with a clear message; activation without internet shows "Connect to the internet to activate" and the paste-key path
+  still works.
+- [x] **P7-04 Instant browser demo** (built 2026-11-07: `cloud/hub/src/demos.ts`; the terminal served at `/pos/`; the seed in `cloud/outlet-server/demo-seed.json`; started from the portal). `/demo` makes a hosted outlet from a demo template (menu, tables, staff),
+  licensed by the cloud key, opened in the browser terminal; deleted after 72 h; at most N at once (a setting). Table
+  `demo_request`. Accept: a verified visitor gets a working floor and billing screen within 30 s; the demo shows its
+  PINs; it is removed after expiry, together with its database; at the cap the visitor is offered the Windows trial.
+- [ ] **P7-05 Plans and Razorpay payments**. Tables `plan`, `plan_price`, `subscription`, `payment`, `invoice`,
+  `invoice_line`. Admin edits plans and add-ons; the portal Billing page; Razorpay order made on the server; payment
+  confirmed by a verified signature or webhook, idempotent; one transaction for payment → invoice (gap-free number per
+  FY, GST) → period → grant → licence slot. Blocked on the GST and price decisions in ADR-0006. Accept: a tampered
+  amount or signature is refused; a replayed webhook changes nothing; a paid renewal reaches the outlet; invoice
+  numbers have no gaps; an issued invoice cannot change.
+- [ ] **P7-06 Portal features + vendor console**. Portal: Outlets, Licences (seats in use, move to a new PC once per
+  30 days), Team (invite, roles owner/admin/billing), Downloads, Account (GSTIN, address). Admin: demo requests and
+  conversion, extend trial, coupons, failed renewals, invoice export (CSV). Accept: a `billing` user cannot move a
+  licence; moving a licence revokes the old grant and signs one for the new PC; an invite link works once.
+- [ ] **P7-07 Product website** served by the cloud: home, features, pricing (from `plan`), demo, sign-up, terms,
+  privacy, refund and cancellation; original design; works on a phone. Accept: the pricing page shows the plans from
+  the admin page; every page loads without the admin key; the legal pages are linked from the footer and checkout.

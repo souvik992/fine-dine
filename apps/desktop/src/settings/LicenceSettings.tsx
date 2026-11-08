@@ -1,6 +1,7 @@
 import type { LicenceInfo } from '@dinepos/shared';
+import { ApiError } from '@dinepos/client';
 import { useQuery } from '@tanstack/react-query';
-import { Copy, KeyRound, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Copy, KeyRound, LogIn, ShieldAlert, ShieldCheck, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { useApp } from '../app-context.js';
 import { ErrorText, SectionHeader, useSave } from './common.js';
@@ -14,6 +15,75 @@ const STATE_TEXT: Record<LicenceInfo['state'], string> = {
   grace: 'Ended: grace period',
   expired: 'Ended',
 };
+
+/** The DinePOS account portal (P7-01), where customers sign up and manage plans. */
+const PORTAL = 'https://portal.posinext.com';
+
+/**
+ * P7-03: activate this PC with a DinePOS account: a 14-day free trial, or the key the account already has for this PC.
+ * The outlet server talks to DinePOS Cloud; the password is never stored.
+ */
+function AccountActivation({ onDone }: { onDone: () => Promise<unknown> }) {
+  const { api } = useApp();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState<'trial' | 'signin' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+  const go = async (mode: 'trial' | 'signin') => {
+    setBusy(mode);
+    setError(null);
+    setDone(null);
+    try {
+      const r = await api.send<{ kind: string | null; licence: LicenceInfo }>('POST', '/v1/licence/activate', { mode, email: email.trim(), password });
+      setPassword('');
+      setDone(r.kind === 'trial' ? `Free trial started: ${r.licence.message}` : `Licence installed: ${r.licence.message}`);
+      await onDone();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not reach the outlet server.');
+    } finally {
+      setBusy(null);
+    }
+  };
+  const ready = email.trim().length > 3 && password.length > 0 && busy === null;
+  return (
+    <div className="mb-6 rounded-xl border border-border bg-card p-4" data-testid="licence-account">
+      <p className="font-semibold">Your DinePOS account</p>
+      <p className="mb-3 text-sm text-muted-foreground">
+        Sign in to start a 14-day free trial on this PC, or to get the licence your account already has for it. No account yet? Create one at{' '}
+        <span className="font-semibold text-foreground">portal.posinext.com</span>.
+      </p>
+      <form
+        className="grid gap-3 sm:grid-cols-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (ready) void go('signin');
+        }}
+      >
+        <label className="block text-sm font-semibold">
+          Email
+          <input className="input mt-1" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Account email" />
+        </label>
+        <label className="block text-sm font-semibold">
+          Password
+          <input className="input mt-1" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} aria-label="Account password" />
+        </label>
+        <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+          <button type="button" className="btn btn-primary" disabled={!ready} onClick={() => void go('trial')}>
+            <Sparkles className="h-4 w-4" /> {busy === 'trial' ? 'Starting…' : 'Start 14-day free trial'}
+          </button>
+          <button type="submit" className="btn" disabled={!ready}>
+            <LogIn className="h-4 w-4" /> {busy === 'signin' ? 'Signing in…' : 'Sign in and get my licence'}
+          </button>
+          <span className="text-xs text-muted-foreground">Needs internet once. Billing then works offline.</span>
+        </div>
+      </form>
+      <ErrorText error={error} />
+      {done ? <p className="mt-3 text-sm font-semibold text-ok">{done}</p> : null}
+      <p className="sr-only">{PORTAL}</p>
+    </div>
+  );
+}
 
 /**
  * Licence (P2-09, docs/07): the status, this PC's hardware id (send it to get a key), seats in use, and installing a
@@ -81,6 +151,8 @@ export function LicenceSettings() {
         <span className="text-sm text-muted-foreground">Send this to your DinePOS supplier to get or renew a key.</span>
       </div>
 
+      {l.enforced ? <AccountActivation onDone={() => info.refetch()} /> : null}
+
       {l.enforced ? (
         <form
           onSubmit={(e) => {
@@ -95,7 +167,7 @@ export function LicenceSettings() {
           }}
         >
           <label className="block text-sm font-semibold">
-            Licence key
+            Or paste a licence key
             <textarea
               className="input mt-1 h-28 resize-y py-2 font-mono text-xs"
               placeholder="Paste the whole key you were sent"

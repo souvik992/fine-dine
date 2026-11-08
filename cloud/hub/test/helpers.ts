@@ -1,11 +1,17 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Server } from 'node:http';
 import { Hub } from '../src/hub.ts';
 import { createHubServer } from '../src/http.ts';
+import type { HttpOptions } from '../src/http.ts';
+import type { Demos } from '../src/demos.ts';
 import { UrbanPiper } from '../src/urbanpiper.ts';
 import type { Fetcher } from '../src/urbanpiper.ts';
+import type { Mail } from '../src/mailer.ts';
+import { generateKeyPairSync } from 'node:crypto';
+
+/** P7-02: the test cloud's licence signing key pair (the hub signs with the private half). */
+export const TEST_CLOUD_KEY = generateKeyPairSync('ed25519');
 import type { PublishedMenu } from '../../contract/src/menu.ts';
 import { DEFAULT_SERVICEABILITY } from '../../contract/src/serviceability.ts';
 import type { Hours } from '../../contract/src/serviceability.ts';
@@ -32,16 +38,21 @@ export function menu(o: Partial<PublishedMenu> = {}): PublishedMenu {
 
 export interface TestHub {
   hub: Hub; base: string; clock: { t: number }; dir: string; up: UrbanPiper;
+  /** P7-01: every email the hub sent (customer accounts) */
+  mail: Mail[];
+  /** P7-04: the browser demos (when started with a demo option) */
+  demos: Demos | null;
   call(method: string, path: string, o?: { body?: unknown; key?: string; admin?: boolean; idem?: string; token?: string; headers?: Record<string, string> }): Promise<{ status: number; json: any }>;
   close(): Promise<void>;
   restart(): Promise<TestHub>;
 }
 
 /** upFetch: a stand-in UrbanPiper for the hub's calls to it (its outbox is then sent only when a test calls up.pump()). */
-export async function startHub(dir = mkdtempSync(join(tmpdir(), 'hub-test-')), clock = { t: Date.parse('2026-10-16T12:00:00+05:30') }, upFetch?: Fetcher): Promise<TestHub> {
-  const hub = new Hub({ dbPath: join(dir, 'hub.db'), now: () => clock.t, devOtp: true, onlinePayments: false });
+export async function startHub(dir = mkdtempSync(join(tmpdir(), 'hub-test-')), clock = { t: Date.parse('2026-10-16T12:00:00+05:30') }, upFetch?: Fetcher, extra: Partial<HttpOptions> = {}): Promise<TestHub> {
+  const mail: Mail[] = [];
+  const hub = new Hub({ dbPath: join(dir, 'hub.db'), now: () => clock.t, devOtp: true, onlinePayments: false, mailer: { kind: 'test', send: async (m) => { mail.push(m); } }, licenceSigningKey: TEST_CLOUD_KEY.privateKey });
   const up = new UrbanPiper(hub, { fetch: upFetch ?? (async () => { throw new Error('no UrbanPiper in this test'); }), kick: false, allowLocalWebhooks: true });
-  const server: Server = createHubServer(hub, { adminKey: 'admin-test-key', heartbeatMs: 100, urbanpiper: up });
+  const server = createHubServer(hub, { adminKey: 'admin-test-key', heartbeatMs: 100, urbanpiper: up, ...extra });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
   const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   const call: TestHub['call'] = async (method, path, o = {}) => {
@@ -57,7 +68,7 @@ export async function startHub(dir = mkdtempSync(join(tmpdir(), 'hub-test-')), c
     return { status: r.status, json: t ? JSON.parse(t) : null };
   };
   const close = () => new Promise<void>((r) => { server.close(() => r()); server.closeAllConnections(); hub.close(); });
-  const t: TestHub = { hub, base, clock, dir, up, call, close, restart: async () => { await close(); return startHub(dir, clock, upFetch); } };
+  const t: TestHub = { hub, base, clock, dir, up, mail, demos: server.demos, call, close, restart: async () => { await close(); return startHub(dir, clock, upFetch, extra); } };
   return t;
 }
 

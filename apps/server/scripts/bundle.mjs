@@ -5,13 +5,15 @@
 //     migrations/NNNN_*.sql              read at startup next to server.mjs
 //     web/captain/                       the captain phone app, served at /captain (P3-01)
 //     web/kds/                           the kitchen display, served at /kds (P4-02)
+//     web/pos/                           the billing terminal's screens for a browser, served at /pos (P7-04)
+//     demo-seed.json                     (cloud only) the browser demo's sample outlet as commands (P7-04)
 //     node_modules/better-sqlite3/       native SQLite binding (Node-API prebuild, any Node >= 18)
 //     package.json                       { "type": "module" }
 //
 // The installer adds node.exe (pinned Node runtime) and the service wrapper beside these.
 import { execSync } from 'node:child_process';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -54,6 +56,17 @@ cpSync(`${repo}apps/captain/dist`, `${out}web/captain`, { recursive: true, filte
 // The kitchen display (P4-02), served at /kds.
 execSync('npm run build -w @dinepos/kds', { cwd: repo, stdio: 'inherit' });
 cpSync(`${repo}apps/kds/dist`, `${out}web/kds`, { recursive: true, filter: (p) => !p.endsWith('.map') });
+// P7-04: the billing terminal's screens (the Electron app's renderer) for a browser, served at /pos.
+execSync('npx vite build', { cwd: `${repo}apps/desktop`, stdio: 'inherit' });
+cpSync(`${repo}apps/desktop/dist-renderer`, `${out}web/pos`, { recursive: true, filter: (p) => !p.endsWith('.map') && !/[\\/]server\.html$/.test(p) });
+if (cloud) {
+  // P7-04: DinePOS Cloud sends these to a new browser demo outlet as ordinary commands (single writer: the outlet server)
+  const tmp = `${out}.demo-seed.mjs`;
+  await build({ absWorkingDir: root, entryPoints: ['src/seed/demo-seed.ts'], outfile: tmp, bundle: true, platform: 'node', format: 'esm', target: 'node22', alias: { '@dinepos/shared': `${repo}packages/shared/src/index.ts` }, logLevel: 'warning' });
+  const { demoSeed } = await import(pathToFileURL(tmp).href);
+  writeFileSync(`${out}demo-seed.json`, JSON.stringify(demoSeed(), null, 1));
+  rmSync(tmp);
+}
 
 // better-sqlite3: only what runs (no sources, no build tooling), the prebuilds for where it runs.
 const sqlite = `${repo}node_modules/better-sqlite3/`;

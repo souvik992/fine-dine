@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import http from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import net from 'node:net';
@@ -106,6 +106,19 @@ export class HostedOutlets {
     const store = this.hub.store({ slug });
     exec(this.hub.db, 'UPDATE hosted_outlet SET enabled = 0 WHERE store_id = ?', store.id);
     await this.kill(store.id);
+  }
+
+  /**
+   * P7-04: ends a browser demo outlet for good: stops its server, deletes its data folder (database, backups, logs) and
+   * frees its port. Only for demo outlets, which hold no real data.
+   */
+  async remove(slug: string): Promise<void> {
+    const store = this.hub.store({ slug });
+    exec(this.hub.db, 'UPDATE hosted_outlet SET enabled = 0 WHERE store_id = ?', store.id);
+    await this.kill(store.id);
+    this.running.delete(store.id);
+    rmSync(join(this.o.dataRoot, store.id), { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    exec(this.hub.db, 'DELETE FROM hosted_outlet WHERE store_id = ?', store.id);
   }
 
   status(storeId: string): { hosted: boolean; running: boolean; port: number | null; restarts: number; lastExit: string | null; startedAt: number | null } {

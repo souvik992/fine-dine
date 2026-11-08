@@ -2,7 +2,7 @@ import type { LoginResult, Right, SessionInfo } from '@dinepos/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ApiClient, type ApiError } from './api/client.js';
-import { loadDeviceToken, loadServerUrl, saveDeviceToken, saveServerUrl } from './api/settings.js';
+import { deviceTokenFromHash, loadDeviceToken, loadServerUrl, saveDeviceToken, saveServerUrl, servedByOutlet } from './api/settings.js';
 import { StreamClient, streamUrl, type StreamStatus } from './api/stream.js';
 
 /** The signed-in person on this terminal. */
@@ -68,13 +68,21 @@ function loadSession(): Session | null {
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const [serverUrl, setUrl] = useState(() => loadServerUrl(storage(), window.location.search));
+  const [serverUrl, setUrl] = useState(() => loadServerUrl(storage(), window.location.search, servedByOutlet(window.location)));
   const [streamStatus, setStreamStatus] = useState<StreamStatus>('connecting');
   const [session, setSession] = useState<Session | null>(loadSession);
   const [pinRequest, setPinRequest] = useState<PinRequest | null>(null);
   const sessionRef = useRef(session);
   sessionRef.current = session;
-  const [deviceToken, setDeviceTokenState] = useState(() => loadDeviceToken(storage(), serverUrl));
+  const [deviceToken, setDeviceTokenState] = useState(() => {
+    // P7-04: a token handed over in the address (browser demo) is kept like a paired one, then taken off the address
+    const handed = deviceTokenFromHash(window.location.hash);
+    if (handed) {
+      saveDeviceToken(storage(), serverUrl, handed);
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+    return loadDeviceToken(storage(), serverUrl);
+  });
   const deviceRef = useRef(deviceToken);
   deviceRef.current = deviceToken;
   const [needsPairing, setNeedsPairing] = useState(false);

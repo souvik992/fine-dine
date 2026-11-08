@@ -55,7 +55,7 @@ npm run dev
 ```
 
 This prints a connection link for the POS (`http://localhost:4900/connect/<code>`), the hub admin page (`/admin`) with
-an admin key for this run, and a demo ordering page (`/order/demo`). Then:
+an admin key for this run, and a demo ordering page (`/order/sample`). Then:
 
 1. In the POS, open **Settings > Online orders**, turn online orders on, choose Website, and save.
 2. In the **Order hub** card, paste the connection link and press **Connect**.
@@ -154,6 +154,77 @@ owner types the hub address and the code into the POS.
 
 Files live in `backups/<storeId>/` next to `hub.db` (never in the database); the newest 30 backups per store are kept.
 They are not encrypted (the owner's choice, docs/DECISIONS.md), so secure the server and its disk.
+
+## Customer accounts and the portal (P7-01, ADR-0006)
+
+The portal for DinePOS customers, at `portal.posinext.com` (any host name that reaches this cloud works; `portal`,
+`www`, `app`, `api`, `admin` and a few others can never be store addresses). Pages: `/signup`, `/login`, `/forgot`,
+`/app` (one page, `public/portal.html`). The admin page lists accounts under **Accounts**.
+
+Sign up (business name, your name, email, mobile, password) → a 6-digit code by email → verified and signed in.
+- Passwords: scrypt (N=16384, salted), never stored or logged in clear. At least 8 characters.
+- Codes: 10 minutes, 5 wrong tries lock the code (ask for a new one), at most 5 codes an hour per person.
+- Sign-in: an HttpOnly, SameSite=Lax cookie `dp_account` (Secure over https), 30 days, rolling. Only its SHA-256 is
+  stored. Someone whose email is not verified never gets one. A password reset ends every sign-in of that person; a
+  password change ends the others.
+- Limits per IP: sign-up, resend and forgot 5 a minute; sign-in 10; codes 20. 10 wrong passwords for one email lock it
+  for 15 minutes.
+
+| Endpoint | |
+|---|---|
+| `POST /v1/account/signup` | `{businessName, name, email, phone, password}` → `{email, verify: true}`; 409 `EMAIL_TAKEN` |
+| `POST /v1/account/verify` | `{email, code}` → sets the cookie |
+| `POST /v1/account/resend` · `/forgot` | `{email}` → `{ok}` (the same answer for unknown emails) |
+| `POST /v1/account/reset` | `{email, code, password}` → sets the cookie, ends other sign-ins |
+| `POST /v1/account/login` · `/logout` | `{email, password}`; 403 `EMAIL_NOT_VERIFIED` (a new code is sent) |
+| `GET /v1/account/me` | `{user, account, stores}` |
+| `POST /v1/account/password` | `{current, password}` |
+| `GET /v1/account/status` | `{signupOpen}` |
+| `GET /v1/admin/accounts` (admin key) | the newest 500 accounts |
+
+**Email** (`src/mailer.ts`): Brevo, free plan. Set `HUB_BREVO_API_KEY`, `HUB_MAIL_FROM` (a sender verified in Brevo)
+and optionally `HUB_MAIL_FROM_NAME` in `/etc/dinepos-cloud.env`. Without them, sign-up is **closed**. For development,
+`HUB_DEV_MAIL=1` (and `npm run dev`) writes the codes to the log instead.
+
+## Licence keys signed by the cloud (P7-02)
+
+The cloud signs trial, demo and paid keys itself with its own Ed25519 key. The DinePOS app trusts it next to the
+vendor's master key, but only for keys of at most 400 days.
+- **Install the key once** (the private key is in the vendor's keygen folder:
+  `keys/dinepos-cloud-signing-private.pem`). Copy it to the server, then run
+  `sudo -u dinepos-cloud npm run admin -- cloud-key import /path/to/dinepos-cloud-signing-private.pem`, delete the
+  copied file, and restart the service. `npm run admin -- cloud-key public` must print the same value as
+  `CLOUD_LICENCE_PUBLIC_KEY` in `apps/server/src/licence/public-key.ts`.
+- Every key signed here is a `licence_grant` row (append-only: only a revoke can be recorded, once). A grant is put in
+  the store's licence slot, so the outlet installs it within an hour. Revoking takes it off the slot; a key an outlet
+  already installed keeps working until it ends.
+- Admin page › a store › Licence: **Keys signed by this cloud** (sign one for a hardware id, 1 to 400 days, seats;
+  revoke). API: `GET`/`POST /v1/admin/stores/<slug>/grants`, `POST /v1/admin/grants/<id>/revoke`,
+  `GET /v1/admin/licence-signing`.
+
+## Windows trial and activation (P7-03)
+
+DinePOS on a PC: **Settings › Licence › Your DinePOS account**. The outlet server calls `POST /v1/activate`
+`{email, password, hardwareId, outletName, mode: "trial" | "signin", link}` (10 a minute per IP):
+- `trial`: a 14-day key (1 terminal, 1 captain phone, 1 kitchen screen). Each PC, email and mobile gets one trial
+  (`trial_claim`). The first activation makes the account's outlet (`account_store`) and, with `link`, pairs it with
+  this cloud, so renewals and paid keys arrive by themselves.
+- `signin`: the key the account already has for this PC (after a reinstall); otherwise `NO_LICENCE`.
+- The same password check as the portal (wrong passwords lock the email for 15 minutes; an unverified email gets a
+  new code).
+
+## Browser demo (P7-04)
+
+A signed-in portal user presses **Start the browser demo** (portal › account page). In about 3 to 30 seconds they get a
+sample restaurant, run here as a hosted outlet (`demo-xxxxxx`). It has 12 tables, 30 dishes, sample printers, and
+staff whose PINs are shown on the page (owner 1234, manager 2345, cashier 1111, captain 3333). **Open the demo
+terminal** opens the real billing screens in the browser, already paired. Each demo has a 3-day licence signed by
+this cloud and is deleted after 72 hours.
+
+Needs: hosted outlets (`cloud/outlet-server`, which holds `web/pos` and `demo-seed.json`), the signing key above, and a
+device domain (`HUB_DEVICE_DOMAIN` or the host of `HUB_PUBLIC_URL`), with wildcard DNS for `*.<domain>`.
+`HUB_MAX_DEMOS` (default 10) caps how many run at once. Each one is a DinePOS server, about 60 to 80 MB of memory, so
+size the instance for it. `GET`/`POST /v1/account/demo`, `GET /v1/admin/demos`.
 
 ## DinePOS outlets: sales sync and licence renewals
 

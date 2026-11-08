@@ -6,8 +6,11 @@
 //   npm run admin -- list
 //   npm run admin -- revoke-device <deviceId>
 //   npm run admin -- site-password <slug>                 -> a new password for the store's website builder (/admin)
+//   npm run admin -- cloud-key import <file.pem>          -> P7-02: install the licence signing key (from the keygen folder)
+//   npm run admin -- cloud-key public                     -> the installed signing key's public half (must match the app's)
 import { join } from 'node:path';
-import { mkdirSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { loadSigningKey, publicKeyBase64 } from '../src/licences.ts';
 import { Hub, HubError } from '../src/hub.ts';
 import { many } from '../src/db.ts';
 
@@ -32,8 +35,19 @@ try {
     hub.revokeDevice(a); console.log(`Device ${a} can no longer connect.`);
   } else if (cmd === 'site-password' && a) {
     console.log(`Website builder password for ${a}: ${hub.newSitePassword(a).password}\n(The old one no longer works. Sign in at the website's address with /admin at the end.)`);
+  } else if (cmd === 'cloud-key' && a === 'import' && b) {
+    const key = loadSigningKey(b); // checks it is an Ed25519 private key
+    const to = process.env.HUB_LICENCE_SIGNING_KEY_FILE || join(dir, 'licence-signing-key.pem');
+    if (existsSync(to)) throw new Error(`A signing key is already installed at ${to}. Remove it first if you really mean to replace it.`);
+    copyFileSync(b, to); chmodSync(to, 0o600);
+    console.log(`Licence signing key installed at ${to}.
+Public key: ${publicKeyBase64(key)}
+It must equal CLOUD_LICENCE_PUBLIC_KEY in apps/server/src/licence/public-key.ts. Restart the cloud: sudo systemctl restart dinepos-cloud`);
+  } else if (cmd === 'cloud-key' && a === 'public') {
+    const f = process.env.HUB_LICENCE_SIGNING_KEY_FILE || join(dir, 'licence-signing-key.pem');
+    console.log(existsSync(f) ? publicKeyBase64(loadSigningKey(f)) : `No signing key at ${f}.`);
   } else {
-    console.log('Commands: create-store <slug> "<name>" | pairing-code <slug> | list | revoke-device <deviceId> | site-password <slug>');
+    console.log('Commands: create-store <slug> "<name>" | pairing-code <slug> | list | revoke-device <deviceId> | site-password <slug> | cloud-key import <file.pem> | cloud-key public');
     process.exitCode = 2;
   }
 } catch (e) {

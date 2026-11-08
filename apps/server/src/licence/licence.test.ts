@@ -62,6 +62,44 @@ describe('licence keys', () => {
     expect(licenceStatus(null, at(0), HW)).toMatchObject({ state: 'none', canOpenDay: false });
   });
 
+  it('P7-02: master and cloud keys are trusted; a cloud key is limited to 400 days; an unknown kid is refused', () => {
+    const cloud = generateKeyPairSync('ed25519');
+    const trusted = [
+      { id: 'master', publicKey: vendor.publicKey },
+      { id: 'cloud', publicKey: cloud.publicKey, maxDays: 400 },
+    ];
+    const reason = (r: ReturnType<typeof verifyKey>) => (r.ok ? 'ok' : r.reason);
+    // an existing key (no kid) is a master key and still verifies, long or short
+    expect(reason(verifyKey(issue({ expiresAt: at(3650).toISOString() }), trusted, HW))).toBe('ok');
+    // the cloud's own key: up to 400 days
+    expect(reason(verifyKey(issue({ kid: 'cloud', expiresAt: at(14).toISOString() }, cloud.privateKey), trusted, HW))).toBe('ok');
+    expect(reason(verifyKey(issue({ kid: 'cloud', expiresAt: at(400).toISOString() }, cloud.privateKey), trusted, HW))).toBe('ok');
+    expect(reason(verifyKey(issue({ kid: 'cloud', expiresAt: at(401).toISOString() }, cloud.privateKey), trusted, HW))).toMatch(/at most 400 days/);
+    expect(reason(verifyKey(issue({ kid: 'cloud', issuedAt: 'whenever', expiresAt: at(30).toISOString() }, cloud.privateKey), trusted, HW))).toMatch(/at most 400 days/);
+    // a key cannot claim to be someone else's: the cloud key signing as master, or an unknown kid
+    expect(reason(verifyKey(issue({ expiresAt: at(3650).toISOString() }, cloud.privateKey), trusted, HW))).toMatch(/not genuine/);
+    expect(reason(verifyKey(issue({ kid: 'cloud' }, vendor.privateKey), trusted, HW))).toMatch(/not genuine/);
+    expect(reason(verifyKey(issue({ kid: 'partner' }, cloud.privateKey), trusted, HW))).toMatch(/not genuine/);
+    // an old build trusting only the master key refuses a cloud key
+    expect(reason(verifyKey(issue({ kid: 'cloud' }, cloud.privateKey), vendor.publicKey, HW))).toMatch(/not genuine/);
+    // the gate and the environment
+    const g = createLicenceGate({ keys: trusted, hardwareId: HW });
+    expect(g.verify(issue({ kid: 'cloud', expiresAt: at(14).toISOString() }, cloud.privateKey)).ok).toBe(true);
+    const cloudPub = cloud.publicKey.export({ format: 'der', type: 'spki' }).toString('base64');
+    const envGate = licenceGateFor({ DINEPOS_CLOUD_LICENCE_PUBLIC_KEY: cloudPub, DINEPOS_HARDWARE_ID: HW }, false);
+    expect(envGate.verify(issue({ kid: 'cloud', expiresAt: at(14).toISOString() }, cloud.privateKey)).ok).toBe(true);
+    expect(envGate.verify(issue({ kid: 'cloud', expiresAt: at(500).toISOString() }, cloud.privateKey)).ok).toBe(false);
+  });
+
+  it('P7-03: a trial key (feature "trial") is ok until its last 2 days, then says to choose a plan', () => {
+    const v = verifyKey(issue({ expiresAt: at(14).toISOString(), features: ['trial'] }), vendor.publicKey, HW);
+    expect(licenceStatus(v, at(0), HW)).toMatchObject({ state: 'ok', message: 'Free trial until 2026-11-16 (14 days left).' });
+    expect(licenceStatus(v, at(11.5), HW).state).toBe('ok');
+    expect(licenceStatus(v, at(12.5), HW)).toMatchObject({ state: 'expiring', canOpenDay: true });
+    expect(licenceStatus(v, at(12.5), HW).message).toMatch(/free trial ends on .* Choose a plan/);
+    expect(licenceStatus(v, at(15), HW).state).toBe('grace');
+  });
+
   it('the hardware id is stable and readable; only the installed server ignores the environment', () => {
     expect(formatHardwareId(['guid-1', 'ABCD-1234'])).toBe(formatHardwareId(['guid-1', 'ABCD-1234']));
     expect(formatHardwareId(['guid-1', 'ABCD-1234'])).toMatch(/^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/);

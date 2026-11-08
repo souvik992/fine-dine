@@ -2,7 +2,7 @@
 // latest time the server has seen (turning the clock back does not extend a licence).
 import type { KeyObject } from 'node:crypto';
 import type { Db } from '../db/connection.js';
-import { licenceStatus, publicKeyFrom, verifyKey, type LicenceSeats, type LicenceStatus, type Verified } from './licence.js';
+import { licenceStatus, publicKeyFrom, verifyKey, type LicenceSeats, type LicenceStatus, type TrustedKey, type Verified } from './licence.js';
 
 export interface LicenceGate {
   /** False in development runs: everything is allowed and the status says so. */
@@ -34,9 +34,19 @@ function effectiveNow(db: Db, now: Date): Date {
   return new Date(lastMs);
 }
 
-export function createLicenceGate(opts: { publicKey: string | KeyObject; hardwareId: string }): LicenceGate {
-  const key = typeof opts.publicKey === 'string' ? publicKeyFrom(opts.publicKey) : opts.publicKey;
-  const verify = (raw: string) => verifyKey(raw, key, opts.hardwareId);
+/** A trusted key as configured: base64 SPKI (or a KeyObject), with an optional limit in days (P7-02). */
+export interface TrustedKeyConfig {
+  id: string;
+  publicKey: string | KeyObject;
+  maxDays?: number;
+}
+
+/** `publicKey` alone is the master key; `keys` lists every trusted key (master and cloud, P7-02). */
+export function createLicenceGate(opts: { publicKey?: string | KeyObject; keys?: readonly TrustedKeyConfig[]; hardwareId: string }): LicenceGate {
+  const configs = opts.keys ?? (opts.publicKey ? [{ id: 'master', publicKey: opts.publicKey }] : []);
+  if (!configs.length) throw new Error('createLicenceGate: no trusted key');
+  const keys: TrustedKey[] = configs.map((k) => ({ id: k.id, publicKey: typeof k.publicKey === 'string' ? publicKeyFrom(k.publicKey) : k.publicKey, ...(k.maxDays !== undefined ? { maxDays: k.maxDays } : {}) }));
+  const verify = (raw: string) => verifyKey(raw, keys, opts.hardwareId);
   const status = (db: Db, now: Date) => {
     const raw = stored(db).licence_key;
     return licenceStatus(raw ? verify(raw) : null, effectiveNow(db, now), opts.hardwareId);

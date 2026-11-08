@@ -1,5 +1,6 @@
-// The phone and kitchen-screen apps (docs/01: "Captain and KDS PWAs are served at /captain and /kds"). Static files
-// built by Vite; served without a device token (they are code, not data: every API call they make needs one).
+// The phone and kitchen-screen apps (docs/01: "Captain and KDS PWAs are served at /captain and /kds"), and (P7-04) the
+// billing terminal's own screens at /pos for a browser (the DinePOS Cloud browser demo). Static files built by Vite;
+// served without a device token (they are code, not data: every API call they make needs one).
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,12 +24,17 @@ const TYPES: Record<string, string> = {
 const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:; font-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'";
 
 /** Where a web app's built files are: next to server.mjs in the installer, apps/<name>/dist in the repo. */
-export function defaultWebDir(name: 'captain' | 'kds'): string {
+export type WebAppName = 'captain' | 'kds' | 'pos';
+export function defaultWebDir(name: WebAppName): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
-  return IS_BUNDLED ? path.join(here, 'web', name) : path.resolve(here, '..', '..', '..', name, 'dist');
+  if (IS_BUNDLED) return path.join(here, 'web', name);
+  return name === 'pos' ? path.resolve(here, '..', '..', '..', 'desktop', 'dist-renderer') : path.resolve(here, '..', '..', '..', name, 'dist');
 }
 
-export function webAppRoutes(app: FastifyInstance, name: 'captain' | 'kds', dir: string): void {
+/** Paths the device check lets through (the apps' files). */
+export const isWebAppPath = (url: string): boolean => (['captain', 'kds', 'pos'] as const).some((n) => url === `/${n}` || url.startsWith(`/${n}/`));
+
+export function webAppRoutes(app: FastifyInstance, name: WebAppName, dir: string): void {
   const prefix = `/${name}`;
   const send = (reply: FastifyReply, file: string, cache: string) =>
     reply
@@ -43,9 +49,11 @@ export function webAppRoutes(app: FastifyInstance, name: 'captain' | 'kds', dir:
   app.get<{ Params: { '*': string } }>(`${prefix}/*`, (req, reply) => {
     const index = path.join(dir, 'index.html');
     if (!existsSync(index)) {
-      return reply.status(404).type('text/plain; charset=utf-8').send(`The ${name} app is not built on this server (npm run build -w @dinepos/${name}).`);
+      return reply.status(404).type('text/plain; charset=utf-8').send(`The ${name} app is not built on this server (npm run build -w @dinepos/${name === 'pos' ? 'desktop' : name}).`);
     }
     const rel = decodeURIComponent(req.params['*'] || 'index.html');
+    // the terminal build also holds the DinePOS Server window's page (Electron only)
+    if (name === 'pos' && rel.startsWith('server.')) return reply.status(404).send();
     const file = path.resolve(dir, rel);
     // Never outside the app folder (../, absolute paths, drive letters).
     if (file !== dir && !file.startsWith(dir + path.sep)) return reply.status(404).send();

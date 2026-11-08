@@ -80,6 +80,7 @@
     <a href="#orders" data-tab="orders">Orders</a>
     <a href="#stores" data-tab="stores">Stores</a>
     <a href="#brands" data-tab="brands">Brands</a>
+    <a href="#accounts" data-tab="accounts">Accounts</a>
     <a href="#settings" data-tab="settings">Hub settings</a>
     <a href="#" id="signout">Sign out</a>
   </nav>
@@ -146,6 +147,14 @@
       <div id="brandErr" class="err"></div>
       <div class="actions"><button class="primary" type="submit" form="brandForm">Add brand</button></div>
     </div>
+  </section>
+
+  <!-- ===================================================== customer accounts (P7-01) -->
+  <section id="accounts" class="hidden">
+    <div class="row between"><h2>Customer accounts</h2><span class="muted" data-updated></span></div>
+    <p class="muted">Businesses that signed up on the portal (<a href="/signup" target="_blank" rel="noopener">/signup</a>). The newest 500.</p>
+    <div id="accountWarn"></div>
+    <div class="card scroll" id="accountList"></div>
   </section>
 
   <!-- ===================================================== settings -->
@@ -242,7 +251,7 @@
   // ------------------------------------------------------------ routing (#orders, #stores, #stores/<slug>, #settings)
   function route() {
     const [tab, slug] = location.hash.replace(/^#/, '').split('/');
-    return { tab: ['orders', 'stores', 'brands', 'settings'].includes(tab) ? tab : 'orders', slug: tab === 'stores' && slug ? decodeURIComponent(slug) : null };
+    return { tab: ['orders', 'stores', 'brands', 'accounts', 'settings'].includes(tab) ? tab : 'orders', slug: tab === 'stores' && slug ? decodeURIComponent(slug) : null };
   }
   function show() {
     const signedIn = Boolean(key), r = route();
@@ -254,6 +263,7 @@
     $('store').classList.toggle('hidden', !signedIn || !r.slug);
     $('settings').classList.toggle('hidden', !signedIn || r.tab !== 'settings');
     $('brands').classList.toggle('hidden', !signedIn || r.tab !== 'brands');
+    $('accounts').classList.toggle('hidden', !signedIn || r.tab !== 'accounts');
     for (const a of document.querySelectorAll('nav [data-tab]')) a.classList.toggle('on', a.dataset.tab === r.tab);
   }
   window.addEventListener('hashchange', () => { ui.pausing = false; show(); refresh(); });
@@ -271,6 +281,7 @@
       if (r.tab === 'orders') await renderOrders();
       else if (r.slug) { if (!typing()) await renderStore(r.slug); }
       else if (r.tab === 'stores') renderStores();
+      else if (r.tab === 'accounts') await renderAccounts();
       else if (r.tab === 'brands' && !(document.activeElement && document.activeElement.closest('#brands'))) await renderBrands();
       if (!settingsDirty) fillSettings();
       if (r.tab === 'settings' && !(document.activeElement && document.activeElement.closest('#upAccount'))) await renderAccount();
@@ -379,6 +390,24 @@
       await refresh();
     } catch (e) { $('addErr').textContent = e.message; }
   });
+
+  // ------------------------------------------------------------ customer accounts (P7-01)
+  const ACCOUNT_STATUS = { new: 'New', trial: 'Trial', active: 'Active', past_due: 'Payment due', suspended: 'Suspended', closed: 'Closed' };
+  async function renderAccounts() {
+    const { accounts, signupOpen } = await api('GET', '/v1/admin/accounts');
+    $('accountWarn').replaceChildren(...(signupOpen ? [] : [h('div', { class: 'banner info' }, 'Sign-up is closed: no email provider is set up. Set HUB_BREVO_API_KEY and HUB_MAIL_FROM in /etc/dinepos-cloud.env.')]));
+    if (!accounts.length) { $('accountList').replaceChildren(h('div', { class: 'muted' }, 'No accounts yet.')); return; }
+    $('accountList').replaceChildren(h('table', {},
+      h('thead', {}, h('tr', {}, h('th', {}, 'Business'), h('th', {}, 'Owner'), h('th', {}, 'Mobile'), h('th', {}, 'Status'), h('th', { class: 'num' }, 'People'), h('th', { class: 'num' }, 'Outlets'), h('th', {}, 'Signed up'))),
+      h('tbody', {}, accounts.map((a) => h('tr', {},
+        h('td', {}, a.name),
+        h('td', {}, a.owner ? [a.owner.name, h('div', { class: 'sub' }, a.owner.email, ' ', a.owner.verified ? chip('ok', 'verified') : chip('warn', 'not verified'))] : '-'),
+        h('td', {}, a.phone),
+        h('td', {}, chip('plain', ACCOUNT_STATUS[a.status] || a.status)),
+        h('td', { class: 'num' }, String(a.users)),
+        h('td', { class: 'num' }, String(a.stores)),
+        h('td', {}, when(a.createdAt)))))));
+  }
 
   // ------------------------------------------------------------ brands: one website, the nearest outlet gets the order
   async function renderBrands() {
@@ -545,7 +574,33 @@
       h('div', { class: 'hint' }, 'The POS checks the key itself: it must be genuine, made for that PC and end later than the key it has.'),
       h('div', { class: 'actions' }, h('button', { class: 'primary', onclick: () => save(input.value) }, 'Save key'),
         lic.set ? h('button', { class: 'danger', onclick: () => { if (confirm('Remove the key from the hub? The POS keeps the key it has installed.')) save(''); } }, 'Remove from hub') : null),
-      err);
+      err, grantsBox(slug, lic));
+  }
+  /** P7-02: keys this cloud signed for the store, and a form to sign one (at most 400 days). */
+  function grantsBox(slug, lic) {
+    const box = h('div', { class: 'box' }, h('span', { class: 'muted' }, 'Loading cloud keys…'));
+    const KIND = { trial: 'Trial', paid: 'Paid', demo: 'Demo', manual: 'Made here' };
+    (async () => {
+      let r;
+      try { r = await api('GET', `/v1/admin/stores/${encodeURIComponent(slug)}/grants`); } catch (e) { box.replaceChildren(h('span', { class: 'err' }, e.message)); return; }
+      const err = h('div', { class: 'err' });
+      const f = { hw: h('input', { placeholder: 'AB12-CD34-EF56-7890-1A2B', value: lic.hardwareId || '' }), days: h('input', { type: 'number', min: '1', max: '400', value: '365' }),
+        t: h('input', { type: 'number', min: '1', value: '1' }), c: h('input', { type: 'number', min: '0', value: '2' }), k: h('input', { type: 'number', min: '0', value: '1' }) };
+      const issue = async () => {
+        try { await api('POST', `/v1/admin/stores/${encodeURIComponent(slug)}/grants`, { hardwareId: f.hw.value.trim(), days: Number(f.days.value), terminals: Number(f.t.value), captains: Number(f.c.value), kds: Number(f.k.value) }); renderStore(slug); }
+        catch (e) { err.textContent = e.message; }
+      };
+      const revoke = async (g) => { if (!confirm('Revoke this key? It is taken off the hub; a POS that already installed it keeps it until it ends.')) return; try { await api('POST', `/v1/admin/grants/${g.id}/revoke`, { reason: 'revoked by admin' }); renderStore(slug); } catch (e) { err.textContent = e.message; } };
+      box.replaceChildren(h('h3', {}, 'Keys signed by this cloud'),
+        r.grants.length ? h('div', { class: 'scroll' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Kind'), h('th', {}, 'PC'), h('th', {}, 'Seats'), h('th', {}, 'Ends'), h('th', {}, ''))),
+          h('tbody', {}, r.grants.map((g) => h('tr', {}, h('td', {}, KIND[g.kind] || g.kind), h('td', {}, g.hardwareId), h('td', {}, `${g.seats.terminals} T · ${g.seats.captains} C · ${g.seats.kds} K`),
+            h('td', {}, day(g.expiresAt)), h('td', {}, g.revokedAt ? chip('bad', 'revoked') : h('button', { class: 'danger', onclick: () => revoke(g) }, 'Revoke'))))))) : h('p', { class: 'muted' }, 'None yet.'),
+        r.ready ? [h('div', { class: 'grid' }, h('div', {}, h('label', {}, 'Hardware id'), f.hw), h('div', {}, h('label', {}, 'Days (1 to 400)'), f.days),
+            h('div', {}, h('label', {}, 'Terminals'), f.t), h('div', {}, h('label', {}, 'Captain phones'), f.c), h('div', {}, h('label', {}, 'Kitchen screens'), f.k)),
+          h('div', { class: 'actions' }, h('button', { class: 'primary', onclick: issue }, 'Sign a key and put it here')), err]
+          : h('p', { class: 'muted' }, 'This cloud has no signing key yet: on the server run npm run admin -- cloud-key import <file.pem>, then restart it.'));
+    })();
+    return box;
   }
 
   function storeSettings(p) {

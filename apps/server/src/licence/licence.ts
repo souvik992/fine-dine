@@ -20,6 +20,18 @@ export interface LicencePayload {
   features: string[];
   /** Optional: the outlet the key was issued for (informational; reinstalling keeps the same key). */
   outletId?: string;
+  /** P7-02: which trusted key signed it ("master" when missing: every key made before DinePOS Cloud signed keys). */
+  kid?: string;
+}
+
+/**
+ * A key the app trusts (ADR-0006). `master` is the vendor's offline key (no limit); `cloud` is DinePOS Cloud's own
+ * key, trusted only for keys of at most `maxDays` (a leaked cloud key cannot make long licences).
+ */
+export interface TrustedKey {
+  id: string;
+  publicKey: KeyObject;
+  maxDays?: number;
 }
 
 export type LicenceState =
@@ -50,6 +62,8 @@ export interface LicenceStatus {
 }
 
 export const WARN_DAYS = 15;
+/** P7-03: a trial or demo key (feature "trial") warns only in its last 2 days: the whole trial (14 days; a browser demo 3) is shorter than WARN_DAYS. */
+export const TRIAL_WARN_DAYS = 2;
 export const GRACE_DAYS = 7;
 const DAY = 86_400_000;
 
@@ -78,11 +92,21 @@ export function publicKeyFrom(spkiBase64: string): KeyObject {
 
 export type Verified = { ok: true; payload: LicencePayload } | { ok: false; reason: string };
 
-/** Signature by the vendor's key, and issued for this PC. Expiry is judged by `licenceStatus`. */
-export function verifyKey(raw: string, publicKey: KeyObject, hardwareId: string): Verified {
+/** Signature by a trusted key (within that key's limit), and issued for this PC. Expiry is judged by `licenceStatus`. */
+export function verifyKey(raw: string, trusted: KeyObject | readonly TrustedKey[], hardwareId: string): Verified {
   const parsed = parseKey(raw);
   if (!parsed) return { ok: false, reason: 'This is not a DinePOS licence key. Paste the whole key you were sent.' };
-  if (!verify(null, parsed.signed, publicKey, parsed.signature)) return { ok: false, reason: 'This licence key is not genuine (its signature does not match).' };
+  const keys: readonly TrustedKey[] = 'length' in trusted ? trusted : [{ id: 'master', publicKey: trusted }];
+  const kid = parsed.payload.kid ?? 'master';
+  const signer = keys.find((k) => k.id === kid);
+  if (!signer || !verify(null, parsed.signed, signer.publicKey, parsed.signature)) return { ok: false, reason: 'This licence key is not genuine (its signature does not match).' };
+  if (signer.maxDays !== undefined) {
+    const issued = Date.parse(parsed.payload.issuedAt);
+    const span = Date.parse(parsed.payload.expiresAt) - issued;
+    if (Number.isNaN(issued) || span > signer.maxDays * DAY) {
+      return { ok: false, reason: `This licence key is not valid: keys from DinePOS Cloud last at most ${signer.maxDays} days. Ask for a new key.` };
+    }
+  }
   if (parsed.payload.hardwareId !== hardwareId) {
     return { ok: false, reason: `This licence key is for another computer (${parsed.payload.hardwareId}); this one is ${hardwareId}.` };
   }
@@ -102,8 +126,12 @@ export function licenceStatus(verified: Verified | null, now: Date, hardwareId: 
   const daysLeft = Math.ceil((expires - now.getTime()) / DAY);
   const base = { licensee: p.licensee, expiresAt: p.expiresAt, daysLeft, seats: p.seats, hardwareId };
   if (now.getTime() < expires) {
-    if (daysLeft <= WARN_DAYS) return { ...base, state: 'expiring', canOpenDay: true, message: `The licence ends on ${dateText(p.expiresAt)} (${daysLeft} day${daysLeft === 1 ? '' : 's'} left). Renew it in time.` };
-    return { ...base, state: 'ok', canOpenDay: true, message: `Licensed to ${p.licensee} until ${dateText(p.expiresAt)}.` };
+    const trial = Array.isArray(p.features) && p.features.includes('trial');
+    const left = `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`;
+    if (daysLeft <= (trial ? TRIAL_WARN_DAYS : WARN_DAYS)) {
+      return { ...base, state: 'expiring', canOpenDay: true, message: trial ? `The free trial ends on ${dateText(p.expiresAt)} (${left}). Choose a plan in your DinePOS account to keep billing.` : `The licence ends on ${dateText(p.expiresAt)} (${left}). Renew it in time.` };
+    }
+    return { ...base, state: 'ok', canOpenDay: true, message: trial ? `Free trial until ${dateText(p.expiresAt)} (${left}).` : `Licensed to ${p.licensee} until ${dateText(p.expiresAt)}.` };
   }
   const graceEnds = new Date(expires + GRACE_DAYS * DAY).toISOString();
   if (now.getTime() < Date.parse(graceEnds)) {

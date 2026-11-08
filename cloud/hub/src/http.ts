@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
-import { Hub, HubError } from './hub.ts';
+import { Hub, HubError, RESERVED_SLUGS } from './hub.ts';
 import { UrbanPiper } from './urbanpiper.ts';
 import { Brands } from './brands.ts';
 import { GuestRelay, GUEST_CSP } from './relay.ts';
@@ -12,6 +12,11 @@ import type { HostedOutlets } from './hosted.ts';
 import type { Monitor } from './monitor.ts';
 import { randomUUID } from 'node:crypto';
 import { acceptUpgrade, refuseUpgrade } from './ws.ts';
+import { one } from './db.ts';
+import { Demos } from './demos.ts';
+import { Activations } from './activation.ts';
+import type { ActivateInput } from './activation.ts';
+import type { DemoHost, DemoSeed } from './demos.ts';
 import type { PublishedMenu } from '../../contract/src/menu.ts';
 
 /**
@@ -40,6 +45,8 @@ export interface HttpOptions {
   hosted?: HostedOutlets;
   /** Hosted outlets down, backups failing (GET /health/deep, the admin page). */
   monitor?: Monitor;
+  /** P7-04: the browser demo: the sample outlet (demo-seed.json path or data), how many at once; host defaults to `hosted`. */
+  demo?: { seed: string | DemoSeed | null; max?: number; hours?: number; host?: DemoHost };
 }
 
 interface Ctx { req: IncomingMessage; res: ServerResponse; params: Record<string, string>; query: URLSearchParams; body: unknown; ip: string }
@@ -65,7 +72,7 @@ function limiter(perMinute: () => number) {
 
 const PAGE_HEADERS = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' };
 
-export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server {
+export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { demos: Demos | null } {
   const routes: Route[] = [];
   const add = (method: string, path: string, handler: Handler, opt: { cors?: boolean; maxBody?: number; raw?: boolean } = {}) => {
     const keys: string[] = [];
@@ -95,14 +102,19 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server {
   const tunnels = o.tunnels ?? new Tunnels();
   const deviceDomain = (o.deviceDomain ?? (o.publicUrl ? new URL(o.publicUrl).hostname : '')).toLowerCase();
   const deviceScheme = o.publicUrl ? new URL(o.publicUrl).protocol : 'https:';
+  // a port in the public address (local testing: http://localhost:4900 → http://<store>.localhost:4900) is kept
+  const devicePort = o.publicUrl && new URL(o.publicUrl).port ? `:${new URL(o.publicUrl).port}` : '';
   const deviceLimit = limiter(() => 1200);
+  const outletUrl = (slug: string) => (deviceDomain ? `${deviceScheme}//${slug}.${deviceDomain}${devicePort}` : null);
+  const demoHost = o.demo?.host ?? o.hosted;
+  const demos = o.demo && demoHost ? new Demos(hub, { host: demoHost, seed: o.demo.seed, max: o.demo.max, hours: o.demo.hours, outletUrl }) : null;
   /** The store whose device address this request is for (Host = <store>.<deviceDomain>), or null. */
   const outletOf = (req: IncomingMessage): { id: string; slug: string } | null | 'unknown' => {
     if (!deviceDomain) return null;
     const host = String(req.headers.host ?? '').toLowerCase().replace(/:\d+$/, '');
     if (!host.endsWith(`.${deviceDomain}`)) return null;
     const label = host.slice(0, -(deviceDomain.length + 1));
-    if (!label || label.includes('.')) return null;
+    if (!label || label.includes('.') || RESERVED_SLUGS.has(label)) return null; // portal.<cloud> and the like are the cloud's own
     try {
       const st = hub.store({ slug: label });
       return { id: st.id, slug: st.slug };
@@ -165,6 +177,54 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server {
   add('POST', '/v1/site/:slug/discard', (c) => hub.discardSiteDraft(c.params.slug!, siteToken(c)), { cors: true });
   add('PUT', '/v1/site/:slug/images/:name', (c) => hub.putSiteImage(c.params.slug!, siteToken(c), c.params.name!, (c.body as { dataBase64?: unknown } | null)?.dataBase64), { cors: true, maxBody: 2_100_000 });
 
+  // ---- customer accounts (P7-01, src/accounts.ts): the portal signs in with an HttpOnly cookie (SameSite=Lax; these
+  // routes send no CORS headers, so other sites cannot call them with it)
+  const COOKIE = 'dp_account';
+  const accountToken = (c: Ctx) => {
+    for (const part of String(c.req.headers.cookie ?? '').split(';')) {
+      const [k, ...v] = part.trim().split('=');
+      if (k === COOKIE) return v.join('=') || undefined;
+    }
+    return undefined;
+  };
+  const secure = (c: Ctx) => (o.publicUrl ?? '').startsWith('https:') || String(c.req.headers['x-forwarded-proto'] ?? '').split(',')[0]!.trim() === 'https';
+  const setSession = (c: Ctx, s: { token: string; expiresAt: number } | null) => {
+    const age = s ? Math.max(0, Math.floor((s.expiresAt - hub.now()) / 1000)) : 0;
+    c.res.setHeader('Set-Cookie', `${COOKIE}=${s ? s.token : ''}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${age}${secure(c) ? '; Secure' : ''}`);
+    return s ? { ok: true, expiresAt: s.expiresAt } : { ok: true };
+  };
+  const ua = (c: Ctx) => String(c.req.headers['user-agent'] ?? '');
+  const signupLimit = limiter(() => 5), loginLimit = limiter(() => 10), codeLimit = limiter(() => 20);
+  type B = Record<string, unknown> | null;
+  add('POST', '/v1/account/signup', (c) => { signupLimit(c.ip); return hub.accounts.signup(c.body); });
+  add('POST', '/v1/account/resend', (c) => { signupLimit(c.ip); return hub.accounts.resendVerify((c.body as B)?.email); });
+  add('POST', '/v1/account/verify', (c) => { codeLimit(c.ip); const b = c.body as B; return setSession(c, hub.accounts.verifyEmail(b?.email, b?.code, ua(c))); });
+  add('POST', '/v1/account/login', async (c) => { loginLimit(c.ip); const b = c.body as B; return setSession(c, await hub.accounts.login(b?.email, b?.password, ua(c))); });
+  add('POST', '/v1/account/logout', (c) => { hub.accounts.logout(accountToken(c)); return setSession(c, null); });
+  add('GET', '/v1/account/me', (c) => hub.accounts.me(accountToken(c)));
+  add('POST', '/v1/account/forgot', (c) => { signupLimit(c.ip); return hub.accounts.forgotPassword((c.body as B)?.email); });
+  add('POST', '/v1/account/reset', async (c) => { codeLimit(c.ip); const b = c.body as B; return setSession(c, await hub.accounts.resetPassword(b?.email, b?.code, b?.password, ua(c))); });
+  add('POST', '/v1/account/password', (c) => { loginLimit(c.ip); const b = c.body as B; return hub.accounts.changePassword(accountToken(c), b?.current, b?.password); });
+  add('GET', '/v1/account/status', () => ({ signupOpen: hub.accounts.open }));
+  // P7-03: the Windows app activating on a PC (its outlet server calls this with the account's email and password)
+  const activations = new Activations(hub);
+  const activateLimit = limiter(() => 10);
+  add('POST', '/v1/activate', async (c) => { activateLimit(c.ip); return activations.activate((c.body ?? {}) as ActivateInput); });
+  // P7-04: the browser demo (src/demos.ts), for a signed-in person
+  const demoLimit = limiter(() => 5);
+  add('GET', '/v1/account/demo', (c) => {
+    if (demos) return demos.current(accountToken(c));
+    hub.accounts.session(accountToken(c));
+    return { demo: null, available: false, reason: 'The browser demo is not set up on this cloud.' };
+  });
+  add('POST', '/v1/account/demo', async (c) => {
+    demoLimit(c.ip);
+    if (!demos) { hub.accounts.session(accountToken(c)); throw new HubError('NOT_AVAILABLE', 'The browser demo is not set up on this cloud.', 503); }
+    return demos.start(accountToken(c));
+  });
+  add('GET', '/v1/admin/demos', (c) => { admin(c); return { demos: demos?.adminList() ?? [], available: demos ? demos.unavailable() === null : false, reason: demos?.unavailable() ?? 'Not set up.' }; });
+  add('GET', '/v1/admin/accounts', (c) => { admin(c); return { accounts: hub.accounts.adminList(), signupOpen: hub.accounts.open }; });
+
   // ---- admin
   // A connection link carries the hub address and a one-use pairing code: the shop pastes only this into its POS.
   const base = (c: Ctx) => (o.publicUrl ?? `${String(c.req.headers['x-forwarded-proto'] ?? 'http').split(',')[0]!.trim()}://${String(c.req.headers['x-forwarded-host'] ?? c.req.headers.host ?? 'localhost')}`).replace(/\/+$/, '');
@@ -179,6 +239,20 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server {
   add('GET', '/v1/admin/stores/:slug/sales', (c) => { admin(c); return hub.sync.sales(hub.store({ slug: c.params.slug! }).id, Number(c.query.get('days') ?? 14)); });
   add('GET', '/v1/admin/stores/:slug/licence', (c) => { admin(c); return hub.sync.licenceInfo(hub.store({ slug: c.params.slug! }).id); });
   add('PUT', '/v1/admin/stores/:slug/licence', (c) => { admin(c); return hub.sync.setLicence(hub.store({ slug: c.params.slug! }).id, (c.body as { key?: unknown } | null)?.key); });
+  // P7-02: licence keys signed by this cloud (kept in licence_grant, put in the store's licence slot)
+  add('GET', '/v1/admin/licence-signing', (c) => { admin(c); return { ready: hub.licences.ready, publicKey: hub.licences.publicKey() }; });
+  add('GET', '/v1/admin/stores/:slug/grants', (c) => { admin(c); return { grants: hub.licences.forStore(hub.store({ slug: c.params.slug! }).id), ready: hub.licences.ready }; });
+  add('POST', '/v1/admin/stores/:slug/grants', (c) => {
+    admin(c);
+    const st = hub.store({ slug: c.params.slug! });
+    const b = (c.body ?? {}) as { hardwareId?: unknown; days?: unknown; terminals?: unknown; captains?: unknown; kds?: unknown; licensee?: unknown };
+    const owner = one<{ account_id: string }>(hub.db, 'SELECT account_id FROM account_store WHERE store_id = ?', st.id);
+    return hub.licences.issue({
+      storeId: st.id, accountId: owner?.account_id ?? null, hardwareId: String(b.hardwareId ?? ''), kind: 'manual', days: Number(b.days),
+      seats: { terminals: Number(b.terminals ?? 1), captains: Number(b.captains ?? 0), kds: Number(b.kds ?? 0) }, licensee: String(b.licensee ?? st.name), by: 'admin',
+    });
+  });
+  add('POST', '/v1/admin/grants/:id/revoke', (c) => { admin(c); return hub.licences.revoke(c.params.id!, (c.body as { reason?: unknown } | null)?.reason); });
   add('POST', '/v1/admin/stores/:slug/site-password', (c) => { admin(c); return hub.newSitePassword(c.params.slug!); });
   add('GET', '/v1/admin/stores/:slug/orders', (c) => { admin(c); return hub.adminOrders({ slug: c.params.slug!, limit: Number(c.query.get('limit') ?? 50) }); });
   add('POST', '/v1/admin/devices/:id/revoke', (c) => { admin(c); hub.revokeDevice(c.params.id!); return { ok: true }; });
@@ -275,7 +349,6 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server {
     if (!hosted) throw new HubError('NOT_AVAILABLE', 'Hosted outlets are not set up on this cloud.', 503);
     return hosted;
   };
-  const outletUrl = (slug: string) => (deviceDomain ? `${deviceScheme}//${slug}.${deviceDomain}` : null);
   const hostedView = async (slug: string) => {
     const st = hub.store({ slug });
     const s = hosted ? hosted.status(st.id) : { hosted: false, running: false, port: null, restarts: 0, lastExit: null, startedAt: null };
@@ -408,6 +481,24 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server {
     return Symbol.for('handled');
   });
 
+  // ---- the customer portal (P7-01): one page; it shows sign-up, sign-in, password reset or the account by its path
+  const portalPage = (c: Ctx) => {
+    c.res.writeHead(200, { ...PAGE_HEADERS, 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin', 'Content-Security-Policy': "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; form-action 'self'" });
+    c.res.end(readFileSync(join(pub, 'portal.html')));
+    return Symbol.for('handled');
+  };
+  for (const p of ['/signup', '/login', '/forgot', '/app']) add('GET', p, portalPage);
+  // the DinePOS fonts (Manrope, Fraunces; SIL OFL), as in the desktop app
+  add('GET', '/fonts/:name', (c) => {
+    const name = c.params.name!;
+    if (!['manrope-latin.woff2', 'fraunces-latin.woff2'].includes(name)) throw new HubError('NOT_FOUND', 'Not found.', 404);
+    const bytes = readFileSync(join(pub, 'fonts', name));
+    c.res.writeHead(200, { 'Content-Type': 'font/woff2', 'Content-Length': bytes.length, 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff' });
+    c.res.end(bytes);
+    return Symbol.for('handled');
+  });
+  add('GET', '/', (c) => { c.res.writeHead(302, { Location: '/app', 'Cache-Control': 'no-store' }); c.res.end(); return Symbol.for('handled'); });
+
   // ---- a connection link opened in a browser: says where to paste it (the code is not used up here)
   add('GET', '/connect/:code', (c) => {
     const code = c.params.code!.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 9);
@@ -497,7 +588,7 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server {
     relay.close();
     tunnels.close();
   });
-  return server;
+  return Object.assign(server, { demos });
 }
 
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';

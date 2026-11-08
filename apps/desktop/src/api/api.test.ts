@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiClient, ApiError, type Fetch } from './client.js';
-import { DEFAULT_SERVER_URL, loadServerUrl, normaliseServerUrl, saveServerUrl } from './settings.js';
+import { DEFAULT_SERVER_URL, deviceTokenFromHash, loadServerUrl, normaliseServerUrl, saveServerUrl, servedByOutlet } from './settings.js';
 import { StreamClient, streamUrl, type SocketLike, type StreamEvent } from './stream.js';
 
 describe('server URL settings', () => {
@@ -19,6 +19,27 @@ describe('server URL settings', () => {
     expect(loadServerUrl(store, '')).toBe('http://10.0.0.5:7420');
     expect(loadServerUrl(store, '?server=http%3A%2F%2F127.0.0.1%3A9000')).toBe('http://127.0.0.1:9000');
     expect(streamUrl('http://10.0.0.5:7420')).toBe('ws://10.0.0.5:7420/v1/stream');
+  });
+});
+
+describe('the terminal in a browser, served by an outlet at /pos/ (P7-04)', () => {
+  it('uses the outlet that served it, and only then', () => {
+    const at = (href: string) => { const u = new URL(href); return { protocol: u.protocol, pathname: u.pathname, origin: u.origin }; };
+    expect(servedByOutlet(at('https://demo-ab12cd.cloud.example/pos/'))).toBe('https://demo-ab12cd.cloud.example');
+    expect(servedByOutlet(at('http://192.168.1.10:7420/pos'))).toBe('http://192.168.1.10:7420');
+    expect(servedByOutlet(at('app://dinepos/index.html'))).toBeNull();
+    expect(servedByOutlet(at('http://127.0.0.1:5173/'))).toBeNull();
+    expect(servedByOutlet(at('https://x.example/posters'))).toBeNull();
+    const store = { getItem: () => 'http://10.0.0.5:7420', setItem: () => undefined };
+    expect(loadServerUrl(store, '?server=10.0.0.9', 'https://demo.example')).toBe('https://demo.example');
+    expect(loadServerUrl(store, '', null)).toBe('http://10.0.0.5:7420');
+  });
+  it('takes a device token from the address fragment', () => {
+    const tok = 'dvt_' + 'a'.repeat(43);
+    expect(deviceTokenFromHash(`#device=${tok}`)).toBe(tok);
+    expect(deviceTokenFromHash('#device=short')).toBeNull();
+    expect(deviceTokenFromHash('#device=<script>alert(1)</script>aaaaaaaaaaaaaaaa')).toBeNull();
+    expect(deviceTokenFromHash('')).toBeNull();
   });
 });
 
