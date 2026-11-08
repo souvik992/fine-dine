@@ -121,7 +121,6 @@ cat > /usr/local/bin/dinepos-cloud-update <<'SCRIPT'
 set -euo pipefail
 git -C /opt/dinepos fetch --depth 1 origin main
 git -C /opt/dinepos reset --hard origin/main
-git -C /opt/dinepos submodule update --init --depth 1  # vendor/saas-portal: the licensing module
 systemctl restart dinepos-cloud
 echo "Hub updated to $(git -C /opt/dinepos log -1 --format='%h %s')"
 SCRIPT
@@ -143,9 +142,8 @@ install -d -o dineposcloud -g dineposcloud -m 0750 /var/lib/dinepos-cloud
 if [ -d /opt/dinepos/.git ]; then
   git -C /opt/dinepos fetch --depth 1 origin main
   git -C /opt/dinepos reset --hard origin/main
-  git -C /opt/dinepos submodule update --init --depth 1  # vendor/saas-portal: the licensing module
 else
-  git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/souvik992/fine-dine.git /opt/dinepos
+  git clone --depth 1 https://github.com/souvik992/fine-dine.git /opt/dinepos
 fi
 systemctl daemon-reload
 systemctl enable dinepos-cloud

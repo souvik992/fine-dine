@@ -74,10 +74,10 @@ active person must be able to manage staff; changing a PIN, role or active flag 
   opening a new business date (never block mid-service).
 - Seats enforced at device pairing.
 - Keygen CLI lives outside this repo (keep the private key off customer machines).
-- The key format, signing and hardware ids are also the platform's licensing module (`packages/licensing` in
-  souvik992/saas-portal, added 2026-11-08), included here as the git submodule `vendor/saas-portal`. DinePOS Cloud
-  (`cloud/hub`) signs with it; the app keeps its own copy of the checks (`apps/server/src/licence/`), and the module's
-  tests prove both directions match. Keys may carry `product` (`fine_dine`); the app ignores it.
+- The key format, signing and hardware ids are also the licensing library `packages/licensing` (2026-11-08, ADR-0007),
+  shared by every product. DinePOS Cloud (`cloud/hub`) signs with it; the app keeps its own copy of the checks
+  (`apps/server/src/licence/`), and the library's tests prove both directions match. Keys may carry `product`
+  (`fine_dine`, `tiffin_qsr`).
 
 Built in P2-09 (product owner's decisions 2026-11-03: **no key → billing cannot start**; keygen in a separate folder):
 - Key = `base64url(payload JSON).base64url(Ed25519 signature)`; payload `{ v: 1, licensee, hardwareId, issuedAt,

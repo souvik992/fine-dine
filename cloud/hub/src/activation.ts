@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { normaliseHardwareId } from '../../../vendor/saas-portal/packages/licensing/src/index.ts';
+import { normaliseHardwareId } from '../../../packages/licensing/src/index.ts';
 import { exec, hash, one, tx } from './db.ts';
 import { HubError } from './hub.ts';
 import type { Hub } from './hub.ts';

@@ -5,7 +5,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/dist-*/**', '**/.tsbuild/**', '**/release/**', '**/.stage/**', '**/build-cache/**', '**/out/**', '**/coverage/**', '**/node_modules/**', '**/data/**', '**/.build/**', 'addons/*/scripts/*.d.mts', 'cloud/**', 'vendor/**', 'apps/captain-android/**/build/**'],
+    ignores: ['**/dist/**', '**/dist-*/**', '**/.tsbuild/**', '**/release/**', '**/.stage/**', '**/build-cache/**', '**/out/**', '**/coverage/**', '**/node_modules/**', '**/data/**', '**/.build/**', 'addons/*/scripts/*.d.mts', 'cloud/**', 'apps/captain-android/**/build/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

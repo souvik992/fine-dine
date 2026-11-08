@@ -245,3 +245,41 @@ for every task: `docs/adr/0006-accounts-trials-billing.md`, `docs/07-security-li
 - [ ] **P7-07 Product website** served by the cloud: home, features, pricing (from `plan`), demo, sign-up, terms,
   privacy, refund and cancellation; original design; works on a phone. Accept: the pricing page shows the plans from
   the admin page; every page loads without the admin key; the legal pages are linked from the footer and checkout.
+
+## Phase 8 — One backend, the portal, downloads and trials for two products (ADR-0007)
+
+Added 2026-11-08 at the product owner's request. Read first for every task: `docs/adr/0007-one-backend-two-products.md`,
+`cloud/hub/README.md`, `cloud/hub/src/accounts.ts`, `cloud/hub/src/activation.ts`, `cloud/hub/src/licences.ts`.
+
+- [x] **P8-01 Licensing library into this repository; saas-portal becomes UI only.** Move `packages/licensing` here
+  (tests and fixtures included), point the hub at it, remove the `vendor/saas-portal` submodule (and its lines in the
+  deploy scripts); delete saas-portal's `cloud/saas` API, its migrations and the library there. Accept: hub tests pass
+  from a fresh clone without submodules; saas-portal holds only `cloud/saas-web`.
+- [ ] **P8-02 Two products, 30-day trials.** `product` on licence grants and trial claims (`fine_dine`, `tiffin_qsr`);
+  `/v1/activate` takes the product; trial 30 days; one trial per product per account, PC and mobile; the DinePOS app
+  sends `fine_dine` and refuses keys for another product. Accept: a Tiffin trial on a PC does not use up its DinePOS
+  trial; a `tiffin_qsr` key does not install in DinePOS.
+- [ ] **P8-03 Builds on every push.** fine-dine CI builds and tests, then publishes `DinePOS-Setup-<v>.exe` and
+  `DinePOS-TableQR-Setup-<v>.exe` to a GitHub Release on every push to main; tiffin CI publishes its installer and the
+  ODS add-on the same way. Accept: a push to main produces a release with the installers attached.
+- [ ] **P8-04 Download catalogue in the hub.** `GET /v1/downloads` (products and add-ons, newest version, size, date)
+  from the GitHub Releases API (cached; works when GitHub is down with the last list); signed-in download links
+  record who downloaded what. Accept: the newest release appears within the cache time; a download is recorded.
+- [ ] **P8-05 Browser demo off.** Portal no longer offers it; `/v1/account/demo` answers "not available" unless
+  `HUB_BROWSER_DEMO=1`. Accept: no demo can be started by default.
+- [ ] **P8-06 Portal rebuilt (saas-portal `cloud/saas-web`) in the DinePOS look.** Home, product choice (QSR or Fine
+  Dine), sign-up with email code, sign-in, forgot password, all against the hub's `/v1/account/*`. Accept: sign-up to
+  signed-in works against a local hub; looks like DinePOS (orange, Manrope/Fraunces); works on a phone.
+- [ ] **P8-07 Client area home and Downloads / Licences / Add-ons pages.** Tiles like a hosting client area; downloads
+  for the chosen products; licences per PC with seats and end dates; add-ons per product. Accept: a Fine Dine
+  customer sees the DinePOS and Table QR downloads; a QSR customer sees Tiffin POS and ODS.
+- [ ] **P8-08 Support, announcements, knowledge base, service status.** Hub tables and routes; tickets with replies
+  (customer and vendor), admin-page tabs to answer tickets and write announcements and articles; status from the
+  hub's health. Accept: a ticket opened in the portal is answered from the admin page and the reply shows in the
+  portal.
+- [ ] **P8-09 Portal deployment.** saas-portal CI builds and publishes the portal on every push; the cloud server's
+  update fetches it; the hub serves it on the `portal.` host with the API on the same origin; steps to point
+  portal.posinext.com at the server. Accept: after an update the server serves the newest portal build.
+- [ ] **P8-10 Licensing in Tiffin POS** (tiffin repository): hardware id, Settings › Licence with sign-in to DinePOS
+  Cloud (`tiffin_qsr`, 30-day trial), warnings, grace, no new business day without a valid key, renewals. Accept:
+  as P2-09 and P7-03, for Tiffin POS.

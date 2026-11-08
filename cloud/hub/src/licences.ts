@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { KeyObject } from 'node:crypto';
-// The platform's licensing module (souvik992/saas-portal, packages/licensing; a git submodule at vendor/saas-portal):
-// the key format, signing and hardware ids, shared with the SaaS API and every product.
-import { loadSigningKey, normaliseHardwareId, publicKeyBase64, signKey } from '../../../vendor/saas-portal/packages/licensing/src/index.ts';
+// The licensing library (packages/licensing, ADR-0007): the key format, signing and hardware ids for every product.
+import { loadSigningKey, normaliseHardwareId, publicKeyBase64, signKey } from '../../../packages/licensing/src/index.ts';
 import { exec, many, one, tx } from './db.ts';
 import type { Db } from './db.ts';
 import { HubError } from './hub.ts';

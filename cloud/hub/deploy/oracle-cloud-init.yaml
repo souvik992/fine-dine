@@ -98,7 +98,6 @@ write_files:
       set -euo pipefail
       git -C /opt/dinepos fetch --depth 1 origin main
       git -C /opt/dinepos reset --hard origin/main
-      git -C /opt/dinepos submodule update --init --depth 1  # vendor/saas-portal: the licensing module
       systemctl restart dinepos-cloud
       echo "Hub updated to $(git -C /opt/dinepos log -1 --format='%h %s')"
 
@@ -126,7 +125,7 @@ runcmd:
   # The hub
   - useradd --system --home /var/lib/dinepos-cloud --shell /usr/sbin/nologin dineposcloud
   - install -d -o dineposcloud -g dineposcloud -m 0750 /var/lib/dinepos-cloud
-  - git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/souvik992/fine-dine.git /opt/dinepos
+  - git clone --depth 1 https://github.com/souvik992/fine-dine.git /opt/dinepos
   - systemctl daemon-reload
   - systemctl enable --now dinepos-cloud
   - /usr/local/bin/dinepos-cloud-domain

@@ -17,9 +17,8 @@ Next (docs/10-roadmap.md, Phase 6):
 - **P6-03** cloud printing through a small print agent at the outlet.
 - **P6-04** fully hosted outlets with no master PC (one database per outlet in the cloud): see below.
 
-Zero runtime dependencies: Node 24 and `node:sqlite`. One shared module: the platform's licensing code
-(`packages/licensing` in souvik992/saas-portal), a git submodule at `vendor/saas-portal` that Node runs from source.
-After cloning or pulling, run `git submodule update --init` (the server's install and update scripts do this). It follows the order contract in `../contract/` (life cycle,
+Zero runtime dependencies: Node 24 and `node:sqlite`. It imports one library from this repository by source: the
+licensing library (`packages/licensing`; ADR-0007). It follows the order contract in `../contract/` (life cycle,
 shapes, checks, prices; the pricing code is in `../core/`).
 
 ## Put it on AWS (one server, about 10 minutes)
@@ -192,7 +191,7 @@ and optionally `HUB_MAIL_FROM_NAME` in `/etc/dinepos-cloud.env`. Without them, s
 
 The cloud signs trial, demo and paid keys itself with its own Ed25519 key. The DinePOS app trusts it next to the
 vendor's master key, but only for keys of at most 400 days. Signing, the key format and hardware ids come from the
-platform's licensing module (`vendor/saas-portal/packages/licensing`, the same code the SaaS API uses); keys say
+licensing library (`packages/licensing`); keys say
 `product: "fine_dine"`, which the app accepts like keys without it.
 - **Install the key once** (the private key is in the vendor's keygen folder:
   `keys/dinepos-cloud-signing-private.pem`). Copy it to the server, then run
