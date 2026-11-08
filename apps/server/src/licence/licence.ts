@@ -22,6 +22,8 @@ export interface LicencePayload {
   outletId?: string;
   /** P7-02: which trusted key signed it ("master" when missing: every key made before DinePOS Cloud signed keys). */
   kid?: string;
+  /** P8-02 (ADR-0007): the product the key is for. Missing on keys made before products: those are DinePOS keys. */
+  product?: string;
 }
 
 /**
@@ -62,10 +64,12 @@ export interface LicenceStatus {
 }
 
 export const WARN_DAYS = 15;
-/** P7-03: a trial or demo key (feature "trial") warns only in its last 2 days: the whole trial (14 days; a browser demo 3) is shorter than WARN_DAYS. */
+/** P7-03: a trial key (feature "trial") warns only in its last 2 days, not for the whole last WARN_DAYS of a 30-day trial. */
 export const TRIAL_WARN_DAYS = 2;
 export const GRACE_DAYS = 7;
 const DAY = 86_400_000;
+/** P8-02: this app's product code (keys for another product, e.g. Tiffin POS, are refused). */
+export const PRODUCT = 'fine_dine';
 
 const b64url = (s: string) => Buffer.from(s, 'base64url');
 
@@ -109,6 +113,10 @@ export function verifyKey(raw: string, trusted: KeyObject | readonly TrustedKey[
   }
   if (parsed.payload.hardwareId !== hardwareId) {
     return { ok: false, reason: `This licence key is for another computer (${parsed.payload.hardwareId}); this one is ${hardwareId}.` };
+  }
+  if (parsed.payload.product !== undefined && parsed.payload.product !== PRODUCT) {
+    const other = parsed.payload.product === 'tiffin_qsr' ? 'Tiffin POS' : 'another product';
+    return { ok: false, reason: `This licence key is for ${other}, not DinePOS.` };
   }
   return { ok: true, payload: parsed.payload };
 }

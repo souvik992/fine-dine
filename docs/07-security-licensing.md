@@ -74,10 +74,13 @@ active person must be able to manage staff; changing a PIN, role or active flag 
   opening a new business date (never block mid-service).
 - Seats enforced at device pairing.
 - Keygen CLI lives outside this repo (keep the private key off customer machines).
-- The key format, signing and hardware ids are also the platform's licensing module (`packages/licensing` in
-  souvik992/saas-portal, added 2026-11-08), included here as the git submodule `vendor/saas-portal`. DinePOS Cloud
-  (`cloud/hub`) signs with it; the app keeps its own copy of the checks (`apps/server/src/licence/`), and the module's
-  tests prove both directions match. Keys may carry `product` (`fine_dine`); the app ignores it.
+- The key format, signing and hardware ids are also the licensing library `packages/licensing` (2026-11-08, ADR-0007),
+  shared by every product. DinePOS Cloud (`cloud/hub`) signs with it; the app keeps its own copy of the checks
+  (`apps/server/src/licence/`), and the library's tests prove both directions match. Keys may carry `product`
+  (`fine_dine`, `tiffin_qsr`).
+- Tiffin POS (souvik992/tiffin, P8-10) uses the same keys and DinePOS Cloud for activation and renewals (product
+  `tiffin_qsr`). Unlike DinePOS, it locks the whole POS behind a lock screen when there is no usable licence (the
+  owner's decision); installs that already had bills got 30 days to activate.
 
 Built in P2-09 (product owner's decisions 2026-11-03: **no key → billing cannot start**; keygen in a separate folder):
 - Key = `base64url(payload JSON).base64url(Ed25519 signature)`; payload `{ v: 1, licensee, hardwareId, issuedAt,
@@ -108,7 +111,7 @@ Built in P2-09 (product owner's decisions 2026-11-03: **no key → billing canno
   vendor's offline key, no limit) and `cloud` (DinePOS Cloud's own key, only for keys of at most 400 days). The key
   says which one signed it in `kid`; no `kid` means `master`, so every earlier key keeps working. An unknown `kid`, or a
   cloud key over 400 days, is `invalid`. Development runs: `DINEPOS_CLOUD_LICENCE_PUBLIC_KEY` adds a test cloud key.
-- **Activation with a DinePOS account (P7-03):** Settings › Licence › Your DinePOS account: **Start 14-day free trial**
+- **Activation with a DinePOS account (P7-03):** Settings › Licence › Your DinePOS account: **Start 30-day free trial**
   or **Sign in and get my licence** (`POST /v1/licence/activate`, right `admin`). The server asks DinePOS Cloud with the
   email, password and this PC's hardware id, installs the key it gets (`InstallLicence`) and links the outlet to the
   cloud for renewals (`SaveOnlineLink`). The password is never stored. Without internet the screen says so, and

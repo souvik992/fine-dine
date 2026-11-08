@@ -17,9 +17,8 @@ Next (docs/10-roadmap.md, Phase 6):
 - **P6-03** cloud printing through a small print agent at the outlet.
 - **P6-04** fully hosted outlets with no master PC (one database per outlet in the cloud): see below.
 
-Zero runtime dependencies: Node 24 and `node:sqlite`. One shared module: the platform's licensing code
-(`packages/licensing` in souvik992/saas-portal), a git submodule at `vendor/saas-portal` that Node runs from source.
-After cloning or pulling, run `git submodule update --init` (the server's install and update scripts do this). It follows the order contract in `../contract/` (life cycle,
+Zero runtime dependencies: Node 24 and `node:sqlite`. It imports one library from this repository by source: the
+licensing library (`packages/licensing`; ADR-0007). It follows the order contract in `../contract/` (life cycle,
 shapes, checks, prices; the pricing code is in `../core/`).
 
 ## Put it on AWS (one server, about 10 minutes)
@@ -192,7 +191,7 @@ and optionally `HUB_MAIL_FROM_NAME` in `/etc/dinepos-cloud.env`. Without them, s
 
 The cloud signs trial, demo and paid keys itself with its own Ed25519 key. The DinePOS app trusts it next to the
 vendor's master key, but only for keys of at most 400 days. Signing, the key format and hardware ids come from the
-platform's licensing module (`vendor/saas-portal/packages/licensing`, the same code the SaaS API uses); keys say
+licensing library (`packages/licensing`); keys say
 `product: "fine_dine"`, which the app accepts like keys without it.
 - **Install the key once** (the private key is in the vendor's keygen folder:
   `keys/dinepos-cloud-signing-private.pem`). Copy it to the server, then run
@@ -206,18 +205,66 @@ platform's licensing module (`vendor/saas-portal/packages/licensing`, the same c
   revoke). API: `GET`/`POST /v1/admin/stores/<slug>/grants`, `POST /v1/admin/grants/<id>/revoke`,
   `GET /v1/admin/licence-signing`.
 
-## Windows trial and activation (P7-03)
+## Windows trial and activation (P7-03, P8-02)
 
-DinePOS on a PC: **Settings › Licence › Your DinePOS account**. The outlet server calls `POST /v1/activate`
-`{email, password, hardwareId, outletName, mode: "trial" | "signin", link}` (10 a minute per IP):
-- `trial`: a 14-day key (1 terminal, 1 captain phone, 1 kitchen screen). Each PC, email and mobile gets one trial
-  (`trial_claim`). The first activation makes the account's outlet (`account_store`) and, with `link`, pairs it with
-  this cloud, so renewals and paid keys arrive by themselves.
-- `signin`: the key the account already has for this PC (after a reinstall); otherwise `NO_LICENCE`.
+Two products (`src/products.ts`; ADR-0007): `fine_dine` (DinePOS) and `tiffin_qsr` (Tiffin POS). DinePOS on a PC:
+**Settings › Licence › Your DinePOS account**; Tiffin POS the same (P8-10). The app's server calls `POST /v1/activate`
+`{email, password, hardwareId, outletName, mode: "trial" | "signin", link, product}` (10 a minute per IP; `product`
+missing = `fine_dine`, for DinePOS builds before P8-02):
+- `trial`: a 30-day key for that product (DinePOS: 1 terminal, 1 captain phone, 1 kitchen screen; Tiffin POS: 1
+  terminal, 1 kitchen screen). One trial per product for each PC, email and mobile (`trial_claim`, with `product`).
+  The first activation makes the account's outlet for that PC and product (`account_store`) and, with `link`, pairs
+  it with this cloud, so renewals and paid keys arrive by themselves.
+- `signin`: the key the account already has for this PC and product (after a reinstall); otherwise `NO_LICENCE`.
+- Keys say `product`; each app refuses keys for the other (DinePOS still accepts its unlabelled keys from before).
 - The same password check as the portal (wrong passwords lock the email for 15 minutes; an unverified email gets a
   new code).
 
-## Browser demo (P7-04)
+## Windows downloads (P8-04)
+
+The portal's downloads (`src/downloads.ts`; ADR-0007): for **Fine Dine** the DinePOS installer and the Table QR add-on,
+for **QSR** the Tiffin POS installer and the ODS add-on, always the newest build. CI publishes a GitHub Release on every
+push to main (fine-dine `dinepos-build-<n>`, tiffin `tiffin-build-<n>`); the hub reads them from the GitHub API.
+- `GET /v1/downloads`: the list (version, build, size, date, product), cached 10 minutes. When GitHub cannot be reached
+  the last list is used, also after a restart (kept in `setting`). An add-on missing from the newest build (its
+  signing secret was not set) comes from the newest build that has it.
+- `GET /v1/account/downloads/<id>` (signed in): records the download (`download_log`) and redirects to the installer.
+- `GET /v1/admin/downloads` (admin key): downloads per file and version.
+- `GITHUB_TOKEN` (optional): GitHub allows 60 API requests an hour per server without it; the cache needs at most 12.
+
+## Customer portal hosting (P8-09)
+
+The portal is built by souvik992/saas-portal's CI on every push to main (release `portal-build-<n>`, file
+`portal-dist.tar.gz`). `deploy/portal.sh` (run by `dinepos-cloud-update`, `dinepos-cloud-domain` and the installer)
+fetches the newest build into `/opt/dinepos-portal`, sets `HUB_PORTAL_DIR`, and adds the portal's site to Caddy. The
+hub (`src/portal.ts`) serves it on `HUB_PORTAL_DOMAIN`; its `/v1/...` calls reach the hub on the same address.
+
+Moving portal.posinext.com from Lovable to this server (once):
+1. Merge saas-portal's portal into main, so its CI publishes the first `portal-build`.
+2. On the server, once: `sudo bash /opt/dinepos/cloud/hub/deploy/install.sh` (installs the new update script); later
+   updates are `sudo dinepos-cloud-update`.
+3. Email must work for sign-up codes: `HUB_BREVO_API_KEY` and `HUB_MAIL_FROM` in `/etc/dinepos-cloud.env`.
+4. Cloudflare DNS for posinext.com: replace the `portal` record (Lovable's) with an **A** record to this server's IP,
+   **DNS only** (grey cloud) so Caddy can get the certificate. Remove the custom domain from the Lovable project.
+5. In `/etc/dinepos-cloud.env` set `HUB_PORTAL_DOMAIN=portal.posinext.com`, then `sudo dinepos-cloud-domain`.
+   `https://portal.posinext.com` then serves the portal; until the first build is fetched it says it is being installed.
+
+## Customer portal: licences, support, announcements, knowledge base, status (P8-07, P8-08)
+
+The portal (souvik992/saas-portal `cloud/saas-web`; ADR-0007) reads all of this from here, on the same origin:
+- `GET /v1/account/licences`: the account's keys (product, outlet, PC, seats, end, revoked, key text).
+- `POST /v1/account/products` `{products}`: QSR (`tiffin_qsr`), Fine Dine (`fine_dine`) or both (owner or admin).
+- Tickets (`src/support.ts`): `GET|POST /v1/account/tickets`, `GET /v1/account/tickets/<id>`, `POST .../reply`,
+  `POST .../close`. Numbered from #1001; private to the account. Admin page › **Support**: tickets waiting for an
+  answer first; an answer is emailed to the customer who opened the ticket (`/v1/admin/tickets...`).
+- Announcements: `GET /v1/announcements` (`?product=`), written on the admin page (`/v1/admin/announcements`).
+- Knowledge base: `GET /v1/kb`, `GET /v1/kb/<slug>` (plain text; blank lines make paragraphs), written on the admin page.
+- `GET /v1/status`: sign-in, licence activation, downloads published, online orders relay.
+
+## Browser demo (P7-04; off since P8-05)
+
+Off by default (ADR-0007: the trial is the Windows app). Start the cloud with `HUB_BROWSER_DEMO=1` to offer it again;
+without it the portal's demo routes answer that there is no browser demo.
 
 A signed-in portal user presses **Start the browser demo** (portal › account page). In about 3 to 30 seconds they get a
 sample restaurant, run here as a hosted outlet (`demo-xxxxxx`). It has 12 tables, 30 dishes, sample printers, and

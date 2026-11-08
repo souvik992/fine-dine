@@ -1,4 +1,0 @@
-[submodule "vendor/saas-portal"]
-	path = vendor/saas-portal
-	url = https://github.com/souvik992/saas-portal.git
-	branch = main

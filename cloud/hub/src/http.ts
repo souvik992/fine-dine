@@ -16,6 +16,10 @@ import { one } from './db.ts';
 import { Demos } from './demos.ts';
 import { Activations } from './activation.ts';
 import type { ActivateInput } from './activation.ts';
+import { productOf } from './products.ts';
+import { Downloads } from './downloads.ts';
+import { Support } from './support.ts';
+import type { Portal } from './portal.ts';
 import type { DemoHost, DemoSeed } from './demos.ts';
 import type { PublishedMenu } from '../../contract/src/menu.ts';
 
@@ -47,6 +51,12 @@ export interface HttpOptions {
   monitor?: Monitor;
   /** P7-04: the browser demo: the sample outlet (demo-seed.json path or data), how many at once; host defaults to `hosted`. */
   demo?: { seed: string | DemoSeed | null; max?: number; hours?: number; host?: DemoHost };
+  /** P8-04: the Windows downloads (newest GitHub Release of each product). Not given: one is made here. */
+  downloads?: Downloads;
+  /** P8-04: the GitHub API client for the downloads made here (tests). */
+  githubFetch?: typeof fetch;
+  /** P8-09: the customer portal, served on its own address (src/portal.ts). */
+  portal?: Portal;
 }
 
 interface Ctx { req: IncomingMessage; res: ServerResponse; params: Record<string, string>; query: URLSearchParams; body: unknown; ip: string }
@@ -205,21 +215,74 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
   add('POST', '/v1/account/forgot', (c) => { signupLimit(c.ip); return hub.accounts.forgotPassword((c.body as B)?.email); });
   add('POST', '/v1/account/reset', async (c) => { codeLimit(c.ip); const b = c.body as B; return setSession(c, await hub.accounts.resetPassword(b?.email, b?.code, b?.password, ua(c))); });
   add('POST', '/v1/account/password', (c) => { loginLimit(c.ip); const b = c.body as B; return hub.accounts.changePassword(accountToken(c), b?.current, b?.password); });
+  add('GET', '/v1/account/licences', (c) => {
+    const user = hub.accounts.session(accountToken(c));
+    return { licences: hub.licences.forAccount(user.account_id).map(({ id, product, kind, hardwareId, storeName, licensee, seats, issuedAt, expiresAt, revokedAt, key }) => ({ id, product, kind, hardwareId, outlet: storeName, licensee, seats, issuedAt, expiresAt, revoked: revokedAt !== null, key })) };
+  });
+  add('POST', '/v1/account/products', (c) => hub.accounts.setProducts(accountToken(c), (c.body as B)?.products));
   add('GET', '/v1/account/status', () => ({ signupOpen: hub.accounts.open }));
   // P7-03: the Windows app activating on a PC (its outlet server calls this with the account's email and password)
   const activations = new Activations(hub);
+
+  // ---- P8-04: Windows downloads (src/downloads.ts). The list is public; a download needs a signed-in account (recorded).
+  const downloads = o.downloads ?? new Downloads(hub.db, { log: console, now: () => hub.now(), ...(o.githubFetch ? { fetch: o.githubFetch } : {}) });
+  add('GET', '/v1/downloads', async () => ({ downloads: await downloads.list() }));
+  add('GET', '/v1/account/downloads/:id', async (c) => {
+    const user = hub.accounts.session(accountToken(c));
+    const d = await downloads.start(user.id, user.account_id, c.params.id!);
+    c.res.writeHead(302, { Location: d.url, 'Cache-Control': 'no-store' });
+    c.res.end();
+    return Symbol.for('handled');
+  });
+  add('GET', '/v1/admin/downloads', (c) => { admin(c); return { stats: downloads.stats() }; });
+
+  // ---- P8-08: support tickets, announcements, knowledge base, service status (src/support.ts)
+  const support = new Support(hub);
+  const ticketLimit = limiter(() => 10);
+  add('GET', '/v1/account/tickets', (c) => ({ tickets: support.mine(accountToken(c)) }));
+  add('POST', '/v1/account/tickets', (c) => { ticketLimit(c.ip); return support.open(accountToken(c), c.body); });
+  add('GET', '/v1/account/tickets/:id', (c) => support.oneOfMine(accountToken(c), c.params.id!));
+  add('POST', '/v1/account/tickets/:id/reply', (c) => { ticketLimit(c.ip); return support.reply(accountToken(c), c.params.id!, c.body); });
+  add('POST', '/v1/account/tickets/:id/close', (c) => support.closeMine(accountToken(c), c.params.id!));
+  add('GET', '/v1/admin/tickets', (c) => { admin(c); return { tickets: support.adminList() }; });
+  add('GET', '/v1/admin/tickets/:id', (c) => { admin(c); return support.adminGet(c.params.id!); });
+  add('POST', '/v1/admin/tickets/:id/reply', async (c) => { admin(c); return support.adminReply(c.params.id!, c.body); });
+  add('POST', '/v1/admin/tickets/:id/close', (c) => { admin(c); return support.adminClose(c.params.id!); });
+  add('GET', '/v1/announcements', (c) => ({ announcements: support.announcements(c.query.get('product') ?? undefined) }));
+  add('POST', '/v1/admin/announcements', (c) => { admin(c); return support.announce(c.body); });
+  add('POST', '/v1/admin/announcements/:id/delete', (c) => { admin(c); return support.unannounce(c.params.id!); });
+  add('GET', '/v1/kb', () => ({ articles: support.articles() }));
+  add('GET', '/v1/kb/:slug', (c) => support.article(c.params.slug!));
+  add('POST', '/v1/admin/kb', (c) => { admin(c); return support.saveArticle(c.body); });
+  add('POST', '/v1/admin/kb/:slug/delete', (c) => { admin(c); return support.deleteArticle(c.params.slug!); });
+  // public status for the portal: is the cloud answering, can PCs activate, are downloads published
+  add('GET', '/v1/status', async () => {
+    let db = true;
+    try { one(hub.db, 'SELECT 1 AS x'); } catch { db = false; }
+    const list = await downloads.list().catch(() => []);
+    const published = list.filter((d) => d.available).length;
+    const components = [
+      { name: 'Client area and sign-in', status: db ? 'ok' : 'down', note: db ? 'Working' : 'The database is not answering' },
+      { name: 'Licence activation and renewals', status: db && hub.licences.ready ? 'ok' : 'down', note: hub.licences.ready ? 'PCs can start trials and get their keys' : 'Licence signing is not set up' },
+      { name: 'Downloads', status: published > 0 ? 'ok' : 'degraded', note: published > 0 ? `${published} installer${published === 1 ? '' : 's'} published` : 'No installer published yet' },
+      { name: 'Online orders relay', status: db ? 'ok' : 'down', note: db ? 'Orders reach the outlets' : 'Down' },
+    ];
+    return { ok: components.every((x) => x.status === 'ok'), checkedAt: hub.now(), components };
+  });
   const activateLimit = limiter(() => 10);
   add('POST', '/v1/activate', async (c) => { activateLimit(c.ip); return activations.activate((c.body ?? {}) as ActivateInput); });
-  // P7-04: the browser demo (src/demos.ts), for a signed-in person
+  // P7-04: the browser demo (src/demos.ts), for a signed-in person. P8-05 (ADR-0007): off unless the cloud is started
+  // with it (HUB_BROWSER_DEMO=1); the trial is the Windows app.
   const demoLimit = limiter(() => 5);
+  const NO_DEMO = 'There is no browser demo. Download the Windows app and start a 30-day free trial on your PC.';
   add('GET', '/v1/account/demo', (c) => {
     if (demos) return demos.current(accountToken(c));
     hub.accounts.session(accountToken(c));
-    return { demo: null, available: false, reason: 'The browser demo is not set up on this cloud.' };
+    return { demo: null, available: false, reason: NO_DEMO };
   });
   add('POST', '/v1/account/demo', async (c) => {
     demoLimit(c.ip);
-    if (!demos) { hub.accounts.session(accountToken(c)); throw new HubError('NOT_AVAILABLE', 'The browser demo is not set up on this cloud.', 503); }
+    if (!demos) { hub.accounts.session(accountToken(c)); throw new HubError('NOT_AVAILABLE', NO_DEMO, 503); }
     return demos.start(accountToken(c));
   });
   add('GET', '/v1/admin/demos', (c) => { admin(c); return { demos: demos?.adminList() ?? [], available: demos ? demos.unavailable() === null : false, reason: demos?.unavailable() ?? 'Not set up.' }; });
@@ -245,11 +308,13 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
   add('POST', '/v1/admin/stores/:slug/grants', (c) => {
     admin(c);
     const st = hub.store({ slug: c.params.slug! });
-    const b = (c.body ?? {}) as { hardwareId?: unknown; days?: unknown; terminals?: unknown; captains?: unknown; kds?: unknown; licensee?: unknown };
+    const b = (c.body ?? {}) as { hardwareId?: unknown; days?: unknown; terminals?: unknown; captains?: unknown; kds?: unknown; licensee?: unknown; product?: unknown };
+    const product = productOf(b.product);
+    if (!product) throw new HubError('VALIDATION', 'Choose the product: fine_dine (DinePOS) or tiffin_qsr (Tiffin POS).', 400, { fields: { product: 'Unknown product.' } });
     const owner = one<{ account_id: string }>(hub.db, 'SELECT account_id FROM account_store WHERE store_id = ?', st.id);
     return hub.licences.issue({
       storeId: st.id, accountId: owner?.account_id ?? null, hardwareId: String(b.hardwareId ?? ''), kind: 'manual', days: Number(b.days),
-      seats: { terminals: Number(b.terminals ?? 1), captains: Number(b.captains ?? 0), kds: Number(b.kds ?? 0) }, licensee: String(b.licensee ?? st.name), by: 'admin',
+      seats: { terminals: Number(b.terminals ?? 1), captains: Number(b.captains ?? 0), kds: Number(b.kds ?? 0) }, licensee: String(b.licensee ?? st.name), by: 'admin', product,
     });
   });
   add('POST', '/v1/admin/grants/:id/revoke', (c) => { admin(c); return hub.licences.revoke(c.params.id!, (c.body as { reason?: unknown } | null)?.reason); });
@@ -523,6 +588,10 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
     if (outlet === 'unknown') return json(res, 404, { ok: false, error: { code: 'NOT_FOUND', message: 'No DinePOS outlet at this address.' } });
     if (outlet && hosted?.isHosted(outlet.id)) return void hosted.proxy(outlet.id, req, res);
     if (outlet) return void forwardToOutlet(req, res, outlet);
+    // P8-09: the customer portal's pages on its own address; its /v1 calls fall through to the routes below
+    if (o.portal?.isPortalHost(req)) {
+      try { if (o.portal.serve(req, res)) return; } catch { return json(res, 500, { error: { code: 'ERROR', message: 'The portal page could not be read.' } }); }
+    }
     try {
       const url = new URL(req.url ?? '/', 'http://hub');
       let params: Record<string, string> = {};

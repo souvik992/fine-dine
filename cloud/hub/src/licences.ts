@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { KeyObject } from 'node:crypto';
-// The platform's licensing module (souvik992/saas-portal, packages/licensing; a git submodule at vendor/saas-portal):
-// the key format, signing and hardware ids, shared with the SaaS API and every product.
-import { loadSigningKey, normaliseHardwareId, publicKeyBase64, signKey } from '../../../vendor/saas-portal/packages/licensing/src/index.ts';
+// The licensing library (packages/licensing, ADR-0007): the key format, signing and hardware ids for every product.
+import { loadSigningKey, normaliseHardwareId, publicKeyBase64, signKey } from '../../../packages/licensing/src/index.ts';
 import { exec, many, one, tx } from './db.ts';
 import type { Db } from './db.ts';
 import { HubError } from './hub.ts';
 import type { SalesSync } from './sync.ts';
+import { DEFAULT_PRODUCT, type ProductCode } from './products.ts';
 
 /**
  * Licence keys signed by DinePOS Cloud itself (P7-02, ADR-0006). The cloud holds its own Ed25519 key (`kid: "cloud"`);
@@ -18,8 +18,6 @@ import type { SalesSync } from './sync.ts';
 
 export const CLOUD_KEY_MAX_DAYS = 400;
 const DAY = 86_400_000;
-/** The product these keys are for (the `product` field; the DinePOS app accepts keys with and without it). */
-export const PRODUCT = 'fine_dine';
 
 export type GrantKind = 'trial' | 'paid' | 'demo' | 'manual';
 export interface Seats { terminals: number; captains: number; kds: number }
@@ -32,17 +30,19 @@ export interface GrantInput {
   seats: Seats;
   licensee: string;
   features?: string[];
+  /** P8-02: the product the key is for (default fine_dine); written into the key as `product`. */
+  product?: ProductCode;
   /** Put it in the store's licence slot (default true). */
   putInSlot?: boolean;
   by?: string;
 }
 export interface Grant {
   id: string; storeId: string; accountId: string | null; hardwareId: string; kind: GrantKind; licensee: string; seats: Seats; features: string[];
-  issuedAt: number; expiresAt: number; revokedAt: number | null; revokedReason: string | null; by: string; key: string;
+  issuedAt: number; expiresAt: number; revokedAt: number | null; revokedReason: string | null; by: string; key: string; product: ProductCode;
 }
 interface GrantRow {
   id: string; store_id: string; account_id: string | null; hardware_id: string; kind: GrantKind; licensee: string; seats_json: string; features_json: string;
-  issued_at: number; expires_at: number; key_text: string; revoked_at: number | null; revoked_reason: string | null; created_by: string;
+  issued_at: number; expires_at: number; key_text: string; revoked_at: number | null; revoked_reason: string | null; created_by: string; product: ProductCode;
 }
 
 /** The signing key from a PEM (PKCS#8) text or file (Ed25519 only), and its public half as base64 SPKI. */
@@ -51,7 +51,7 @@ export { loadSigningKey, publicKeyBase64 };
 const toGrant = (r: GrantRow): Grant => ({
   id: r.id, storeId: r.store_id, accountId: r.account_id, hardwareId: r.hardware_id, kind: r.kind, licensee: r.licensee,
   seats: JSON.parse(r.seats_json) as Seats, features: JSON.parse(r.features_json) as string[], issuedAt: r.issued_at, expiresAt: r.expires_at,
-  revokedAt: r.revoked_at, revokedReason: r.revoked_reason, by: r.created_by, key: r.key_text,
+  revokedAt: r.revoked_at, revokedReason: r.revoked_reason, by: r.created_by, key: r.key_text, product: r.product,
 });
 
 export class Licences {
@@ -79,11 +79,12 @@ export class Licences {
     const seats = { terminals: s.terminals, captains: s.captains, kds: s.kds };
     // P7-03: trial and demo keys say so (the app then warns only in their last days)
     const features = [...new Set([...(input.features ?? []), ...(input.kind === 'trial' || input.kind === 'demo' ? ['trial'] : [])])];
-    const keyText = signKey({ kid: 'cloud', licensee, hardwareId, issuedAt: new Date(issuedAt), expiresAt: new Date(expiresAt), seats, features, outletId: input.storeId, product: PRODUCT }, this.key);
+    const product = input.product ?? DEFAULT_PRODUCT;
+    const keyText = signKey({ kid: 'cloud', licensee, hardwareId, issuedAt: new Date(issuedAt), expiresAt: new Date(expiresAt), seats, features, outletId: input.storeId, product }, this.key);
     const id = randomUUID();
     tx(this.db, () => {
-      exec(this.db, `INSERT INTO licence_grant (id, account_id, store_id, hardware_id, kind, licensee, seats_json, features_json, issued_at, expires_at, key_text, created_by)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, id, input.accountId ?? null, input.storeId, hardwareId, input.kind, licensee, JSON.stringify(seats), JSON.stringify(features), issuedAt, expiresAt, keyText, input.by ?? 'cloud');
+      exec(this.db, `INSERT INTO licence_grant (id, account_id, store_id, hardware_id, kind, licensee, seats_json, features_json, issued_at, expires_at, key_text, created_by, product)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, input.accountId ?? null, input.storeId, hardwareId, input.kind, licensee, JSON.stringify(seats), JSON.stringify(features), issuedAt, expiresAt, keyText, input.by ?? 'cloud', product);
       if (input.putInSlot !== false) this.sync.setLicence(input.storeId, keyText);
     });
     return this.get(id)!;
@@ -92,6 +93,12 @@ export class Licences {
   get(id: string): Grant | null {
     const r = one<GrantRow>(this.db, 'SELECT * FROM licence_grant WHERE id = ?', id);
     return r ? toGrant(r) : null;
+  }
+
+  /** P8-07: an account's keys for the portal, newest first, with the outlet's name (browser demos left out). */
+  forAccount(accountId: string): Array<Grant & { storeName: string }> {
+    return many<GrantRow & { store_name: string }>(this.db, `SELECT g.*, s.name AS store_name FROM licence_grant g JOIN store s ON s.id = g.store_id
+      WHERE g.account_id = ? AND g.kind != 'demo' ORDER BY g.issued_at DESC LIMIT 200`, accountId).map((r) => ({ ...toGrant(r), storeName: r.store_name }));
   }
 
   forStore(storeId: string): Grant[] {
