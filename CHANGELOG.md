@@ -86,3 +86,5 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-08 P8-04 Download catalogue in the hub: GET /v1/downloads from the newest GitHub Releases (cached, kept when GitHub is down), signed-in download links recorded in download_log, admin stats
 - 2026-11-08 P8-05 Browser demo off unless HUB_BROWSER_DEMO=1; the demo routes point to the 30-day Windows trial
 - 2026-11-08 P8-06 Portal rebuilt in saas-portal (cloud/saas-web) in the DinePOS look: home with QSR and Fine Dine, sign-up with product choice and email code, sign-in, forgot password, against the hub's /v1/account API; accounts store their products
+- 2026-11-08 P8-07 Client area (portal): tile home like a hosting client area, downloads and add-ons for the chosen products, licences per PC, account (products, password); hub GET /v1/account/licences
+- 2026-11-08 P8-08 Support tickets with replies (emailed), announcements, knowledge base and service status: hub src/support.ts, admin page Support tab, portal pages

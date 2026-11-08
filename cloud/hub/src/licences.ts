@@ -95,6 +95,12 @@ export class Licences {
     return r ? toGrant(r) : null;
   }
 
+  /** P8-07: an account's keys for the portal, newest first, with the outlet's name (browser demos left out). */
+  forAccount(accountId: string): Array<Grant & { storeName: string }> {
+    return many<GrantRow & { store_name: string }>(this.db, `SELECT g.*, s.name AS store_name FROM licence_grant g JOIN store s ON s.id = g.store_id
+      WHERE g.account_id = ? AND g.kind != 'demo' ORDER BY g.issued_at DESC LIMIT 200`, accountId).map((r) => ({ ...toGrant(r), storeName: r.store_name }));
+  }
+
   forStore(storeId: string): Grant[] {
     return many<GrantRow>(this.db, 'SELECT * FROM licence_grant WHERE store_id = ? ORDER BY issued_at DESC LIMIT 100', storeId).map(toGrant);
   }

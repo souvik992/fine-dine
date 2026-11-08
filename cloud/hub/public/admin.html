@@ -71,6 +71,8 @@
   .chip.st-failed { color: #fff; border-color: #991b1b; background: #b91c1c; }
   td .sub { color: var(--muted); font-size: 12px; margin-top: 2px; white-space: normal; max-width: 280px; }
   .hidden { display: none !important; }
+  .stack { display: grid; gap: 8px; }
+  .sub { color: var(--muted); font-size: 12px; }
 </style>
 </head>
 <body>
@@ -81,6 +83,7 @@
     <a href="#stores" data-tab="stores">Stores</a>
     <a href="#brands" data-tab="brands">Brands</a>
     <a href="#accounts" data-tab="accounts">Accounts</a>
+    <a href="#support" data-tab="support">Support</a>
     <a href="#settings" data-tab="settings">Hub settings</a>
     <a href="#" id="signout">Sign out</a>
   </nav>
@@ -155,6 +158,19 @@
     <p class="muted">Businesses that signed up on the portal (<a href="/signup" target="_blank" rel="noopener">/signup</a>). The newest 500.</p>
     <div id="accountWarn"></div>
     <div class="card scroll" id="accountList"></div>
+  </section>
+
+  <!-- ===================================================== support (P8-08): tickets, announcements, knowledge base -->
+  <section id="support" class="hidden">
+    <div class="row between"><h2>Support</h2><span class="muted" data-updated></span></div>
+    <p class="muted">Tickets from the customer portal (waiting for an answer first), news for the portal's Announcements, and Knowledge base articles. Your answer is emailed to the customer.</p>
+    <div class="err" id="supportErr"></div>
+    <div class="card" id="ticketView"></div>
+    <div class="card scroll" id="ticketList"></div>
+    <h3>Announcements</h3>
+    <div class="card" id="announceBox"></div>
+    <h3>Knowledge base</h3>
+    <div class="card" id="kbBox"></div>
   </section>
 
   <!-- ===================================================== settings -->
@@ -251,7 +267,7 @@
   // ------------------------------------------------------------ routing (#orders, #stores, #stores/<slug>, #settings)
   function route() {
     const [tab, slug] = location.hash.replace(/^#/, '').split('/');
-    return { tab: ['orders', 'stores', 'brands', 'accounts', 'settings'].includes(tab) ? tab : 'orders', slug: tab === 'stores' && slug ? decodeURIComponent(slug) : null };
+    return { tab: ['orders', 'stores', 'brands', 'accounts', 'support', 'settings'].includes(tab) ? tab : 'orders', slug: tab === 'stores' && slug ? decodeURIComponent(slug) : null };
   }
   function show() {
     const signedIn = Boolean(key), r = route();
@@ -264,6 +280,7 @@
     $('settings').classList.toggle('hidden', !signedIn || r.tab !== 'settings');
     $('brands').classList.toggle('hidden', !signedIn || r.tab !== 'brands');
     $('accounts').classList.toggle('hidden', !signedIn || r.tab !== 'accounts');
+    $('support').classList.toggle('hidden', !signedIn || r.tab !== 'support');
     for (const a of document.querySelectorAll('nav [data-tab]')) a.classList.toggle('on', a.dataset.tab === r.tab);
   }
   window.addEventListener('hashchange', () => { ui.pausing = false; show(); refresh(); });
@@ -282,6 +299,7 @@
       else if (r.slug) { if (!typing()) await renderStore(r.slug); }
       else if (r.tab === 'stores') renderStores();
       else if (r.tab === 'accounts') await renderAccounts();
+      else if (r.tab === 'support' && !(document.activeElement && document.activeElement.closest('#support'))) await renderSupport();
       else if (r.tab === 'brands' && !(document.activeElement && document.activeElement.closest('#brands'))) await renderBrands();
       if (!settingsDirty) fillSettings();
       if (r.tab === 'settings' && !(document.activeElement && document.activeElement.closest('#upAccount'))) await renderAccount();
@@ -407,6 +425,64 @@
         h('td', { class: 'num' }, String(a.users)),
         h('td', { class: 'num' }, String(a.stores)),
         h('td', {}, when(a.createdAt)))))));
+  }
+
+  // ------------------------------------------------------------ support (P8-08)
+  const TICKET_STATUS = { open: ['warn', 'Waiting for us'], answered: ['ok', 'Answered'], closed: ['plain', 'Closed'] };
+  const PRODUCT_NAME = { fine_dine: 'Fine Dine (DinePOS)', tiffin_qsr: 'QSR (Tiffin POS)' };
+  const productSelect = (label) => h('select', { 'aria-label': label }, h('option', { value: '' }, 'Both products'), h('option', { value: 'tiffin_qsr' }, PRODUCT_NAME.tiffin_qsr), h('option', { value: 'fine_dine' }, PRODUCT_NAME.fine_dine));
+  let openTicket = null;
+  async function supportRun(fn) {
+    $('supportErr').textContent = '';
+    try { await fn(); await renderSupport(); } catch (e) { $('supportErr').textContent = e.message; }
+  }
+  async function renderSupport() {
+    const [{ tickets }, { announcements }, { articles }] = await Promise.all([api('GET', '/v1/admin/tickets'), api('GET', '/v1/announcements'), api('GET', '/v1/kb')]);
+    // tickets
+    $('ticketList').replaceChildren(tickets.length ? h('table', {},
+      h('thead', {}, h('tr', {}, h('th', {}, '#'), h('th', {}, 'Subject'), h('th', {}, 'Business'), h('th', {}, 'Product'), h('th', {}, 'Status'), h('th', {}, 'Updated'))),
+      h('tbody', {}, tickets.map((t) => h('tr', { style: 'cursor:pointer', onclick: () => { openTicket = t.id; void renderSupport(); } },
+        h('td', {}, `#${t.number}`), h('td', {}, t.subject), h('td', {}, t.account.name, h('div', { class: 'sub' }, t.openedBy ? t.openedBy.email : '')),
+        h('td', {}, t.product ? PRODUCT_NAME[t.product] : '-'), h('td', {}, chip(...TICKET_STATUS[t.status])), h('td', {}, ago(t.updatedAt))))))
+      : h('div', { class: 'muted' }, 'No tickets yet.'));
+    if (openTicket) {
+      const t = await api('GET', `/v1/admin/tickets/${openTicket}`);
+      const answer = h('textarea', { rows: '5', placeholder: 'Your answer (emailed to the customer)' });
+      const name = h('input', { placeholder: 'Signed (e.g. Ravi, support)', value: localStorage.getItem('supportName') || '' });
+      const send = (close) => supportRun(async () => {
+        localStorage.setItem('supportName', name.value);
+        await api('POST', `/v1/admin/tickets/${t.id}/reply`, { body: answer.value, name: name.value, close });
+      });
+      $('ticketView').replaceChildren(
+        h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, `#${t.number} ${t.subject}`), h('div', { class: 'row' }, chip(...TICKET_STATUS[t.status]), h('button', { onclick: () => { openTicket = null; void renderSupport(); } }, 'Close view'))),
+        h('div', { class: 'muted' }, `${t.account.name} · ${t.openedBy ? `${t.openedBy.name} <${t.openedBy.email}>` : ''} · ${t.product ? PRODUCT_NAME[t.product] : 'any product'} · opened ${when(t.createdAt)}`),
+        ...t.messages.map((m) => h('div', { style: `margin:10px 0;padding:10px 12px;border-radius:10px;white-space:pre-wrap;background:${m.from === 'staff' ? '#fff4ec' : '#f6f4f0'}` },
+          h('div', { class: 'sub' }, `${m.from === 'staff' ? 'Us' : 'Customer'}: ${m.name} · ${when(m.at)}`), m.body)),
+        answer, h('div', { class: 'row', style: 'margin-top:8px' }, name,
+          h('button', { class: 'primary', onclick: () => send(false) }, 'Send answer'),
+          h('button', { onclick: () => send(true) }, 'Send and close'),
+          t.status !== 'closed' ? h('button', { onclick: () => supportRun(() => api('POST', `/v1/admin/tickets/${t.id}/close`)) }, 'Close without answer') : null));
+      $('ticketView').classList.remove('hidden');
+    } else { $('ticketView').replaceChildren(); $('ticketView').classList.add('hidden'); }
+    // announcements
+    const aTitle = h('input', { placeholder: 'Title, e.g. DinePOS 0.1.7 is out' }), aBody = h('textarea', { rows: '3', placeholder: 'What is new' }), aProduct = productSelect('Announcement product');
+    $('announceBox').replaceChildren(
+      ...announcements.map((a) => h('div', { class: 'row between', style: 'padding:6px 0;border-bottom:1px solid var(--line)' },
+        h('div', {}, h('b', {}, a.title), h('div', { class: 'sub' }, `${a.product ? PRODUCT_NAME[a.product] : 'Everyone'} · ${when(a.publishedAt)}`)),
+        h('button', { onclick: () => confirm(`Delete "${a.title}"?`) && supportRun(() => api('POST', `/v1/admin/announcements/${a.id}/delete`)) }, 'Delete'))),
+      h('div', { style: 'margin-top:10px', class: 'stack' }, aTitle, aBody, h('div', { class: 'row' }, aProduct,
+        h('button', { class: 'primary', onclick: () => supportRun(() => api('POST', '/v1/admin/announcements', { title: aTitle.value, body: aBody.value, product: aProduct.value || null })) }, 'Publish'))));
+    // knowledge base
+    const kSlug = h('input', { placeholder: 'Address (optional, made from the title)' }), kTitle = h('input', { placeholder: 'Title' }), kCat = h('input', { placeholder: 'Category, e.g. Getting started' });
+    const kBody = h('textarea', { rows: '6', placeholder: 'The article (plain text; blank lines make paragraphs)' }), kProduct = productSelect('Article product');
+    const edit = async (slug) => { const a = await api('GET', `/v1/kb/${slug}`); kSlug.value = a.slug; kTitle.value = a.title; kCat.value = a.category; kBody.value = a.body; kProduct.value = a.product || ''; kTitle.focus(); };
+    $('kbBox').replaceChildren(
+      ...articles.map((a) => h('div', { class: 'row between', style: 'padding:6px 0;border-bottom:1px solid var(--line)' },
+        h('div', {}, h('b', {}, a.title), h('div', { class: 'sub' }, `${a.category} · ${a.product ? PRODUCT_NAME[a.product] : 'Both products'} · /${a.slug}`)),
+        h('div', { class: 'row' }, h('button', { onclick: () => void edit(a.slug) }, 'Edit'),
+          h('button', { onclick: () => confirm(`Delete "${a.title}"?`) && supportRun(() => api('POST', `/v1/admin/kb/${a.slug}/delete`)) }, 'Delete')))),
+      h('div', { style: 'margin-top:10px', class: 'stack' }, kTitle, kSlug, kCat, kBody, h('div', { class: 'row' }, kProduct,
+        h('button', { class: 'primary', onclick: () => supportRun(() => api('POST', '/v1/admin/kb', { slug: kSlug.value, title: kTitle.value, category: kCat.value || 'General', body: kBody.value, product: kProduct.value || null })) }, 'Save article'))));
   }
 
   // ------------------------------------------------------------ brands: one website, the nearest outlet gets the order

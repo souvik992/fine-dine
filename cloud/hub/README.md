@@ -232,6 +232,18 @@ push to main (fine-dine `dinepos-build-<n>`, tiffin `tiffin-build-<n>`); the hub
 - `GET /v1/admin/downloads` (admin key): downloads per file and version.
 - `GITHUB_TOKEN` (optional): GitHub allows 60 API requests an hour per server without it; the cache needs at most 12.
 
+## Customer portal: licences, support, announcements, knowledge base, status (P8-07, P8-08)
+
+The portal (souvik992/saas-portal `cloud/saas-web`; ADR-0007) reads all of this from here, on the same origin:
+- `GET /v1/account/licences`: the account's keys (product, outlet, PC, seats, end, revoked, key text).
+- `POST /v1/account/products` `{products}`: QSR (`tiffin_qsr`), Fine Dine (`fine_dine`) or both (owner or admin).
+- Tickets (`src/support.ts`): `GET|POST /v1/account/tickets`, `GET /v1/account/tickets/<id>`, `POST .../reply`,
+  `POST .../close`. Numbered from #1001; private to the account. Admin page › **Support**: tickets waiting for an
+  answer first; an answer is emailed to the customer who opened the ticket (`/v1/admin/tickets...`).
+- Announcements: `GET /v1/announcements` (`?product=`), written on the admin page (`/v1/admin/announcements`).
+- Knowledge base: `GET /v1/kb`, `GET /v1/kb/<slug>` (plain text; blank lines make paragraphs), written on the admin page.
+- `GET /v1/status`: sign-in, licence activation, downloads published, online orders relay.
+
 ## Browser demo (P7-04; off since P8-05)
 
 Off by default (ADR-0007: the trial is the Windows app). Start the cloud with `HUB_BROWSER_DEMO=1` to offer it again;

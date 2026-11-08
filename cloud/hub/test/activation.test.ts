@@ -99,6 +99,14 @@ test('activation: each product has its own trial; keys say their product; a Tiff
     assert.deepEqual(claims.map((r) => [r.product, r.n]), [['fine_dine', 3], ['tiffin_qsr', 3]]);
     const grants = h.hub.db.prepare('SELECT product FROM licence_grant ORDER BY product').all();
     assert.deepEqual(grants.map((r) => r.product), ['fine_dine', 'tiffin_qsr']);
+    // P8-07: the portal lists the account's keys (newest first), with the outlet, seats and end date
+    const login = await fetch(`${h.base}/v1/account/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(a) });
+    const cookie = String(login.headers.get('set-cookie')).split(';')[0]!;
+    const list = (await (await fetch(`${h.base}/v1/account/licences`, { headers: { cookie } })).json()) as { licences: Array<Record<string, unknown>> };
+    assert.deepEqual(list.licences.map((l) => [l.product, l.kind, l.hardwareId, l.revoked]).sort(), [['fine_dine', 'trial', HW, false], ['tiffin_qsr', 'trial', HW, false]]);
+    const q = list.licences.find((l) => l.product === 'tiffin_qsr')!;
+    assert.deepEqual([q.outlet, q.key, q.seats], ['Spice Garden Express', qsr.json.key, { terminals: 1, captains: 0, kds: 1 }]);
+    assert.equal((await fetch(`${h.base}/v1/account/licences`)).status, 401);
   } finally { await h.close(); cleanup(h.dir); }
 });
 

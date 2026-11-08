@@ -117,6 +117,8 @@ export class Hub {
   accounts: Accounts;
   /** P7-02: licence keys signed by this cloud */
   licences: Licences;
+  /** P8-08: email to customers (account codes, support replies). */
+  mailer: Mailer;
   private opts: HubOptions;
   /** open POS event streams per store, and when the last one closed */
   private streams = new Map<string, number>();
@@ -134,7 +136,8 @@ export class Hub {
     const log = opts.log ?? { info: () => undefined, warn: () => undefined };
     const signing = opts.licenceSigningKey === undefined ? null : typeof opts.licenceSigningKey === 'string' ? loadSigningKey(opts.licenceSigningKey) : opts.licenceSigningKey;
     this.licences = new Licences(this.db, this.now, this.sync, signing);
-    this.accounts = new Accounts(this.db, this.now, { mailer: opts.mailer ?? logMailer(log), allowLogMailer: opts.allowLogMailer, log });
+    this.mailer = opts.mailer ?? logMailer(log);
+    this.accounts = new Accounts(this.db, this.now, { mailer: this.mailer, allowLogMailer: opts.allowLogMailer, log });
   }
   close() { this.db.close(); }
 

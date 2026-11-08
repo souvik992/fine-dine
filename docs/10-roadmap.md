@@ -270,10 +270,10 @@ Added 2026-11-08 at the product owner's request. Read first for every task: `doc
 - [x] **P8-06 Portal rebuilt (saas-portal `cloud/saas-web`) in the DinePOS look.** Home, product choice (QSR or Fine
   Dine), sign-up with email code, sign-in, forgot password, all against the hub's `/v1/account/*`. Accept: sign-up to
   signed-in works against a local hub; looks like DinePOS (orange, Manrope/Fraunces); works on a phone.
-- [ ] **P8-07 Client area home and Downloads / Licences / Add-ons pages.** Tiles like a hosting client area; downloads
+- [x] **P8-07 Client area home and Downloads / Licences / Add-ons pages.** Tiles like a hosting client area; downloads
   for the chosen products; licences per PC with seats and end dates; add-ons per product. Accept: a Fine Dine
   customer sees the DinePOS and Table QR downloads; a QSR customer sees Tiffin POS and ODS.
-- [ ] **P8-08 Support, announcements, knowledge base, service status.** Hub tables and routes; tickets with replies
+- [x] **P8-08 Support, announcements, knowledge base, service status.** Hub tables and routes; tickets with replies
   (customer and vendor), admin-page tabs to answer tickets and write announcements and articles; status from the
   hub's health. Accept: a ticket opened in the portal is answered from the admin page and the reply shows in the
   portal.
