@@ -267,7 +267,7 @@ Added 2026-11-08 at the product owner's request. Read first for every task: `doc
   record who downloaded what. Accept: the newest release appears within the cache time; a download is recorded.
 - [x] **P8-05 Browser demo off.** Portal no longer offers it; `/v1/account/demo` answers "not available" unless
   `HUB_BROWSER_DEMO=1`. Accept: no demo can be started by default.
-- [ ] **P8-06 Portal rebuilt (saas-portal `cloud/saas-web`) in the DinePOS look.** Home, product choice (QSR or Fine
+- [x] **P8-06 Portal rebuilt (saas-portal `cloud/saas-web`) in the DinePOS look.** Home, product choice (QSR or Fine
   Dine), sign-up with email code, sign-in, forgot password, all against the hub's `/v1/account/*`. Accept: sign-up to
   signed-in works against a local hub; looks like DinePOS (orange, Manrope/Fraunces); works on a phone.
 - [ ] **P8-07 Client area home and Downloads / Licences / Add-ons pages.** Tiles like a hosting client area; downloads
