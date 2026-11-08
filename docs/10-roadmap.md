@@ -255,7 +255,7 @@ Added 2026-11-08 at the product owner's request. Read first for every task: `doc
   (tests and fixtures included), point the hub at it, remove the `vendor/saas-portal` submodule (and its lines in the
   deploy scripts); delete saas-portal's `cloud/saas` API, its migrations and the library there. Accept: hub tests pass
   from a fresh clone without submodules; saas-portal holds only `cloud/saas-web`.
-- [ ] **P8-02 Two products, 30-day trials.** `product` on licence grants and trial claims (`fine_dine`, `tiffin_qsr`);
+- [x] **P8-02 Two products, 30-day trials.** `product` on licence grants and trial claims (`fine_dine`, `tiffin_qsr`);
   `/v1/activate` takes the product; trial 30 days; one trial per product per account, PC and mobile; the DinePOS app
   sends `fine_dine` and refuses keys for another product. Accept: a Tiffin trial on a PC does not use up its DinePOS
   trial; a `tiffin_qsr` key does not install in DinePOS.

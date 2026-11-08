@@ -100,6 +100,15 @@ describe('licence keys', () => {
     expect(licenceStatus(v, at(15), HW).state).toBe('grace');
   });
 
+  it('P8-02: DinePOS keys (labelled fine_dine, or unlabelled from before) verify; a Tiffin POS key does not', () => {
+    expect(verifyKey(issue({ product: 'fine_dine' }), vendor.publicKey, HW).ok).toBe(true);
+    expect(verifyKey(issue({}), vendor.publicKey, HW).ok).toBe(true);
+    const tiffin = verifyKey(issue({ product: 'tiffin_qsr' }), vendor.publicKey, HW);
+    expect(tiffin).toEqual({ ok: false, reason: 'This licence key is for Tiffin POS, not DinePOS.' });
+    expect(licenceStatus(tiffin, at(0), HW)).toMatchObject({ state: 'invalid', canOpenDay: false });
+    expect(verifyKey(issue({ product: 'pizza_pos' }), vendor.publicKey, HW)).toMatchObject({ ok: false, reason: expect.stringMatching(/another product/) as unknown });
+  });
+
   it('the hardware id is stable and readable; only the installed server ignores the environment', () => {
     expect(formatHardwareId(['guid-1', 'ABCD-1234'])).toBe(formatHardwareId(['guid-1', 'ABCD-1234']));
     expect(formatHardwareId(['guid-1', 'ABCD-1234'])).toMatch(/^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/);

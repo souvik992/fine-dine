@@ -16,6 +16,7 @@ import { one } from './db.ts';
 import { Demos } from './demos.ts';
 import { Activations } from './activation.ts';
 import type { ActivateInput } from './activation.ts';
+import { productOf } from './products.ts';
 import type { DemoHost, DemoSeed } from './demos.ts';
 import type { PublishedMenu } from '../../contract/src/menu.ts';
 
@@ -245,11 +246,13 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
   add('POST', '/v1/admin/stores/:slug/grants', (c) => {
     admin(c);
     const st = hub.store({ slug: c.params.slug! });
-    const b = (c.body ?? {}) as { hardwareId?: unknown; days?: unknown; terminals?: unknown; captains?: unknown; kds?: unknown; licensee?: unknown };
+    const b = (c.body ?? {}) as { hardwareId?: unknown; days?: unknown; terminals?: unknown; captains?: unknown; kds?: unknown; licensee?: unknown; product?: unknown };
+    const product = productOf(b.product);
+    if (!product) throw new HubError('VALIDATION', 'Choose the product: fine_dine (DinePOS) or tiffin_qsr (Tiffin POS).', 400, { fields: { product: 'Unknown product.' } });
     const owner = one<{ account_id: string }>(hub.db, 'SELECT account_id FROM account_store WHERE store_id = ?', st.id);
     return hub.licences.issue({
       storeId: st.id, accountId: owner?.account_id ?? null, hardwareId: String(b.hardwareId ?? ''), kind: 'manual', days: Number(b.days),
-      seats: { terminals: Number(b.terminals ?? 1), captains: Number(b.captains ?? 0), kds: Number(b.kds ?? 0) }, licensee: String(b.licensee ?? st.name), by: 'admin',
+      seats: { terminals: Number(b.terminals ?? 1), captains: Number(b.captains ?? 0), kds: Number(b.kds ?? 0) }, licensee: String(b.licensee ?? st.name), by: 'admin', product,
     });
   });
   add('POST', '/v1/admin/grants/:id/revoke', (c) => { admin(c); return hub.licences.revoke(c.params.id!, (c.body as { reason?: unknown } | null)?.reason); });

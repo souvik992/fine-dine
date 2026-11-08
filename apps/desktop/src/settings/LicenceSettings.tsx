@@ -20,7 +20,7 @@ const STATE_TEXT: Record<LicenceInfo['state'], string> = {
 const PORTAL = 'https://portal.posinext.com';
 
 /**
- * P7-03: activate this PC with a DinePOS account: a 14-day free trial, or the key the account already has for this PC.
+ * P7-03: activate this PC with a DinePOS account: a 30-day free trial, or the key the account already has for this PC.
  * The outlet server talks to DinePOS Cloud; the password is never stored.
  */
 function AccountActivation({ onDone }: { onDone: () => Promise<unknown> }) {
@@ -50,7 +50,7 @@ function AccountActivation({ onDone }: { onDone: () => Promise<unknown> }) {
     <div className="mb-6 rounded-xl border border-border bg-card p-4" data-testid="licence-account">
       <p className="font-semibold">Your DinePOS account</p>
       <p className="mb-3 text-sm text-muted-foreground">
-        Sign in to start a 14-day free trial on this PC, or to get the licence your account already has for it. No account yet? Create one at{' '}
+        Sign in to start a 30-day free trial on this PC, or to get the licence your account already has for it. No account yet? Create one at{' '}
         <span className="font-semibold text-foreground">portal.posinext.com</span>.
       </p>
       <form
@@ -70,7 +70,7 @@ function AccountActivation({ onDone }: { onDone: () => Promise<unknown> }) {
         </label>
         <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
           <button type="button" className="btn btn-primary" disabled={!ready} onClick={() => void go('trial')}>
-            <Sparkles className="h-4 w-4" /> {busy === 'trial' ? 'Starting…' : 'Start 14-day free trial'}
+            <Sparkles className="h-4 w-4" /> {busy === 'trial' ? 'Starting…' : 'Start 30-day free trial'}
           </button>
           <button type="submit" className="btn" disabled={!ready}>
             <LogIn className="h-4 w-4" /> {busy === 'signin' ? 'Signing in…' : 'Sign in and get my licence'}

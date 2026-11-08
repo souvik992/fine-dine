@@ -108,7 +108,7 @@ Built in P2-09 (product owner's decisions 2026-11-03: **no key → billing canno
   vendor's offline key, no limit) and `cloud` (DinePOS Cloud's own key, only for keys of at most 400 days). The key
   says which one signed it in `kid`; no `kid` means `master`, so every earlier key keeps working. An unknown `kid`, or a
   cloud key over 400 days, is `invalid`. Development runs: `DINEPOS_CLOUD_LICENCE_PUBLIC_KEY` adds a test cloud key.
-- **Activation with a DinePOS account (P7-03):** Settings › Licence › Your DinePOS account: **Start 14-day free trial**
+- **Activation with a DinePOS account (P7-03):** Settings › Licence › Your DinePOS account: **Start 30-day free trial**
   or **Sign in and get my licence** (`POST /v1/licence/activate`, right `admin`). The server asks DinePOS Cloud with the
   email, password and this PC's hardware id, installs the key it gets (`InstallLicence`) and links the outlet to the
   cloud for renewals (`SaveOnlineLink`). The password is never stored. Without internet the screen says so, and

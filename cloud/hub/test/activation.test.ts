@@ -4,7 +4,7 @@ import { cleanup, startHub, TEST_CLOUD_KEY } from './helpers.ts';
 import type { TestHub } from './helpers.ts';
 import { verifyKey } from '../../../apps/server/src/licence/licence.ts';
 
-// P7-03: the Windows app activating on a PC with the account's email and password.
+// P7-03, P8-02: the Windows app (DinePOS or Tiffin POS) activating on a PC with the account's email and password.
 const HW = 'AB12-CD34-EF56-7890-1A2B';
 const HW2 = '0000-1111-2222-3333-4444';
 const trusted = [{ id: 'cloud', publicKey: TEST_CLOUD_KEY.publicKey, maxDays: 400 }];
@@ -17,7 +17,7 @@ async function account(h: TestHub, email = 'asha@spicegarden.in', phone = '98765
 }
 const activate = (h: TestHub, body: Record<string, unknown>) => h.call('POST', '/v1/activate', { body: { outletName: 'Spice Garden Salt Lake', hardwareId: HW, ...body } });
 
-test('activation: a trial gives a 14-day cloud key for this PC, makes the account’s outlet and links it to the cloud', async () => {
+test('activation: a trial gives a 30-day cloud key for this PC, makes the account’s outlet and links it to the cloud', async () => {
   const h = await startHub();
   try {
     const a = await account(h);
@@ -30,7 +30,8 @@ test('activation: a trial gives a 14-day cloud key for this PC, makes the accoun
     assert.ok(v.ok, v.ok ? '' : v.reason);
     if (v.ok) {
       assert.deepEqual(v.payload.seats, { terminals: 1, captains: 1, kds: 1 });
-      assert.equal(Date.parse(v.payload.expiresAt) - Date.parse(v.payload.issuedAt), 14 * 86_400_000);
+      assert.equal(Date.parse(v.payload.expiresAt) - Date.parse(v.payload.issuedAt), 30 * 86_400_000);
+      assert.equal((v.payload as { product?: string }).product, 'fine_dine', 'an app that does not say is DinePOS');
       assert.equal(v.payload.licensee, 'Spice Garden');
     }
     // the device key works for this cloud (renewals come down the licence slot)
@@ -55,7 +56,7 @@ test('activation: one trial per PC, per email and per mobile', async () => {
     // same account, another PC: the email has had its trial
     const otherPc = await activate(h, { ...a, mode: 'trial', hardwareId: HW2 });
     assert.deepEqual([otherPc.status, otherPc.json.error.code, otherPc.json.error.details.claim], [409, 'TRIAL_USED', 'email']);
-    assert.match(otherPc.json.error.message, /This email has already had a free trial/);
+    assert.match(otherPc.json.error.message, /This email has already had a free DinePOS trial/);
     // another account on the same PC
     const b = await account(h, 'b@example.com', '9123456780');
     const samePc = await activate(h, { ...b, mode: 'trial' });
@@ -67,6 +68,37 @@ test('activation: one trial per PC, per email and per mobile', async () => {
     // a fresh account, PC and mobile still can
     const d = await account(h, 'd@example.com', '9000000001');
     assert.equal((await activate(h, { ...d, mode: 'trial', hardwareId: '5555-6666-7777-8888-9999' })).status, 200);
+  } finally { await h.close(); cleanup(h.dir); }
+});
+
+test('activation: each product has its own trial; keys say their product; a Tiffin POS key is not a DinePOS key', async () => {
+  const h = await startHub();
+  try {
+    const a = await account(h);
+    const dine = await activate(h, { ...a, mode: 'trial', product: 'fine_dine' });
+    assert.equal(dine.status, 200, JSON.stringify(dine.json));
+    // the same account, PC and mobile can still try the other product
+    const qsr = await activate(h, { ...a, mode: 'trial', product: 'tiffin_qsr', outletName: 'Spice Garden Express' });
+    assert.equal(qsr.status, 200, JSON.stringify(qsr.json));
+    assert.equal(qsr.json.product, 'tiffin_qsr');
+    assert.notEqual(qsr.json.key, dine.json.key);
+    assert.notEqual(qsr.json.store.slug, dine.json.store.slug, 'each product has its own outlet for the PC');
+    const parse = (k: string) => JSON.parse(Buffer.from(k.split('.')[0]!, 'base64url').toString()) as { product: string; seats: unknown; expiresAt: string; issuedAt: string };
+    assert.deepEqual([parse(qsr.json.key).product, parse(qsr.json.key).seats], ['tiffin_qsr', { terminals: 1, captains: 0, kds: 1 }]);
+    assert.equal(Date.parse(parse(qsr.json.key).expiresAt) - Date.parse(parse(qsr.json.key).issuedAt), 30 * 86_400_000);
+    // signing in returns each product's own key
+    assert.equal((await activate(h, { ...a, mode: 'signin', product: 'tiffin_qsr' })).json.key, qsr.json.key);
+    assert.equal((await activate(h, { ...a, mode: 'signin' })).json.key, dine.json.key);
+    // a second Tiffin trial is refused, naming the product
+    const again = await activate(h, { ...a, mode: 'trial', product: 'tiffin_qsr', hardwareId: HW2 });
+    assert.deepEqual([again.status, again.json.error.code], [409, 'TRIAL_USED']);
+    assert.match(again.json.error.message, /free Tiffin POS trial/);
+    // an unknown product is refused before anything is claimed
+    assert.equal((await activate(h, { ...a, mode: 'trial', product: 'pizza_pos' })).status, 400);
+    const claims = h.hub.db.prepare('SELECT product, COUNT(*) AS n FROM trial_claim GROUP BY product ORDER BY product').all();
+    assert.deepEqual(claims.map((r) => [r.product, r.n]), [['fine_dine', 3], ['tiffin_qsr', 3]]);
+    const grants = h.hub.db.prepare('SELECT product FROM licence_grant ORDER BY product').all();
+    assert.deepEqual(grants.map((r) => r.product), ['fine_dine', 'tiffin_qsr']);
   } finally { await h.close(); cleanup(h.dir); }
 });
 

@@ -68,7 +68,7 @@ describe('licence activation through DinePOS Cloud (P7-03)', () => {
     expect(j).toMatchObject({ kind: 'trial', linked: true, licence: { state: 'expiring', seats: { terminals: 1, captains: 1, kds: 1 } } });
     expect(calls).toHaveLength(1);
     expect(calls[0]!.url).toBe('https://cloud.test/v1/activate');
-    expect(calls[0]!.body).toMatchObject({ mode: 'trial', email: 'asha@spicegarden.in', hardwareId: HW, link: true });
+    expect(calls[0]!.body).toMatchObject({ mode: 'trial', email: 'asha@spicegarden.in', hardwareId: HW, link: true, product: 'fine_dine' });
     expect(typeof calls[0]!.body.outletName).toBe('string');
     expect(currentBusinessDate(db)).not.toBeNull();
     const link = db.prepare('SELECT hub_url, device_key, store_slug FROM online_link WHERE id = 1').get();

@@ -12,6 +12,7 @@ import { PosError } from '../core/errors.js';
 import type { Db } from '../db/connection.js';
 import type { LicenceGate } from '../licence/gate.js';
 import type { Execute, OnlineConnector } from '../online/connector.js';
+import { PRODUCT } from '../licence/licence.js';
 import { seatsUsed } from './licence.js';
 
 /** DinePOS Cloud, unless the outlet is already linked to one (Settings › Online orders › Order hub) or DINEPOS_CLOUD_URL says otherwise. */
@@ -55,7 +56,7 @@ export function licenceActivationRoutes(
       res = await (deps.fetch ?? fetch)(`${cloud}/v1/activate`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...parsed.data, hardwareId: deps.licence.hardwareId, outletName, link: !linked }),
+        body: JSON.stringify({ ...parsed.data, hardwareId: deps.licence.hardwareId, outletName, link: !linked, product: PRODUCT }),
         signal: AbortSignal.timeout(20_000),
       });
     } catch {

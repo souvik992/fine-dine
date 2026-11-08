@@ -118,12 +118,7 @@ CREATE TABLE IF NOT EXISTS licence_grant (
 CREATE INDEX IF NOT EXISTS licence_grant_store ON licence_grant(store_id, issued_at);
 CREATE INDEX IF NOT EXISTS licence_grant_account ON licence_grant(account_id);
 CREATE TRIGGER IF NOT EXISTS licence_grant_no_delete BEFORE DELETE ON licence_grant BEGIN SELECT RAISE(ABORT, 'licence_grant is append-only'); END;
-CREATE TRIGGER IF NOT EXISTS licence_grant_only_revoke BEFORE UPDATE ON licence_grant
-  WHEN OLD.revoked_at IS NOT NULL OR NEW.id IS NOT OLD.id OR NEW.account_id IS NOT OLD.account_id OR NEW.store_id IS NOT OLD.store_id
-    OR NEW.hardware_id IS NOT OLD.hardware_id OR NEW.kind IS NOT OLD.kind OR NEW.licensee IS NOT OLD.licensee OR NEW.seats_json IS NOT OLD.seats_json
-    OR NEW.features_json IS NOT OLD.features_json OR NEW.issued_at IS NOT OLD.issued_at OR NEW.expires_at IS NOT OLD.expires_at
-    OR NEW.key_text IS NOT OLD.key_text OR NEW.created_by IS NOT OLD.created_by
-  BEGIN SELECT RAISE(ABORT, 'licence_grant is append-only: only a revoke may be recorded'); END;
+-- licence_grant_only_revoke: made in openHubDb (it names product, a column added after the first release)
 `;
 
 export type Db = DatabaseSync;
@@ -143,6 +138,17 @@ export function openHubDb(path: string): Db {
   for (const [col, type] of [['site_draft_json', 'TEXT'], ['site_published_at', 'INTEGER'], ['site_draft_at', 'INTEGER'], ['site_password_hash', 'TEXT']]) {
     if (!storeCols.has(col!)) db.exec(`ALTER TABLE store ADD COLUMN ${col} ${type}`);
   }
+  // P8-02 (ADR-0007): which product a key is for (keys made before are DinePOS)
+  const grantCols = new Set((db.prepare('PRAGMA table_info(licence_grant)').all() as Array<{ name: string }>).map((c) => c.name));
+  if (!grantCols.has('product')) db.exec("ALTER TABLE licence_grant ADD COLUMN product TEXT NOT NULL DEFAULT 'fine_dine'");
+  // append-only: only a revoke may be recorded, once
+  db.exec(`DROP TRIGGER IF EXISTS licence_grant_only_revoke;
+CREATE TRIGGER licence_grant_only_revoke BEFORE UPDATE ON licence_grant
+  WHEN OLD.revoked_at IS NOT NULL OR NEW.id IS NOT OLD.id OR NEW.account_id IS NOT OLD.account_id OR NEW.store_id IS NOT OLD.store_id
+    OR NEW.hardware_id IS NOT OLD.hardware_id OR NEW.kind IS NOT OLD.kind OR NEW.licensee IS NOT OLD.licensee OR NEW.seats_json IS NOT OLD.seats_json
+    OR NEW.features_json IS NOT OLD.features_json OR NEW.issued_at IS NOT OLD.issued_at OR NEW.expires_at IS NOT OLD.expires_at
+    OR NEW.key_text IS NOT OLD.key_text OR NEW.created_by IS NOT OLD.created_by OR NEW.product IS NOT OLD.product
+  BEGIN SELECT RAISE(ABORT, 'licence_grant is append-only: only a revoke may be recorded'); END;`);
   return db;
 }
 

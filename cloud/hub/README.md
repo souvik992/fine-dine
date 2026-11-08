@@ -205,14 +205,18 @@ licensing library (`packages/licensing`); keys say
   revoke). API: `GET`/`POST /v1/admin/stores/<slug>/grants`, `POST /v1/admin/grants/<id>/revoke`,
   `GET /v1/admin/licence-signing`.
 
-## Windows trial and activation (P7-03)
+## Windows trial and activation (P7-03, P8-02)
 
-DinePOS on a PC: **Settings › Licence › Your DinePOS account**. The outlet server calls `POST /v1/activate`
-`{email, password, hardwareId, outletName, mode: "trial" | "signin", link}` (10 a minute per IP):
-- `trial`: a 14-day key (1 terminal, 1 captain phone, 1 kitchen screen). Each PC, email and mobile gets one trial
-  (`trial_claim`). The first activation makes the account's outlet (`account_store`) and, with `link`, pairs it with
-  this cloud, so renewals and paid keys arrive by themselves.
-- `signin`: the key the account already has for this PC (after a reinstall); otherwise `NO_LICENCE`.
+Two products (`src/products.ts`; ADR-0007): `fine_dine` (DinePOS) and `tiffin_qsr` (Tiffin POS). DinePOS on a PC:
+**Settings › Licence › Your DinePOS account**; Tiffin POS the same (P8-10). The app's server calls `POST /v1/activate`
+`{email, password, hardwareId, outletName, mode: "trial" | "signin", link, product}` (10 a minute per IP; `product`
+missing = `fine_dine`, for DinePOS builds before P8-02):
+- `trial`: a 30-day key for that product (DinePOS: 1 terminal, 1 captain phone, 1 kitchen screen; Tiffin POS: 1
+  terminal, 1 kitchen screen). One trial per product for each PC, email and mobile (`trial_claim`, with `product`).
+  The first activation makes the account's outlet for that PC and product (`account_store`) and, with `link`, pairs
+  it with this cloud, so renewals and paid keys arrive by themselves.
+- `signin`: the key the account already has for this PC and product (after a reinstall); otherwise `NO_LICENCE`.
+- Keys say `product`; each app refuses keys for the other (DinePOS still accepts its unlabelled keys from before).
 - The same password check as the portal (wrong passwords lock the email for 15 minutes; an unverified email gets a
   new code).
 
