@@ -107,6 +107,7 @@ $domain {
   }
 }
 EOF
+bash /opt/dinepos/cloud/hub/deploy/portal.sh --caddy-only || true
 sed -i '/^HUB_PUBLIC_URL=/d' /etc/dinepos-cloud.env
 echo "HUB_PUBLIC_URL=https://$domain" >> /etc/dinepos-cloud.env
 systemctl restart dinepos-cloud
@@ -121,6 +122,7 @@ cat > /usr/local/bin/dinepos-cloud-update <<'SCRIPT'
 set -euo pipefail
 git -C /opt/dinepos fetch --depth 1 origin main
 git -C /opt/dinepos reset --hard origin/main
+bash /opt/dinepos/cloud/hub/deploy/portal.sh || echo "Portal not updated; the hub is."
 systemctl restart dinepos-cloud
 echo "Hub updated to $(git -C /opt/dinepos log -1 --format='%h %s')"
 SCRIPT
@@ -142,8 +144,10 @@ install -d -o dineposcloud -g dineposcloud -m 0750 /var/lib/dinepos-cloud
 if [ -d /opt/dinepos/.git ]; then
   git -C /opt/dinepos fetch --depth 1 origin main
   git -C /opt/dinepos reset --hard origin/main
+  bash /opt/dinepos/cloud/hub/deploy/portal.sh || echo "Portal not updated; the hub is."
 else
   git clone --depth 1 https://github.com/souvik992/fine-dine.git /opt/dinepos
+  bash /opt/dinepos/cloud/hub/deploy/portal.sh || echo "Portal not installed yet; run dinepos-cloud-update later."
 fi
 systemctl daemon-reload
 systemctl enable dinepos-cloud

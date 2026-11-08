@@ -19,6 +19,7 @@ import type { ActivateInput } from './activation.ts';
 import { productOf } from './products.ts';
 import { Downloads } from './downloads.ts';
 import { Support } from './support.ts';
+import type { Portal } from './portal.ts';
 import type { DemoHost, DemoSeed } from './demos.ts';
 import type { PublishedMenu } from '../../contract/src/menu.ts';
 
@@ -54,6 +55,8 @@ export interface HttpOptions {
   downloads?: Downloads;
   /** P8-04: the GitHub API client for the downloads made here (tests). */
   githubFetch?: typeof fetch;
+  /** P8-09: the customer portal, served on its own address (src/portal.ts). */
+  portal?: Portal;
 }
 
 interface Ctx { req: IncomingMessage; res: ServerResponse; params: Record<string, string>; query: URLSearchParams; body: unknown; ip: string }
@@ -585,6 +588,10 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
     if (outlet === 'unknown') return json(res, 404, { ok: false, error: { code: 'NOT_FOUND', message: 'No DinePOS outlet at this address.' } });
     if (outlet && hosted?.isHosted(outlet.id)) return void hosted.proxy(outlet.id, req, res);
     if (outlet) return void forwardToOutlet(req, res, outlet);
+    // P8-09: the customer portal's pages on its own address; its /v1 calls fall through to the routes below
+    if (o.portal?.isPortalHost(req)) {
+      try { if (o.portal.serve(req, res)) return; } catch { return json(res, 500, { error: { code: 'ERROR', message: 'The portal page could not be read.' } }); }
+    }
     try {
       const url = new URL(req.url ?? '/', 'http://hub');
       let params: Record<string, string> = {};

@@ -232,6 +232,23 @@ push to main (fine-dine `dinepos-build-<n>`, tiffin `tiffin-build-<n>`); the hub
 - `GET /v1/admin/downloads` (admin key): downloads per file and version.
 - `GITHUB_TOKEN` (optional): GitHub allows 60 API requests an hour per server without it; the cache needs at most 12.
 
+## Customer portal hosting (P8-09)
+
+The portal is built by souvik992/saas-portal's CI on every push to main (release `portal-build-<n>`, file
+`portal-dist.tar.gz`). `deploy/portal.sh` (run by `dinepos-cloud-update`, `dinepos-cloud-domain` and the installer)
+fetches the newest build into `/opt/dinepos-portal`, sets `HUB_PORTAL_DIR`, and adds the portal's site to Caddy. The
+hub (`src/portal.ts`) serves it on `HUB_PORTAL_DOMAIN`; its `/v1/...` calls reach the hub on the same address.
+
+Moving portal.posinext.com from Lovable to this server (once):
+1. Merge saas-portal's portal into main, so its CI publishes the first `portal-build`.
+2. On the server, once: `sudo bash /opt/dinepos/cloud/hub/deploy/install.sh` (installs the new update script); later
+   updates are `sudo dinepos-cloud-update`.
+3. Email must work for sign-up codes: `HUB_BREVO_API_KEY` and `HUB_MAIL_FROM` in `/etc/dinepos-cloud.env`.
+4. Cloudflare DNS for posinext.com: replace the `portal` record (Lovable's) with an **A** record to this server's IP,
+   **DNS only** (grey cloud) so Caddy can get the certificate. Remove the custom domain from the Lovable project.
+5. In `/etc/dinepos-cloud.env` set `HUB_PORTAL_DOMAIN=portal.posinext.com`, then `sudo dinepos-cloud-domain`.
+   `https://portal.posinext.com` then serves the portal; until the first build is fetched it says it is being installed.
+
 ## Customer portal: licences, support, announcements, knowledge base, status (P8-07, P8-08)
 
 The portal (souvik992/saas-portal `cloud/saas-web`; ADR-0007) reads all of this from here, on the same origin:

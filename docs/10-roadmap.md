@@ -277,7 +277,7 @@ Added 2026-11-08 at the product owner's request. Read first for every task: `doc
   (customer and vendor), admin-page tabs to answer tickets and write announcements and articles; status from the
   hub's health. Accept: a ticket opened in the portal is answered from the admin page and the reply shows in the
   portal.
-- [ ] **P8-09 Portal deployment.** saas-portal CI builds and publishes the portal on every push; the cloud server's
+- [x] **P8-09 Portal deployment.** saas-portal CI builds and publishes the portal on every push; the cloud server's
   update fetches it; the hub serves it on the `portal.` host with the API on the same origin; steps to point
   portal.posinext.com at the server. Accept: after an update the server serves the newest portal build.
 - [ ] **P8-10 Licensing in Tiffin POS** (tiffin repository): hardware id, Settings › Licence with sign-in to DinePOS
