@@ -211,6 +211,7 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
   add('POST', '/v1/account/forgot', (c) => { signupLimit(c.ip); return hub.accounts.forgotPassword((c.body as B)?.email); });
   add('POST', '/v1/account/reset', async (c) => { codeLimit(c.ip); const b = c.body as B; return setSession(c, await hub.accounts.resetPassword(b?.email, b?.code, b?.password, ua(c))); });
   add('POST', '/v1/account/password', (c) => { loginLimit(c.ip); const b = c.body as B; return hub.accounts.changePassword(accountToken(c), b?.current, b?.password); });
+  add('POST', '/v1/account/products', (c) => hub.accounts.setProducts(accountToken(c), (c.body as B)?.products));
   add('GET', '/v1/account/status', () => ({ signupOpen: hub.accounts.open }));
   // P7-03: the Windows app activating on a PC (its outlet server calls this with the account's email and password)
   const activations = new Activations(hub);

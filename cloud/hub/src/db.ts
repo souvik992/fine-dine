@@ -138,6 +138,9 @@ export function openHubDb(path: string): Db {
   for (const [col, type] of [['site_draft_json', 'TEXT'], ['site_published_at', 'INTEGER'], ['site_draft_at', 'INTEGER'], ['site_password_hash', 'TEXT']]) {
     if (!storeCols.has(col!)) db.exec(`ALTER TABLE store ADD COLUMN ${col} ${type}`);
   }
+  // P8-06 (ADR-0007): the products an account chose (QSR, Fine Dine or both); accounts made before chose Fine Dine
+  const accountCols = new Set((db.prepare('PRAGMA table_info(account)').all() as Array<{ name: string }>).map((c) => c.name));
+  if (!accountCols.has('products_json')) db.exec(`ALTER TABLE account ADD COLUMN products_json TEXT NOT NULL DEFAULT '["fine_dine"]'`);
   // P8-02 (ADR-0007): which product a key is for (keys made before are DinePOS)
   const grantCols = new Set((db.prepare('PRAGMA table_info(licence_grant)').all() as Array<{ name: string }>).map((c) => c.name));
   if (!grantCols.has('product')) db.exec("ALTER TABLE licence_grant ADD COLUMN product TEXT NOT NULL DEFAULT 'fine_dine'");

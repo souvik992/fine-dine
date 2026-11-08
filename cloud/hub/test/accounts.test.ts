@@ -248,3 +248,24 @@ test('accounts: sessions expire after 30 days unused; the portal pages are serve
     assert.equal(reserved.status, 409);
   } finally { await h.close(); cleanup(h.dir); }
 });
+
+test('accounts (P8-06): the products chosen at sign-up (QSR, Fine Dine or both) are in the account and can be changed', async () => {
+  const h = await startHub();
+  try {
+    const both = await signedUp(h, browser(h), { products: ['tiffin_qsr', 'fine_dine'] } as Partial<typeof SIGNUP>);
+    assert.deepEqual((await both.call('GET', '/v1/account/me')).json.account.products, ['fine_dine', 'tiffin_qsr']);
+    const changed = await both.call('POST', '/v1/account/products', { products: ['tiffin_qsr'] });
+    assert.deepEqual(changed.json, { products: ['tiffin_qsr'] });
+    assert.deepEqual((await both.call('GET', '/v1/account/me')).json.account.products, ['tiffin_qsr']);
+    for (const bad of [[], ['pizza_pos'], ['fine_dine', 'fine_dine'], 'fine_dine']) {
+      const r = await both.call('POST', '/v1/account/products', { products: bad });
+      assert.deepEqual([r.status, r.json.error.code], [400, 'VALIDATION'], JSON.stringify(bad));
+    }
+    assert.equal((await browser(h).call('POST', '/v1/account/products', { products: ['fine_dine'] })).status, 401);
+    // not saying (older sign-up forms) means Fine Dine; an unknown product is refused before anything is made
+    const plain = await signedUp(h, browser(h), { email: 'b@example.com', phone: '9123456780' });
+    assert.deepEqual((await plain.call('GET', '/v1/account/me')).json.account.products, ['fine_dine']);
+    const r = await browser(h).call('POST', '/v1/account/signup', { ...SIGNUP, email: 'c@example.com', phone: '9000000001', products: ['pizza_pos'] });
+    assert.deepEqual([r.status, r.json.error.details.fields.products], [400, 'Choose at least one product.']);
+  } finally { await h.close(); cleanup(h.dir); }
+});

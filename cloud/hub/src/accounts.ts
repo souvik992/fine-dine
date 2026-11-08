@@ -2,6 +2,7 @@ import { randomBytes, randomInt, randomUUID, scrypt, timingSafeEqual } from 'nod
 import { exec, hash, many, one, tx } from './db.ts';
 import type { Db } from './db.ts';
 import { HubError } from './hub.ts';
+import { DEFAULT_PRODUCT, PRODUCTS, type ProductCode } from './products.ts';
 import type { Mailer } from './mailer.ts';
 
 /**
@@ -22,7 +23,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export type CodePurpose = 'verify' | 'reset';
 export type AccountRole = 'owner' | 'admin' | 'billing';
 export interface UserRow { id: string; account_id: string; email: string; name: string; password_hash: string; role: AccountRole; verified_at: number | null; created_at: number }
-interface AccountRow { id: string; name: string; phone: string; gstin: string | null; status: string; created_at: number }
+interface AccountRow { id: string; name: string; phone: string; gstin: string | null; status: string; created_at: number; products_json: string }
 
 export interface AccountsOptions {
   mailer: Mailer;
@@ -78,7 +79,7 @@ export function normalisePhone(v: unknown): string {
 
 export interface Me {
   user: { id: string; name: string; email: string; role: AccountRole };
-  account: { id: string; name: string; phone: string; gstin: string | null; status: string; createdAt: number };
+  account: { id: string; name: string; phone: string; gstin: string | null; status: string; createdAt: number; products: ProductCode[] };
   stores: Array<{ slug: string; name: string }>;
 }
 
@@ -105,12 +106,13 @@ export class Accounts {
     const email = checkEmail(b.email);
     const phone = normalisePhone(b.phone);
     const password = checkNewPassword(b.password);
+    const products = checkProducts(b.products ?? [DEFAULT_PRODUCT]);
     const passwordHash = await hashPassword(password);
     const userId = randomUUID();
     tx(this.db, () => {
       if (one(this.db, 'SELECT 1 FROM account_user WHERE email = ?', email)) throw new HubError('EMAIL_TAKEN', 'An account with this email already exists. Sign in, or reset your password.', 409, { fields: { email: 'Already registered.' } });
       const accountId = randomUUID(), at = this.now();
-      exec(this.db, "INSERT INTO account (id, name, phone, status, created_at) VALUES (?,?,?,'new',?)", accountId, businessName, phone, at);
+      exec(this.db, "INSERT INTO account (id, name, phone, status, created_at, products_json) VALUES (?,?,?,'new',?,?)", accountId, businessName, phone, at, JSON.stringify(products));
       exec(this.db, "INSERT INTO account_user (id, account_id, email, name, password_hash, role, created_at) VALUES (?,?,?,?,?,'owner',?)", userId, accountId, email, name, passwordHash, at);
     });
     this.o.log?.info('account signed up', { email });
@@ -124,6 +126,15 @@ export class Accounts {
     const u = this.userByEmail(normEmail(emailIn));
     if (u && u.verified_at === null) await this.sendCode(u.id, u.email, 'verify', true);
     return { ok: true };
+  }
+
+  /** P8-06: the products the account uses (owner or admin). Shown in the portal: downloads, add-ons, licences. */
+  setProducts(token: string | undefined, input: unknown): { products: ProductCode[] } {
+    const u = this.session(token);
+    if (u.role === 'billing') throw new HubError('FORBIDDEN', 'Only an owner or admin can change the products.', 403);
+    const products = checkProducts(input);
+    exec(this.db, 'UPDATE account SET products_json = ? WHERE id = ?', JSON.stringify(products), u.account_id);
+    return { products };
   }
 
   verifyEmail(emailIn: unknown, code: unknown, userAgent?: string) {
@@ -186,7 +197,7 @@ export class Accounts {
     const stores = many<{ slug: string; name: string }>(this.db, 'SELECT s.slug, s.name FROM account_store x JOIN store s ON s.id = x.store_id WHERE x.account_id = ? ORDER BY s.name', a.id);
     return {
       user: { id: u.id, name: u.name, email: u.email, role: u.role },
-      account: { id: a.id, name: a.name, phone: a.phone, gstin: a.gstin, status: a.status, createdAt: a.created_at },
+      account: { id: a.id, name: a.name, phone: a.phone, gstin: a.gstin, status: a.status, createdAt: a.created_at, products: JSON.parse(a.products_json) as ProductCode[] },
       stores,
     };
   }
@@ -306,3 +317,13 @@ export class Accounts {
 }
 
 const codeHash = (userId: string, purpose: string, code: string) => hash(`email-code:${purpose}:${userId}:${code}`);
+
+/** P8-06: one or both products, each once, in a fixed order. */
+function checkProducts(value: unknown): ProductCode[] {
+  const list = Array.isArray(value) ? value : [];
+  const chosen = (Object.keys(PRODUCTS) as ProductCode[]).filter((p) => list.includes(p));
+  if (chosen.length === 0 || chosen.length !== list.length) { // an unknown or repeated product is refused
+    throw new HubError('VALIDATION', 'Choose QSR, Fine Dine or both.', 400, { fields: { products: 'Choose at least one product.' } });
+  }
+  return chosen;
+}
