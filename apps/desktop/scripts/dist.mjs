@@ -13,6 +13,8 @@ const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error('Run this through npm: npm run dist -w @dinepos/desktop');
 const run = (args, cwd = repo) => execFileSync(process.execPath, [npmCli, ...args], { cwd, stdio: 'inherit' });
 
+// The workspace packages (@dinepos/shared, ...) are used from their compiled dist/; a fresh checkout (CI) has none.
+run(['run', 'build']);
 run(['run', 'bundle', '-w', '@dinepos/server']);
 run(['run', 'build', '-w', '@dinepos/desktop']);
 await fetchRuntime();
