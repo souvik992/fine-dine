@@ -1,4 +1,5 @@
 import { randomInt } from 'node:crypto';
+import { normaliseHardwareId } from '../../../vendor/saas-portal/packages/licensing/src/index.ts';
 import { exec, hash, one, tx } from './db.ts';
 import { HubError } from './hub.ts';
 import type { Hub } from './hub.ts';
@@ -15,7 +16,6 @@ import type { Grant } from './licences.ts';
 
 export const TRIAL_DAYS = 14;
 export const TRIAL_SEATS = { terminals: 1, captains: 1, kds: 1 };
-const HARDWARE_ID = /^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/;
 
 export interface ActivateInput { email?: unknown; password?: unknown; hardwareId?: unknown; outletName?: unknown; mode?: unknown; link?: unknown }
 export interface Activation {
@@ -39,8 +39,8 @@ export class Activations {
 
   async activate(input: ActivateInput): Promise<Activation> {
     const user = await this.hub.accounts.checkLogin(input.email, input.password);
-    const hardwareId = String(input.hardwareId ?? '').trim().toUpperCase();
-    if (!HARDWARE_ID.test(hardwareId)) throw new HubError('VALIDATION', 'This PC’s hardware id was not sent correctly.', 400);
+    const hardwareId = normaliseHardwareId(input.hardwareId);
+    if (!hardwareId) throw new HubError('VALIDATION', 'This PC’s hardware id was not sent correctly.', 400);
     const mode = input.mode === 'trial' ? 'trial' : 'signin';
     const outletName = String(input.outletName ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) || 'DinePOS outlet';
     const account = one<{ id: string; name: string; phone: string; status: string }>(this.hub.db, 'SELECT id, name, phone, status FROM account WHERE id = ?', user.account_id)!;

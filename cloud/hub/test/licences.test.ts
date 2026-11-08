@@ -26,6 +26,8 @@ test('licences: the admin signs a cloud key; the DinePOS verifier accepts it; it
     if (v.ok) {
       assert.equal(v.payload.kid, 'cloud');
       assert.equal(Date.parse(v.payload.expiresAt) - Date.parse(v.payload.issuedAt), 365 * 86_400_000);
+      // signed by the platform's licensing module (vendor/saas-portal), labelled for this product
+      assert.equal((v.payload as { product?: string }).product, 'fine_dine');
     }
     // the outlet's renewal fetch now gets it
     const slot = await h.call('GET', '/v1/pos/licence', { key: deviceKey });

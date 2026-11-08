@@ -1,6 +1,8 @@
-import { createPrivateKey, createPublicKey, randomUUID, sign } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { KeyObject } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+// The platform's licensing module (souvik992/saas-portal, packages/licensing; a git submodule at vendor/saas-portal):
+// the key format, signing and hardware ids, shared with the SaaS API and every product.
+import { loadSigningKey, normaliseHardwareId, publicKeyBase64, signKey } from '../../../vendor/saas-portal/packages/licensing/src/index.ts';
 import { exec, many, one, tx } from './db.ts';
 import type { Db } from './db.ts';
 import { HubError } from './hub.ts';
@@ -16,7 +18,8 @@ import type { SalesSync } from './sync.ts';
 
 export const CLOUD_KEY_MAX_DAYS = 400;
 const DAY = 86_400_000;
-const HARDWARE_ID = /^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/;
+/** The product these keys are for (the `product` field; the DinePOS app accepts keys with and without it). */
+export const PRODUCT = 'fine_dine';
 
 export type GrantKind = 'trial' | 'paid' | 'demo' | 'manual';
 export interface Seats { terminals: number; captains: number; kds: number }
@@ -42,14 +45,8 @@ interface GrantRow {
   issued_at: number; expires_at: number; key_text: string; revoked_at: number | null; revoked_reason: string | null; created_by: string;
 }
 
-/** The signing key from a PEM (PKCS#8) text or file. */
-export function loadSigningKey(pemOrPath: string): KeyObject {
-  const pem = pemOrPath.includes('-----BEGIN') ? pemOrPath : readFileSync(pemOrPath, 'utf8');
-  const k = createPrivateKey(pem);
-  if (k.asymmetricKeyType !== 'ed25519') throw new Error('The licence signing key must be an Ed25519 private key.');
-  return k;
-}
-export const publicKeyBase64 = (k: KeyObject) => createPublicKey(k).export({ format: 'der', type: 'spki' }).toString('base64');
+/** The signing key from a PEM (PKCS#8) text or file (Ed25519 only), and its public half as base64 SPKI. */
+export { loadSigningKey, publicKeyBase64 };
 
 const toGrant = (r: GrantRow): Grant => ({
   id: r.id, storeId: r.store_id, accountId: r.account_id, hardwareId: r.hardware_id, kind: r.kind, licensee: r.licensee,
@@ -70,8 +67,8 @@ export class Licences {
   /** Signs a key for one PC (or hosted outlet) and records it. Throws NOT_AVAILABLE when no signing key is set up. */
   issue(input: GrantInput): Grant {
     if (!this.key) throw new HubError('NOT_AVAILABLE', 'This cloud has no licence signing key yet (HUB_LICENCE_SIGNING_KEY_FILE).', 503);
-    const hardwareId = String(input.hardwareId ?? '').trim().toUpperCase();
-    if (!HARDWARE_ID.test(hardwareId)) throw new HubError('VALIDATION', 'The hardware id looks like AB12-CD34-EF56-7890-1A2B (Settings › Licence on that PC).', 400, { fields: { hardwareId: 'Not a hardware id.' } });
+    const hardwareId = normaliseHardwareId(input.hardwareId);
+    if (!hardwareId) throw new HubError('VALIDATION', 'The hardware id looks like AB12-CD34-EF56-7890-1A2B (Settings › Licence on that PC).', 400, { fields: { hardwareId: 'Not a hardware id.' } });
     if (!Number.isInteger(input.days) || input.days < 1 || input.days > CLOUD_KEY_MAX_DAYS) throw new HubError('VALIDATION', `A cloud key lasts 1 to ${CLOUD_KEY_MAX_DAYS} days.`, 400, { fields: { days: `1 to ${CLOUD_KEY_MAX_DAYS}.` } });
     const s = input.seats;
     if (!s || ![s.terminals, s.captains, s.kds].every((n) => Number.isInteger(n) && n >= 0 && n <= 99) || s.terminals < 1) throw new HubError('VALIDATION', 'Seats: at least 1 terminal; 0 to 99 of each.', 400, { fields: { seats: 'Check the seats.' } });
@@ -82,9 +79,7 @@ export class Licences {
     const seats = { terminals: s.terminals, captains: s.captains, kds: s.kds };
     // P7-03: trial and demo keys say so (the app then warns only in their last days)
     const features = [...new Set([...(input.features ?? []), ...(input.kind === 'trial' || input.kind === 'demo' ? ['trial'] : [])])];
-    const payload = { v: 1, kid: 'cloud', licensee, hardwareId, issuedAt: new Date(issuedAt).toISOString(), expiresAt: new Date(expiresAt).toISOString(), seats, features, outletId: input.storeId };
-    const body = Buffer.from(JSON.stringify(payload));
-    const keyText = `${body.toString('base64url')}.${sign(null, body, this.key).toString('base64url')}`;
+    const keyText = signKey({ kid: 'cloud', licensee, hardwareId, issuedAt: new Date(issuedAt), expiresAt: new Date(expiresAt), seats, features, outletId: input.storeId, product: PRODUCT }, this.key);
     const id = randomUUID();
     tx(this.db, () => {
       exec(this.db, `INSERT INTO licence_grant (id, account_id, store_id, hardware_id, kind, licensee, seats_json, features_json, issued_at, expires_at, key_text, created_by)
