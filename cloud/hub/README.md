@@ -223,13 +223,30 @@ missing = `fine_dine`, for DinePOS builds before P8-02):
 ## Windows downloads (P8-04)
 
 The portal's downloads (`src/downloads.ts`; ADR-0007): for **Fine Dine** the DinePOS installer and the Table QR add-on,
-for **QSR** the Tiffin POS installer and the ODS add-on, always the newest build. CI publishes a GitHub Release on every
-push to main (fine-dine `dinepos-build-<n>`, tiffin `tiffin-build-<n>`); the hub reads them from the GitHub API.
+for **QSR** the Tiffin POS installer and the ODS add-on, always the newest build.
+
+**Releasing (P8-11).** Installers are built on the vendor's Windows PC and uploaded here; CI does not publish them.
+1. Once: create `%USERPROFILE%\.dinepos\release.json` with `{"hubUrl": "https://<this cloud>", "adminKey": "<HUB_ADMIN_KEY>"}`
+   (never in a repository). Add-ons are signed with the keys already on that PC (`%USERPROFILE%\.dinepos\addon-signing`,
+   `%USERPROFILE%\.tiffinpos\addon-signing`).
+2. In fine-dine: `npm run release` (DinePOS + Table QR). In tiffin: `npm run release` (Tiffin POS + ODS). Each builds
+   from a clean commit, checks the address and key first, then uploads with progress. `-- --no-build` uploads what is
+   already built; `-- --only tableqr` (or `dinepos`, `tiffin`, `ods`) one item.
+3. The portal offers the new version at once.
+
+- `PUT /v1/admin/downloads/<item>/<file name>` (admin key, raw body, `X-Content-SHA256`): the file must be that item's
+  installer (`DinePOS-Setup-<v>.exe`, ...); it is streamed to `<HUB_DATA_DIR>/downloads/<item>/` and kept only if its
+  SHA-256 matches. The same version again replaces it; the newest 3 versions of each item are kept.
+- `DELETE /v1/admin/downloads/<item>/<version>` (admin key): withdraw a version; the newest one left is offered.
+- Uploaded files are not in the nightly backup (they can be uploaded again from the build PC).
+- An item never uploaded is offered from GitHub Releases (fine-dine `dinepos-build-<n>`, tiffin `tiffin-build-<n>`,
+  published by CI before P8-11), read from the GitHub API.
 - `GET /v1/downloads`: the list (version, build, size, date, product), cached 10 minutes. When GitHub cannot be reached
   the last list is used, also after a restart (kept in `setting`). An add-on missing from the newest build (its
   signing secret was not set) comes from the newest build that has it.
-- `GET /v1/account/downloads/<id>` (signed in): records the download (`download_log`) and redirects to the installer.
-- `GET /v1/admin/downloads` (admin key): downloads per file and version.
+- `GET /v1/account/downloads/<id>` (signed in): records the download (`download_log`), then streams the uploaded file
+  (`Content-Disposition: attachment`, `X-Content-SHA256`) or redirects to GitHub's.
+- `GET /v1/admin/downloads` (admin key): downloads per file and version, and the uploaded files.
 - `GITHUB_TOKEN` (optional): GitHub allows 60 API requests an hour per server without it; the cache needs at most 12.
 
 ## Customer portal hosting (P8-09)
