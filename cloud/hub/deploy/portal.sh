@@ -7,8 +7,10 @@
 #   3. when HUB_PORTAL_DOMAIN is set (e.g. portal.posinext.com, DNS pointing at this server), adds that site to Caddy
 #      (its own certificate); the hub serves the portal there and the API on the same address.
 # --caddy-only: step 3 only (after dinepos-cloud-domain rewrote the Caddyfile).
+# HUB_CADDY_MODE=import (alongside another hub, deploy/domain.sh): the site goes in /etc/caddy/dinepos-cloud.caddy.
+# For tests: DINEPOS_ENV, CADDY_DIR; NO_RELOAD=1 leaves reloading Caddy to the caller (domain.sh validates first).
 set -euo pipefail
-ENV=/etc/dinepos-cloud.env
+ENV="${DINEPOS_ENV:-/etc/dinepos-cloud.env}"
 DIR=/opt/dinepos-portal
 REPO=souvik992/saas-portal
 . "$ENV"
@@ -45,7 +47,7 @@ if [ "${1:-}" != "--caddy-only" ]; then
 fi
 
 # Caddy: the portal's site, between markers (replaced each time)
-CADDY=/etc/caddy/Caddyfile
+if [ "${HUB_CADDY_MODE:-own}" = "import" ]; then CADDY="${CADDY_DIR:-/etc/caddy}/dinepos-cloud.caddy"; else CADDY="${CADDY_DIR:-/etc/caddy}/Caddyfile"; fi
 if [ -f "$CADDY" ]; then
   sed -i '/^# >>> dinepos portal/,/^# <<< dinepos portal/d' "$CADDY"
   domain=$(grep '^HUB_PORTAL_DOMAIN=' "$ENV" | tail -1 | cut -d= -f2- | tr -d '[:space:]')
@@ -54,11 +56,11 @@ if [ -f "$CADDY" ]; then
 # >>> dinepos portal (cloud/hub/deploy/portal.sh)
 $domain {
   encode gzip
-  reverse_proxy 127.0.0.1:4900
+  reverse_proxy 127.0.0.1:${HUB_PORT:-4900}
 }
 # <<< dinepos portal
 EOF
     echo "Portal address: https://$domain"
   fi
-  systemctl reload caddy 2>/dev/null || true
+  if [ "${NO_RELOAD:-}" != "1" ]; then systemctl reload caddy 2>/dev/null || true; fi
 fi

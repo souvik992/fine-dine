@@ -3,6 +3,10 @@
 #   curl -fsSL https://raw.githubusercontent.com/souvik992/fine-dine/main/cloud/hub/deploy/install.sh | sudo bash
 # The same as the cloud-init files next to it, for a server that was started without them. Safe to run again: it keeps
 # the admin key, the settings and the data, and updates the hub. Ports 80 and 443 must be open to the internet.
+#
+# Alongside another hub (e.g. the Tiffin order hub on the same server: port 4900, owns /etc/caddy/Caddyfile): found
+# automatically (tiffin-hub.service), or forced with HUB_ALONGSIDE=1. Then DinePOS Cloud uses port 4910 and keeps its
+# Caddy sites in /etc/caddy/dinepos-cloud.caddy, which the Caddyfile only imports (see deploy/domain.sh).
 set -euo pipefail
 if [ "$(id -u)" -ne 0 ]; then echo "Run it with sudo." >&2; exit 1; fi
 export DEBIAN_FRONTEND=noninteractive
@@ -32,13 +36,23 @@ if ! command -v caddy >/dev/null; then
 fi
 
 say "Settings"
+ALONGSIDE=0
+if [ "${HUB_ALONGSIDE:-}" = "1" ] || [ -f /etc/systemd/system/tiffin-hub.service ]; then ALONGSIDE=1; fi
 NEW_KEY=""
 if [ ! -f /etc/dinepos-cloud.env ]; then
   NEW_KEY=$(head -c 24 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n')
+  if [ "$ALONGSIDE" = "1" ]; then
+    PORT=4910; MODE=import
+    echo "Another hub runs on this server: DinePOS Cloud goes alongside it (port 4910, its own Caddy file)."
+  else
+    PORT=4900; MODE=own
+  fi
   cat > /etc/dinepos-cloud.env <<EOF
 HUB_ADMIN_KEY=$NEW_KEY
 HUB_HOST=127.0.0.1
-HUB_PORT=4900
+HUB_PORT=$PORT
+# own: this hub writes /etc/caddy/Caddyfile. import: another hub owns it; this hub's sites are in /etc/caddy/dinepos-cloud.caddy
+HUB_CADDY_MODE=$MODE
 HUB_DATA_DIR=/var/lib/dinepos-cloud
 # Set to your own domain (e.g. hub.example.in) once its DNS points at this server, then run dinepos-cloud-domain.
 HUB_DOMAIN=
@@ -73,46 +87,10 @@ ReadWritePaths=/var/lib/dinepos-cloud
 WantedBy=multi-user.target
 EOF
 
-# Points Caddy at HUB_DOMAIN, or <public-ip>.sslip.io when it is empty, and sets HUB_PUBLIC_URL to match.
+# Points Caddy at the hub's address and sets HUB_PUBLIC_URL (deploy/domain.sh: in the repository, so updates reach it).
 cat > /usr/local/bin/dinepos-cloud-domain <<'SCRIPT'
 #!/bin/bash
-set -euo pipefail
-. /etc/dinepos-cloud.env
-domain="${HUB_DOMAIN:-}"
-if [ -z "$domain" ]; then
-  ip=$(curl -fsS https://api.ipify.org)
-  domain="${ip//./-}.sslip.io"
-fi
-cat > /etc/caddy/Caddyfile <<EOF
-# P6-02: each outlet's device address <store>.$domain gets its own certificate on demand, only for stores the
-# cloud knows (it answers /v1/tls-ask).
-{
-  on_demand_tls {
-    ask http://127.0.0.1:4900/v1/tls-ask
-  }
-}
-$domain {
-  encode gzip
-  reverse_proxy 127.0.0.1:4900 {
-    flush_interval -1
-  }
-}
-*.$domain {
-  tls {
-    on_demand
-  }
-  encode gzip
-  reverse_proxy 127.0.0.1:4900 {
-    flush_interval -1
-  }
-}
-EOF
-bash /opt/dinepos/cloud/hub/deploy/portal.sh --caddy-only || true
-sed -i '/^HUB_PUBLIC_URL=/d' /etc/dinepos-cloud.env
-echo "HUB_PUBLIC_URL=https://$domain" >> /etc/dinepos-cloud.env
-systemctl restart dinepos-cloud
-systemctl reload caddy || systemctl restart caddy
-echo "Hub address: https://$domain  (admin page: https://$domain/admin)"
+exec /bin/bash /opt/dinepos/cloud/hub/deploy/domain.sh "$@"
 SCRIPT
 chmod 755 /usr/local/bin/dinepos-cloud-domain
 
