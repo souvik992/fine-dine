@@ -101,3 +101,17 @@ test('downloads: a signed-in account gets the installer (recorded); without sign
     assert.equal((await h.call('GET', '/v1/admin/downloads')).status, 403);
   } finally { await h.close(); cleanup(h.dir); }
 });
+
+test('P8-05: no browser demo unless the cloud is started with one; the answer points to the Windows trial', async () => {
+  const gh = fakeGitHub();
+  const h = await startHub(undefined, undefined, undefined, { githubFetch: gh.f });
+  try {
+    const cookie = await signedIn(h);
+    const look = await fetch(`${h.base}/v1/account/demo`, { headers: { cookie } });
+    const j = (await look.json()) as { available: boolean; reason: string };
+    assert.equal(j.available, false);
+    assert.match(j.reason, /Windows app .* 30-day free trial/);
+    const start = await fetch(`${h.base}/v1/account/demo`, { method: 'POST', headers: { cookie } });
+    assert.equal(start.status, 503);
+  } finally { await h.close(); cleanup(h.dir); }
+});

@@ -232,7 +232,10 @@ push to main (fine-dine `dinepos-build-<n>`, tiffin `tiffin-build-<n>`); the hub
 - `GET /v1/admin/downloads` (admin key): downloads per file and version.
 - `GITHUB_TOKEN` (optional): GitHub allows 60 API requests an hour per server without it; the cache needs at most 12.
 
-## Browser demo (P7-04)
+## Browser demo (P7-04; off since P8-05)
+
+Off by default (ADR-0007: the trial is the Windows app). Start the cloud with `HUB_BROWSER_DEMO=1` to offer it again;
+without it the portal's demo routes answer that there is no browser demo.
 
 A signed-in portal user presses **Start the browser demo** (portal › account page). In about 3 to 30 seconds they get a
 sample restaurant, run here as a hosted outlet (`demo-xxxxxx`). It has 12 tables, 30 dishes, sample printers, and

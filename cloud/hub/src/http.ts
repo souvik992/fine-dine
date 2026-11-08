@@ -228,16 +228,18 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
   add('GET', '/v1/admin/downloads', (c) => { admin(c); return { stats: downloads.stats() }; });
   const activateLimit = limiter(() => 10);
   add('POST', '/v1/activate', async (c) => { activateLimit(c.ip); return activations.activate((c.body ?? {}) as ActivateInput); });
-  // P7-04: the browser demo (src/demos.ts), for a signed-in person
+  // P7-04: the browser demo (src/demos.ts), for a signed-in person. P8-05 (ADR-0007): off unless the cloud is started
+  // with it (HUB_BROWSER_DEMO=1); the trial is the Windows app.
   const demoLimit = limiter(() => 5);
+  const NO_DEMO = 'There is no browser demo. Download the Windows app and start a 30-day free trial on your PC.';
   add('GET', '/v1/account/demo', (c) => {
     if (demos) return demos.current(accountToken(c));
     hub.accounts.session(accountToken(c));
-    return { demo: null, available: false, reason: 'The browser demo is not set up on this cloud.' };
+    return { demo: null, available: false, reason: NO_DEMO };
   });
   add('POST', '/v1/account/demo', async (c) => {
     demoLimit(c.ip);
-    if (!demos) { hub.accounts.session(accountToken(c)); throw new HubError('NOT_AVAILABLE', 'The browser demo is not set up on this cloud.', 503); }
+    if (!demos) { hub.accounts.session(accountToken(c)); throw new HubError('NOT_AVAILABLE', NO_DEMO, 503); }
     return demos.start(accountToken(c));
   });
   add('GET', '/v1/admin/demos', (c) => { admin(c); return { demos: demos?.adminList() ?? [], available: demos ? demos.unavailable() === null : false, reason: demos?.unavailable() ?? 'Not set up.' }; });

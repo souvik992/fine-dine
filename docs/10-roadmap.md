@@ -265,7 +265,7 @@ Added 2026-11-08 at the product owner's request. Read first for every task: `doc
 - [x] **P8-04 Download catalogue in the hub.** `GET /v1/downloads` (products and add-ons, newest version, size, date)
   from the GitHub Releases API (cached; works when GitHub is down with the last list); signed-in download links
   record who downloaded what. Accept: the newest release appears within the cache time; a download is recorded.
-- [ ] **P8-05 Browser demo off.** Portal no longer offers it; `/v1/account/demo` answers "not available" unless
+- [x] **P8-05 Browser demo off.** Portal no longer offers it; `/v1/account/demo` answers "not available" unless
   `HUB_BROWSER_DEMO=1`. Accept: no demo can be started by default.
 - [ ] **P8-06 Portal rebuilt (saas-portal `cloud/saas-web`) in the DinePOS look.** Home, product choice (QSR or Fine
   Dine), sign-up with email code, sign-in, forgot password, all against the hub's `/v1/account/*`. Accept: sign-up to
