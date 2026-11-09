@@ -46,7 +46,7 @@ test('accounts: sign up → emailed code → verified and signed in; the portal 
     assert.match(h.mail[0]!.text, /\b\d{6}\b/);
     const v = await b.call('POST', '/v1/account/verify', { email: 'ASHA@spicegarden.in ', code: lastCode(h) });
     assert.equal(v.status, 200);
-    assert.match(v.setCookie!, /^dp_account=dpa_[\w-]+; Path=\/; HttpOnly; SameSite=Lax; Max-Age=2592000$/);
+    assert.match(v.setCookie!, /^dp_account=dpa_[\w-]+; Path=\/; HttpOnly; SameSite=Lax; Max-Age=34560000$/);
     assert.equal(v.json.token, undefined, 'the token is only in the HttpOnly cookie');
     const me = await b.call('GET', '/v1/account/me');
     assert.equal(me.status, 200);
@@ -228,16 +228,18 @@ test('accounts: sign-up is rate limited per IP, checked field by field, and clos
   } finally { closed.close(); }
 });
 
-test('accounts: sessions expire after 30 days unused; the portal pages are served; portal.<cloud> is never an outlet', async () => {
+test('accounts: a sign-in stays while used (400 days idle ends it), the cookie is renewed; the portal pages are served; portal.<cloud> is never an outlet', async () => {
   const h = await startHub();
   try {
     const b = await signedUp(h);
-    h.clock.t += 29 * 86_400_000;
-    assert.equal((await b.call('GET', '/v1/account/me')).status, 200, 'used within 30 days: rolls on');
-    h.clock.t += 29 * 86_400_000;
-    assert.equal((await b.call('GET', '/v1/account/me')).status, 200);
-    h.clock.t += 31 * 86_400_000;
-    assert.equal((await b.call('GET', '/v1/account/me')).status, 401);
+    for (let i = 0; i < 4; i++) {
+      h.clock.t += 390 * 86_400_000;
+      const r = await b.call('GET', '/v1/account/me');
+      assert.equal(r.status, 200, `visit ${i + 1}, 390 days after the last: still signed in (${(i + 1) * 390} days in all)`);
+      assert.match(String(r.setCookie), /^dp_account=dpa_[^;]+;.*HttpOnly; SameSite=Lax; Max-Age=345600\d{2}/, 'the cookie is renewed for 400 days');
+    }
+    h.clock.t += 401 * 86_400_000;
+    assert.equal((await b.call('GET', '/v1/account/me')).status, 401, '401 days without a visit: signed out');
     for (const p of ['/signup', '/login', '/forgot', '/app']) {
       const r = await fetch(h.base + p);
       assert.equal(r.status, 200);
@@ -246,6 +248,68 @@ test('accounts: sessions expire after 30 days unused; the portal pages are serve
     }
     const reserved = await h.call('POST', '/v1/admin/stores', { admin: true, body: { slug: 'portal', name: 'Portal' } });
     assert.equal(reserved.status, 409);
+  } finally { await h.close(); cleanup(h.dir); }
+});
+
+test('accounts: signed-in devices are listed; one can be signed out, or all the others', async () => {
+  const h = await startHub();
+  try {
+    const phone = await signedUp(h);
+    const laptop = browser(h), tablet = browser(h);
+    for (const b of [laptop, tablet]) assert.equal((await b.call('POST', '/v1/account/login', { email: SIGNUP.email, password: SIGNUP.password })).status, 200);
+    const list = await laptop.call('GET', '/v1/account/sessions');
+    assert.equal(list.status, 200);
+    const sessions = list.json.sessions as Array<{ id: string; current: boolean }>;
+    assert.equal(sessions.length, 3);
+    assert.equal(sessions.filter((s) => s.current).length, 1);
+    assert.ok(sessions.every((s) => /^[0-9a-f]{16}$/.test(s.id)));
+    assert.ok(!JSON.stringify(list.json).includes(laptop.cookie.split('=')[1]!), 'the list never shows a sign-in token');
+    // the tablet signs the phone out: only the phone is signed out
+    const phoneId = ((await phone.call('GET', '/v1/account/sessions')).json.sessions as Array<{ id: string; current: boolean }>).find((s) => s.current)!.id;
+    assert.equal((await tablet.call('POST', `/v1/account/sessions/${phoneId}/revoke`)).status, 200);
+    assert.equal((await phone.call('GET', '/v1/account/me')).status, 401);
+    assert.equal((await laptop.call('GET', '/v1/account/me')).status, 200);
+    assert.equal((await tablet.call('POST', '/v1/account/sessions/0123456789abcdef/revoke')).status, 404);
+    // another account cannot sign this one's devices out
+    const other = await signedUp(h, browser(h), { email: 'ravi@chaipoint.in', phone: '9811122233' });
+    const laptopId = ((await laptop.call('GET', '/v1/account/sessions')).json.sessions as Array<{ id: string; current: boolean }>).find((s) => s.current)!.id;
+    assert.equal((await other.call('POST', `/v1/account/sessions/${laptopId}/revoke`)).status, 404);
+    // the laptop signs out everything else
+    const r = await laptop.call('POST', '/v1/account/sessions/revoke-others');
+    assert.deepEqual(r.json, { ok: true, signedOut: 1 });
+    assert.equal((await tablet.call('GET', '/v1/account/me')).status, 401);
+    assert.equal((await laptop.call('GET', '/v1/account/me')).status, 200);
+    assert.equal((await browser(h).call('GET', '/v1/account/sessions')).status, 401);
+  } finally { await h.close(); cleanup(h.dir); }
+});
+
+test('accounts: over https the cookie is __Host- and Secure; changes from another website are refused', async () => {
+  const h = await startHub();
+  try {
+    const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
+      fetch(h.base + path, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+    await signedUp(h);
+    const login = { email: SIGNUP.email, password: SIGNUP.password };
+    // https (behind Caddy): the cookie only this exact host can have; an old plain cookie is cleared
+    const r = await post('/v1/account/login', login, { 'x-forwarded-proto': 'https' });
+    assert.equal(r.status, 200);
+    const set = r.headers.getSetCookie();
+    assert.match(set[0]!, /^__Host-dp_account=dpa_[^;]+; Path=\/; HttpOnly; Secure; SameSite=Lax; Max-Age=\d+$/);
+    assert.ok(!/Domain=/i.test(set[0]!));
+    assert.match(set[1]!, /^dp_account=; .*Max-Age=0$/);
+    const cookie = set[0]!.split(';')[0]!;
+    assert.equal((await fetch(h.base + '/v1/account/me', { headers: { cookie } })).status, 200);
+    // another website's page posting with the visitor's cookie (CSRF): refused, whatever the route
+    const host = new URL(h.base).host;
+    for (const origin of ['https://evil.example', 'http://localhost.evil.example', 'null']) {
+      const x = await post('/v1/account/sessions/revoke-others', {}, { cookie, origin, host });
+      assert.equal(x.status, 403, origin);
+    }
+    assert.equal((await post('/v1/account/login', login, { origin: 'https://evil.example' })).status, 403);
+    // the portal's own pages (same host), and callers that are not browsers (no Origin), work
+    assert.equal((await post('/v1/account/login', login, { origin: `http://${host}` })).status, 200);
+    assert.equal((await post('/v1/account/login', login)).status, 200);
+    assert.equal((await post('/v1/account/login', login, { origin: 'https://portal.posinext.com', 'x-forwarded-host': 'portal.posinext.com' })).status, 200);
   } finally { await h.close(); cleanup(h.dir); }
 });
 

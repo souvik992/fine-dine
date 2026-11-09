@@ -189,20 +189,27 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
   add('POST', '/v1/site/:slug/discard', (c) => hub.discardSiteDraft(c.params.slug!, siteToken(c)), { cors: true });
   add('PUT', '/v1/site/:slug/images/:name', (c) => hub.putSiteImage(c.params.slug!, siteToken(c), c.params.name!, (c.body as { dataBase64?: unknown } | null)?.dataBase64), { cors: true, maxBody: 2_100_000 });
 
-  // ---- customer accounts (P7-01, src/accounts.ts): the portal signs in with an HttpOnly cookie (SameSite=Lax; these
-  // routes send no CORS headers, so other sites cannot call them with it)
-  const COOKIE = 'dp_account';
+  // ---- customer accounts (P7-01, src/accounts.ts): the portal signs in with an HttpOnly cookie. Over https it is
+  // `__Host-dp_account` (Secure, Path=/, no Domain: the browser keeps it to this exact host, and no other site or
+  // subdomain can set or replace it). SameSite=Lax, and these routes send no CORS headers, so other sites cannot call
+  // them with it; changes (POST) from another site's page are also refused by their Origin (sameOriginAccount below).
+  // Sign-ins last until 400 days without a visit; each visit renews the cookie (GET /v1/account/me).
+  const COOKIE = 'dp_account', SECURE_COOKIE = '__Host-dp_account';
   const accountToken = (c: Ctx) => {
+    const jar = new Map<string, string>();
     for (const part of String(c.req.headers.cookie ?? '').split(';')) {
       const [k, ...v] = part.trim().split('=');
-      if (k === COOKIE) return v.join('=') || undefined;
+      if (k) jar.set(k, v.join('='));
     }
-    return undefined;
+    return jar.get(SECURE_COOKIE) || jar.get(COOKIE) || undefined;
   };
   const secure = (c: Ctx) => (o.publicUrl ?? '').startsWith('https:') || String(c.req.headers['x-forwarded-proto'] ?? '').split(',')[0]!.trim() === 'https';
+  const cookie = (c: Ctx, value: string, age: number) => (secure(c)
+    ? [`${SECURE_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${age}`, `${COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`]
+    : [`${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${age}`]);
   const setSession = (c: Ctx, s: { token: string; expiresAt: number } | null) => {
     const age = s ? Math.max(0, Math.floor((s.expiresAt - hub.now()) / 1000)) : 0;
-    c.res.setHeader('Set-Cookie', `${COOKIE}=${s ? s.token : ''}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${age}${secure(c) ? '; Secure' : ''}`);
+    c.res.setHeader('Set-Cookie', cookie(c, s ? s.token : '', age));
     return s ? { ok: true, expiresAt: s.expiresAt } : { ok: true };
   };
   const ua = (c: Ctx) => String(c.req.headers['user-agent'] ?? '');
@@ -213,7 +220,17 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
   add('POST', '/v1/account/verify', (c) => { codeLimit(c.ip); const b = c.body as B; return setSession(c, hub.accounts.verifyEmail(b?.email, b?.code, ua(c))); });
   add('POST', '/v1/account/login', async (c) => { loginLimit(c.ip); const b = c.body as B; return setSession(c, await hub.accounts.login(b?.email, b?.password, ua(c))); });
   add('POST', '/v1/account/logout', (c) => { hub.accounts.logout(accountToken(c)); return setSession(c, null); });
-  add('GET', '/v1/account/me', (c) => hub.accounts.me(accountToken(c)));
+  add('GET', '/v1/account/me', (c) => {
+    const token = accountToken(c);
+    const me = hub.accounts.me(token);
+    // renew the cookie with the session's (rolling) end, so a portal used now and then never signs out by itself
+    const end = hub.accounts.sessionExpiry(token);
+    if (token && end) c.res.setHeader('Set-Cookie', cookie(c, token, Math.max(0, Math.floor((end - hub.now()) / 1000))));
+    return me;
+  });
+  add('GET', '/v1/account/sessions', (c) => ({ sessions: hub.accounts.sessions(accountToken(c)) }));
+  add('POST', '/v1/account/sessions/:id/revoke', (c) => hub.accounts.revokeSession(accountToken(c), c.params.id));
+  add('POST', '/v1/account/sessions/revoke-others', (c) => hub.accounts.revokeOtherSessions(accountToken(c)));
   add('POST', '/v1/account/forgot', (c) => { signupLimit(c.ip); return hub.accounts.forgotPassword((c.body as B)?.email); });
   add('POST', '/v1/account/reset', async (c) => { codeLimit(c.ip); const b = c.body as B; return setSession(c, await hub.accounts.resetPassword(b?.email, b?.code, b?.password, ua(c))); });
   add('POST', '/v1/account/password', (c) => { loginLimit(c.ip); const b = c.body as B; return hub.accounts.changePassword(accountToken(c), b?.current, b?.password); });
@@ -627,6 +644,9 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
         break;
       }
       if (!route) throw new HubError(pathOk ? 'METHOD_NOT_ALLOWED' : 'NOT_FOUND', pathOk ? 'Method not allowed.' : 'Not found.', pathOk ? 405 : 404);
+      if (req.method !== 'GET' && url.pathname.startsWith('/v1/account/') && !sameOriginAccount(req)) {
+        throw new HubError('FORBIDDEN', 'This request came from another website and was refused.', 403);
+      }
       let body: unknown = null;
       if (req.method !== 'GET' && !route.raw) {
         const chunks: Buffer[] = [];
@@ -682,6 +702,23 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
   // take longer (P8-11). Headers must still arrive within headersTimeout (60 s), so a slow-headers client gains nothing.
   server.requestTimeout = 60 * 60_000;
   return Object.assign(server, { demos });
+}
+
+/**
+ * A change to a customer account (POST /v1/account/...) must come from the portal's own pages. Browsers send Origin
+ * with every POST; one from another host is refused (cross-site request forgery). Requests without Origin (scripts,
+ * the Windows apps' activation) are not browser requests and carry no portal cookie, so they pass. In development the
+ * portal's dev server (localhost) forwards to the hub on another port: loopback to loopback is allowed.
+ */
+function sameOriginAccount(req: IncomingMessage): boolean {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  let o: URL;
+  try { o = new URL(origin); } catch { return false; }
+  const hosts = [req.headers.host, req.headers['x-forwarded-host']].flatMap((h) => String(h ?? '').split(',')).map((h) => h.trim().toLowerCase()).filter(Boolean);
+  if (hosts.includes(o.host.toLowerCase())) return true;
+  const loop = (h: string) => /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(h);
+  return loop(o.host) && hosts.some(loop) && /^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress ?? '');
 }
 
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
