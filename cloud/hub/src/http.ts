@@ -18,6 +18,7 @@ import { Activations } from './activation.ts';
 import type { ActivateInput } from './activation.ts';
 import { productOf } from './products.ts';
 import { Downloads } from './downloads.ts';
+import { DemoRequests } from './demo-requests.ts';
 import { Support } from './support.ts';
 import type { Portal } from './portal.ts';
 import type { DemoHost, DemoSeed } from './demos.ts';
@@ -59,6 +60,10 @@ export interface HttpOptions {
   downloadsDir?: string;
   /** P8-09: the customer portal, served on its own address (src/portal.ts). */
   portal?: Portal;
+  /** posinext.com "Book a Demo" requests are emailed here (HUB_DEMO_REQUEST_TO; never shown anywhere). Not set: only saved. */
+  demoRequestTo?: string;
+  /** Warnings from the demo requests (an email that could not be sent). */
+  log?: { warn(m: string): void };
 }
 
 interface Ctx { req: IncomingMessage; res: ServerResponse; params: Record<string, string>; query: URLSearchParams; body: unknown; ip: string }
@@ -278,6 +283,12 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
     return { file: await downloads.upload(c.params.item!, decodeURIComponent(c.params.file!), c.req, String(c.req.headers['x-content-sha256'] ?? '').toLowerCase(), declared) };
   }, { raw: true });
   add('DELETE', '/v1/admin/downloads/:item/:version', (c) => { admin(c); downloads.remove(c.params.item!, decodeURIComponent(c.params.version!)); return { ok: true }; });
+
+  // ---- posinext.com "Book a Demo" form (src/demo-requests.ts): open to the website (CORS), rate limited
+  const demoRequests = new DemoRequests(hub, o.demoRequestTo, o.log);
+  const demoRequestLimit = limiter(() => 10);
+  add('POST', '/v1/demo-requests', (c) => { demoRequestLimit(c.ip); return demoRequests.submit(c.body, c.ip); }, { cors: true, maxBody: 8 * 1024 });
+  add('GET', '/v1/admin/demo-requests', (c) => { admin(c); return { requests: demoRequests.list() }; });
 
   // ---- P8-08: support tickets, announcements, knowledge base, service status (src/support.ts)
   const support = new Support(hub);

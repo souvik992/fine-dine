@@ -289,6 +289,14 @@ The portal (souvik992/saas-portal `cloud/saas-web`; ADR-0007) reads all of this 
 - Knowledge base: `GET /v1/kb`, `GET /v1/kb/<slug>` (plain text; blank lines make paragraphs), written on the admin page.
 - `GET /v1/status`: sign-in, licence activation, downloads published, online orders relay.
 
+## posinext.com "Book a Demo" requests
+
+The posinext.com website (a static site; souvik992/saas-portal `site/`) posts its demo form to
+`POST /v1/demo-requests` on this hub (CORS open, 10 a minute per address, a hidden field drops bots). Each request is
+saved and emailed to `HUB_DEMO_REQUEST_TO` (needs the Brevo settings above) in `/etc/dinepos-cloud.env`. That address
+lives only on the server: it is never in the website or in any response. A request whose email fails is still kept;
+list them with `GET /v1/admin/demo-requests` (admin key).
+
 ## Browser demo (P7-04; off since P8-05)
 
 Off by default (ADR-0007: the trial is the Windows app). Start the cloud with `HUB_BROWSER_DEMO=1` to offer it again;
