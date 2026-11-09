@@ -232,7 +232,8 @@ missing = `fine_dine`, for DinePOS builds before P8-02):
 
 ## Windows downloads (P8-04)
 
-The portal's downloads (`src/downloads.ts`; ADR-0007): for **Fine Dine** the DinePOS installer and the Table QR add-on,
+The portal's downloads (`src/downloads.ts`; ADR-0007): for **Fine Dine** the DinePOS installer and the Table QR and
+Kitchen display (DinePOS Kitchen, `apps/kitchen`) add-ons,
 for **QSR** the Tiffin POS installer and the ODS add-on, always the newest build.
 
 **Releasing (P8-11).** Installers are built on the vendor's Windows PC and uploaded here; CI does not publish them.
