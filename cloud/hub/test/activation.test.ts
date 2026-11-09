@@ -126,3 +126,46 @@ test('activation: wrong password, unverified email, no licence yet, bad hardware
     assert.equal(h.hub.db.prepare('SELECT COUNT(*) AS n FROM trial_claim').get()!.n, 0, 'nothing claimed by refused tries');
   } finally { await h.close(); cleanup(h.dir); }
 });
+
+test('activation: an admin trial reset lets the 30-day trial start again (the old trial key revoked; paid keys and other products untouched)', async () => {
+  const h = await startHub();
+  try {
+    const a = await account(h);
+    const first = await activate(h, { ...a, mode: 'trial' });
+    assert.equal(first.status, 200);
+    const tiffin = await activate(h, { ...a, mode: 'trial', product: 'tiffin_qsr' });
+    assert.equal(tiffin.status, 200);
+    assert.equal((await activate(h, { ...a, mode: 'trial' })).status, 200, 'same PC: the same trial key comes back');
+    assert.equal((await activate(h, { ...a, mode: 'trial', hardwareId: HW2 })).json.error.code, 'TRIAL_USED');
+
+    // admin key needed; unknown email refused
+    assert.equal((await h.call('POST', '/v1/admin/trials/reset', { body: { email: a.email } })).status, 403);
+    assert.equal((await h.call('POST', '/v1/admin/trials/reset', { admin: true, body: { email: 'nobody@example.com' } })).status, 404);
+    assert.equal((await h.call('POST', '/v1/admin/trials/reset', { admin: true, body: {} })).status, 400);
+
+    // reset DinePOS only
+    h.clock.t += 5 * 86_400_000;
+    const r = await h.call('POST', '/v1/admin/trials/reset', { admin: true, body: { email: a.email, product: 'fine_dine' } });
+    assert.equal(r.status, 200, JSON.stringify(r.json));
+    assert.deepEqual([r.json.revokedKeys, r.json.products], [1, ['fine_dine']]);
+    assert.ok(r.json.clearedClaims >= 3, 'hardware, email and mobile');
+    // the app's sign-in no longer finds the old key; a new trial starts with a fresh 30 days
+    assert.equal((await activate(h, { ...a, mode: 'signin' })).json.error.code, 'NO_LICENCE');
+    const again = await activate(h, { ...a, mode: 'trial' });
+    assert.equal(again.status, 200);
+    assert.notEqual(again.json.key, first.json.key);
+    assert.equal(again.json.expiresAt, h.clock.t + 30 * 86_400_000);
+    const lic = (await h.call('GET', '/v1/admin/stores/' + first.json.store.slug + '/grants', { admin: true })).json.grants as Array<{ key: string; revokedReason: string | null }>;
+    assert.equal(lic.find((g) => g.key === first.json.key)!.revokedReason, 'trial reset by admin');
+    // Tiffin POS was not reset: its trial is still used
+    assert.equal((await activate(h, { ...a, mode: 'trial', product: 'tiffin_qsr', hardwareId: HW2 })).json.error.code, 'TRIAL_USED');
+
+    // a PC on its own (another account used it): only that PC's record goes
+    const b = await account(h, 'ravi@chaipoint.in', '9811122233');
+    assert.equal((await activate(h, { ...b, mode: 'trial', product: 'tiffin_qsr', hardwareId: HW })).json.error.code, 'TRIAL_USED', 'this PC had a Tiffin trial');
+    const pc = await h.call('POST', '/v1/admin/trials/reset', { admin: true, body: { hardwareId: HW, product: 'tiffin_qsr' } });
+    assert.equal(pc.status, 200);
+    assert.equal((await activate(h, { ...b, mode: 'trial', product: 'tiffin_qsr', hardwareId: HW })).status, 200);
+    assert.equal((await h.call('POST', '/v1/admin/trials/reset', { admin: true, body: { hardwareId: 'not-an-id' } })).status, 400);
+  } finally { await h.close(); cleanup(h.dir); }
+});

@@ -78,6 +78,42 @@ export class Activations {
     return this.answer(grant, input.link === true, outletName);
   }
 
+  /**
+   * Admin: lets the 30-day trial be started again (testing, or a customer we agree to give a second trial). For the account
+   * of `email` (and/or one PC by its hardware id), for one product or both: its unexpired trial keys are revoked (keys are
+   * never deleted; the app then finds no key on sign-in) and its trial claims (that email, mobile and PCs; the PC given)
+   * are removed, so the next "Start 30-day free trial" makes a new trial. Paid and manual keys are not touched.
+   */
+  resetTrial(input: { email?: unknown; hardwareId?: unknown; product?: unknown }): { revokedKeys: number; clearedClaims: number; products: ProductCode[] } {
+    const email = String(input.email ?? '').trim().toLowerCase();
+    const hw = input.hardwareId ? normaliseHardwareId(String(input.hardwareId)) : null;
+    if (input.hardwareId && !hw) throw new HubError('VALIDATION', 'That is not a hardware id (like AB12-CD34-EF56-7890).', 400, { fields: { hardwareId: 'Not a hardware id.' } });
+    if (!email && !hw) throw new HubError('VALIDATION', 'Give the account email, the PC hardware id, or both.', 400);
+    const products: ProductCode[] = input.product ? [productOf(input.product) ?? (() => { throw new HubError('VALIDATION', 'Unknown product.', 400); })()] : (Object.keys(PRODUCTS) as ProductCode[]);
+    const user = email ? one<{ account_id: string; email: string }>(this.hub.db, 'SELECT account_id, email FROM account_user WHERE email = ?', email) : undefined;
+    if (email && !user) throw new HubError('NOT_FOUND', `No account with the email ${email}.`, 404);
+    const phone = user ? one<{ phone: string }>(this.hub.db, 'SELECT phone FROM account WHERE id = ?', user.account_id)?.phone : undefined;
+    let revokedKeys = 0, clearedClaims = 0;
+    tx(this.hub.db, () => {
+      for (const product of products) {
+        const where: string[] = [], args: unknown[] = [];
+        if (user) { where.push('account_id = ?'); args.push(user.account_id); }
+        if (hw) { where.push('hardware_id = ?'); args.push(hw); }
+        const trials = this.hub.db.prepare(`SELECT id FROM licence_grant WHERE kind = 'trial' AND product = ? AND revoked_at IS NULL AND (${where.join(' OR ')})`).all(product, ...args) as Array<{ id: string }>;
+        for (const g of trials) { this.hub.licences.revoke(g.id, 'trial reset by admin'); revokedKeys++; }
+        const hashes = [
+          ...(user ? [claimHash(product, 'email', user.email)] : []),
+          ...(phone ? [claimHash(product, 'phone', phone)] : []),
+          ...(hw ? [claimHash(product, 'hardware', hw)] : []),
+        ];
+        for (const h of hashes) clearedClaims += Number(this.hub.db.prepare('DELETE FROM trial_claim WHERE value_hash = ?').run(h).changes);
+        // the account's other trial PCs too
+        if (user) clearedClaims += Number(this.hub.db.prepare('DELETE FROM trial_claim WHERE account_id = ? AND product = ?').run(user.account_id, product).changes);
+      }
+    });
+    return { revokedKeys, clearedClaims, products };
+  }
+
   /** The account's store for this PC and product: the one an earlier key was for, else a new one (named after the outlet). */
   private storeFor(accountId: string, hardwareId: string, product: ProductCode, outletName: string): string {
     const before = one<{ store_id: string }>(this.hub.db, 'SELECT store_id FROM licence_grant WHERE account_id = ? AND hardware_id = ? AND product = ? ORDER BY issued_at DESC LIMIT 1', accountId, hardwareId, product);

@@ -56,6 +56,10 @@ FunctionEnd
 Function un.onInit
   SetShellVarContext all
   StrCpy $INSTDIR "$APPDATA\DinePOS\addons\tableqr"
+  ; the same registry view as the installer (.onInit), or DeleteRegKey misses the entry and Windows keeps listing Table QR
+  ${If} ${RunningX64}
+    SetRegView 64
+  ${EndIf}
 FunctionEnd
 
 Section "Table QR"
