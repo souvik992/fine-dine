@@ -6,7 +6,9 @@
 #   <store>.<domain> for outlet devices with on-demand certificates (P6-02).
 # HUB_CADDY_MODE=import: another hub on this server (e.g. the Tiffin order hub) owns the Caddyfile. This hub's sites
 #   go in /etc/caddy/dinepos-cloud.caddy, which the Caddyfile imports (one line, added if missing): HUB_DOMAIN (else
-#   cloud.<public-ip>.sslip.io) and HUB_PORTAL_DOMAIN (else portal.<public-ip>.sslip.io). No outlet device addresses.
+#   cloud-<public-ip>.sslip.io) and HUB_PORTAL_DOMAIN (else portal-<public-ip>.sslip.io). No outlet device addresses.
+#   (Dashes, not dots: the other hub serves *.<public-ip>.sslip.io with on-demand certificates that only it approves,
+#   so cloud.<public-ip>.sslip.io would never get a certificate.)
 #   The other hub's sites are never rewritten, and a config Caddy does not accept is rolled back before reloading.
 #   If the other hub rewrites its Caddyfile later, run dinepos-cloud-domain again to put the import line back.
 #
@@ -48,8 +50,8 @@ if [ "$mode" = "import" ]; then
   portal="${HUB_PORTAL_DOMAIN:-}"
   if [ -z "$domain" ] || [ -z "$portal" ]; then
     d=$(ip_dashed)
-    [ -z "$domain" ] && domain="cloud.$d.sslip.io"
-    [ -z "$portal" ] && { portal="portal.$d.sslip.io"; set_env HUB_PORTAL_DOMAIN "$portal"; }
+    [ -z "$domain" ] && domain="cloud-$d.sslip.io"
+    [ -z "$portal" ] && { portal="portal-$d.sslip.io"; set_env HUB_PORTAL_DOMAIN "$portal"; }
   fi
   cat > "$OURS" <<EOF
 # DinePOS Cloud (cloud/hub/deploy/domain.sh). Imported by the Caddyfile, which another hub on this server owns.
