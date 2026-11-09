@@ -73,7 +73,7 @@ export class DemoRequests {
         'What they are looking for:', message || '-',
       ].join('\n');
       try {
-        await this.hub.mailer.send({ to: this.to, subject: `Demo request: ${restaurant} (${name})`, text });
+        await this.hub.mailer.send({ to: this.to, subject: `Demo request: ${restaurant} (${name})`, text, ...(email ? { replyTo: email } : {}) });
         exec(this.db, 'UPDATE demo_request SET mailed = 1 WHERE id = ?', id);
       } catch (e) {
         this.log.warn(`demo request ${id} saved but not emailed: ${e instanceof Error ? e.message : String(e)}`);

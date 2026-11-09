@@ -95,3 +95,4 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-09 Kitchen display (DinePOS Kitchen, apps/kitchen) offered as a Fine Dine add-on download (hub catalogue `dinepos-kitchen`); `npm run release` builds and uploads it with DinePOS and Table QR
 - 2026-11-09 Admin "Reset trial" (Accounts tab; POST /v1/admin/trials/reset): revokes the trial keys and clears the trial claims so a 30-day trial can start again. Table QR 1.1.1: its uninstaller removes the Windows entry (64-bit registry view). DinePOS Kitchen 0.1.1: uninstalling removes its start-with-Windows entry
 - 2026-11-09 Cloud: POST /v1/demo-requests for the posinext.com "Book a Demo" form (saved, emailed to HUB_DEMO_REQUEST_TO set on the server only; GET /v1/admin/demo-requests)
+- 2026-11-09 Cloud: email through a mailbox's SMTP server (HUB_SMTP_HOST/USER/PASS, TLS 465; e.g. Zoho for support@posinext.com) when Brevo is not set; demo request emails reply to the restaurant

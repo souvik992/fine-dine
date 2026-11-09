@@ -197,6 +197,11 @@ Sign up (business name, your name, email, mobile, password) → a 6-digit code b
 and optionally `HUB_MAIL_FROM_NAME` in `/etc/dinepos-cloud.env`. Without them, sign-up is **closed**. For development,
 `HUB_DEV_MAIL=1` (and `npm run dev`) writes the codes to the log instead.
 
+**Email without Brevo: a mailbox's SMTP server** (e.g. Zoho Mail for `support@posinext.com`). In
+`/etc/dinepos-cloud.env` set `HUB_SMTP_HOST=smtppro.zoho.in`, `HUB_SMTP_USER=support@posinext.com`,
+`HUB_SMTP_PASS=<Zoho app password>` and `HUB_MAIL_FROM_NAME=POSINEXT` (port 465 with TLS; `HUB_SMTP_PORT` changes it;
+the sender is `HUB_MAIL_FROM`, default the user). Brevo is used instead when its settings are there.
+
 ## Licence keys signed by the cloud (P7-02)
 
 The cloud signs trial, demo and paid keys itself with its own Ed25519 key. The DinePOS app trusts it next to the
@@ -293,7 +298,7 @@ The portal (souvik992/saas-portal `cloud/saas-web`; ADR-0007) reads all of this 
 
 The posinext.com website (a static site; souvik992/saas-portal `site/`) posts its demo form to
 `POST /v1/demo-requests` on this hub (CORS open, 10 a minute per address, a hidden field drops bots). Each request is
-saved and emailed to `HUB_DEMO_REQUEST_TO` (needs the Brevo settings above) in `/etc/dinepos-cloud.env`. That address
+saved and emailed to `HUB_DEMO_REQUEST_TO` (needs Brevo or SMTP email, above; a reply goes to the restaurant's email) in `/etc/dinepos-cloud.env`. That address
 lives only on the server: it is never in the website or in any response. A request whose email fails is still kept;
 list them with `GET /v1/admin/demo-requests` (admin key).
 
