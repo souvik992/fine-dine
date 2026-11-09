@@ -32,5 +32,6 @@ module.exports = {
     shortcutName: 'DinePOS Kitchen',
     deleteAppDataOnUninstall: false,
     runAfterFinish: true,
+    include: 'build/installer.nsh',
   },
 };

@@ -330,6 +330,13 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
   });
   add('GET', '/v1/admin/demos', (c) => { admin(c); return { demos: demos?.adminList() ?? [], available: demos ? demos.unavailable() === null : false, reason: demos?.unavailable() ?? 'Not set up.' }; });
   add('GET', '/v1/admin/accounts', (c) => { admin(c); return { accounts: hub.accounts.adminList(), signupOpen: hub.accounts.open }; });
+  // a second 30-day trial (testing, or agreed with a customer): revokes the trial keys, clears the trial claims
+  add('POST', '/v1/admin/trials/reset', (c) => {
+    admin(c);
+    const r = activations.resetTrial((c.body ?? {}) as { email?: unknown; hardwareId?: unknown; product?: unknown });
+    console.log(new Date().toISOString(), 'trial reset by admin', JSON.stringify({ ...(c.body as object), ...r }));
+    return r;
+  });
 
   // ---- admin
   // A connection link carries the hub address and a one-use pairing code: the shop pastes only this into its POS.
