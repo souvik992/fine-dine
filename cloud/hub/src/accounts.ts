@@ -31,6 +31,12 @@ export interface AccountsOptions {
   mailer: Mailer;
   /** Accept the development mailer (codes in the log). Off in production: sign-up is then closed until email is set up. */
   allowLogMailer?: boolean;
+  /**
+   * HUB_SKIP_EMAIL_VERIFY=1: sign-up needs no emailed code: the account is created confirmed and signed in at once, and
+   * sign-up is open without an email provider. For getting started only: anyone can then sign up with an email that is
+   * not theirs, and "forgot password" cannot work without email.
+   */
+  skipEmailVerify?: boolean;
   log?: { info(m: string, d?: unknown): void; warn(m: string, d?: unknown): void };
 }
 
@@ -93,14 +99,15 @@ export class Accounts {
   constructor(db: Db, now: () => number, o: AccountsOptions) { this.db = db; this.now = now; this.o = o; }
 
   /** False while only the development mailer is set and it is not allowed (production without email set up). */
-  get open(): boolean { return this.o.mailer.kind !== 'log' || this.o.allowLogMailer === true; }
+  get open(): boolean { return this.o.mailer.kind !== 'log' || this.o.allowLogMailer === true || this.o.skipEmailVerify === true; }
   private needOpen() {
     if (!this.open) throw new HubError('SIGNUP_CLOSED', 'Sign-up is not open yet. Please contact us.', 503);
   }
 
   // ---------------------------------------------------------------- sign up, verify
 
-  async signup(input: unknown): Promise<{ email: string; verify: true }> {
+  /** A new account. Normally an emailed code confirms it (verify: true); with skipEmailVerify it is signed in at once. */
+  async signup(input: unknown, userAgent?: string): Promise<{ email: string; verify: true } | { email: string; verify: false; session: { token: string; expiresAt: number } }> {
     this.needOpen();
     const b = (input ?? {}) as Record<string, unknown>;
     const businessName = checkText(b.businessName, 'businessName', 'the business name', 80);
@@ -115,8 +122,13 @@ export class Accounts {
       if (one(this.db, 'SELECT 1 FROM account_user WHERE email = ?', email)) throw new HubError('EMAIL_TAKEN', 'An account with this email already exists. Sign in, or reset your password.', 409, { fields: { email: 'Already registered.' } });
       const accountId = randomUUID(), at = this.now();
       exec(this.db, "INSERT INTO account (id, name, phone, status, created_at, products_json) VALUES (?,?,?,'new',?,?)", accountId, businessName, phone, at, JSON.stringify(products));
-      exec(this.db, "INSERT INTO account_user (id, account_id, email, name, password_hash, role, created_at) VALUES (?,?,?,?,?,'owner',?)", userId, accountId, email, name, passwordHash, at);
+      exec(this.db, "INSERT INTO account_user (id, account_id, email, name, password_hash, role, created_at, verified_at) VALUES (?,?,?,?,?,'owner',?,?)",
+        userId, accountId, email, name, passwordHash, at, this.o.skipEmailVerify ? at : null);
     });
+    if (this.o.skipEmailVerify) {
+      this.o.log?.info('account signed up (email not checked: HUB_SKIP_EMAIL_VERIFY)', { email });
+      return { email, verify: false, session: this.newSession(userId, userAgent) };
+    }
     this.o.log?.info('account signed up', { email });
     await this.sendCode(userId, email, 'verify');
     return { email, verify: true };
@@ -170,6 +182,11 @@ export class Accounts {
       throw new HubError('BAD_LOGIN', 'The email or password is not right.', 401);
     }
     this.loginFails.delete(email);
+    if (u.verified_at === null && this.o.skipEmailVerify) {
+      // made before HUB_SKIP_EMAIL_VERIFY was set: the right password is enough now
+      exec(this.db, 'UPDATE account_user SET verified_at = ? WHERE id = ?', now, u.id);
+      u.verified_at = now;
+    }
     if (u.verified_at === null) {
       if (this.open) await this.sendCode(u.id, u.email, 'verify', true);
       throw new HubError('EMAIL_NOT_VERIFIED', 'Verify your email first: we have sent you a new code.', 403, { email: u.email });

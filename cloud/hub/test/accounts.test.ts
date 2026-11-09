@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { cleanup, startHub } from './helpers.ts';
 import type { TestHub } from './helpers.ts';
 import { Hub } from '../src/hub.ts';
+import { createHubServer } from '../src/http.ts';
 import { checkPassword, hashPassword, normalisePhone } from '../src/accounts.ts';
 import { logMailer } from '../src/mailer.ts';
 
@@ -226,6 +227,31 @@ test('accounts: sign-up is rate limited per IP, checked field by field, and clos
     assert.equal(closed.accounts.open, false);
     await assert.rejects(closed.accounts.signup(SIGNUP), (e: Error & { code?: string }) => e.code === 'SIGNUP_CLOSED');
   } finally { closed.close(); }
+});
+
+test('accounts: HUB_SKIP_EMAIL_VERIFY: sign-up without email is open and signs in at once; older unconfirmed accounts sign in with their password', async () => {
+  const sent: string[] = [];
+  const hub = new Hub({ dbPath: ':memory:', mailer: logMailer({ info: (m: string) => { sent.push(m); } }), skipEmailVerify: true });
+  const server = createHubServer(hub, {});
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  try {
+    assert.equal(hub.accounts.open, true);
+    const r = await fetch(`${base}/v1/account/signup`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(SIGNUP) });
+    assert.equal(r.status, 200);
+    assert.deepEqual(await r.json(), { email: 'asha@spicegarden.in', verify: false });
+    const cookie = String(r.headers.get('set-cookie')).split(';')[0]!;
+    assert.match(cookie, /^dp_account=dpa_/);
+    const me = await fetch(`${base}/v1/account/me`, { headers: { cookie } });
+    assert.equal(me.status, 200, 'signed in straight after sign-up');
+    assert.equal(sent.filter((m) => /code/i.test(m)).length, 0, 'no code was sent');
+    // an account made earlier, never confirmed: the right password signs in (no code asked), a wrong one does not
+    hub.db.prepare("INSERT INTO account (id, name, phone, status, created_at, products_json) VALUES ('a2','Chai Point','+919811122233','new',0,'[\"tiffin_qsr\"]')").run();
+    hub.db.prepare("INSERT INTO account_user (id, account_id, email, name, password_hash, role, created_at) VALUES ('u2','a2','ravi@chaipoint.in','Ravi',?,'owner',0)").run(await hashPassword('chai-point-2026'));
+    await assert.rejects(hub.accounts.login('ravi@chaipoint.in', 'wrong-password'), (e: Error & { code?: string }) => e.code === 'BAD_LOGIN');
+    const s = await hub.accounts.login('ravi@chaipoint.in', 'chai-point-2026');
+    assert.equal(hub.accounts.me(s.token).user.email, 'ravi@chaipoint.in');
+  } finally { server.close(); server.closeAllConnections(); hub.close(); }
 });
 
 test('accounts: a sign-in stays while used (400 days idle ends it), the cookie is renewed; the portal pages are served; portal.<cloud> is never an outlet', async () => {

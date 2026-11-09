@@ -175,6 +175,9 @@ Sign up (business name, your name, email, mobile, password) → a 6-digit code b
 - Other websites: changes (`POST /v1/account/...`) whose `Origin` is another host are refused (403), and these routes
   send no CORS headers. Portal pages are served with a Content-Security-Policy (own scripts only, no framing),
   Permissions-Policy, and HSTS over https.
+- `HUB_SKIP_EMAIL_VERIFY=1` (for getting started before email is set up): sign-up is open without an email provider,
+  needs no code and signs in at once; accounts made earlier sign in with their password. Anyone can then sign up with
+  an email that is not theirs, and "forgot password" cannot work: set up Brevo, then remove it.
 - Limits per IP: sign-up, resend and forgot 5 a minute; sign-in 10; codes 20. 10 wrong passwords for one email lock it
   for 15 minutes.
 

@@ -57,6 +57,8 @@ export interface HubOptions {
   mailer?: Mailer;
   /** Accept the log mailer for sign-up (development, HUB_DEV_MAIL=1). */
   allowLogMailer?: boolean;
+  /** Sign-up without the emailed code (HUB_SKIP_EMAIL_VERIFY=1; see AccountsOptions.skipEmailVerify). */
+  skipEmailVerify?: boolean;
   /** P7-02: the cloud's licence signing key (Ed25519 private: a KeyObject, PEM text or a file path). Not set: no keys signed here. */
   licenceSigningKey?: KeyObject | string;
 }
@@ -137,7 +139,7 @@ export class Hub {
     const signing = opts.licenceSigningKey === undefined ? null : typeof opts.licenceSigningKey === 'string' ? loadSigningKey(opts.licenceSigningKey) : opts.licenceSigningKey;
     this.licences = new Licences(this.db, this.now, this.sync, signing);
     this.mailer = opts.mailer ?? logMailer(log);
-    this.accounts = new Accounts(this.db, this.now, { mailer: this.mailer, allowLogMailer: opts.allowLogMailer, log });
+    this.accounts = new Accounts(this.db, this.now, { mailer: this.mailer, allowLogMailer: opts.allowLogMailer, skipEmailVerify: opts.skipEmailVerify, log });
   }
   close() { this.db.close(); }
 

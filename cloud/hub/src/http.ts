@@ -215,7 +215,12 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
   const ua = (c: Ctx) => String(c.req.headers['user-agent'] ?? '');
   const signupLimit = limiter(() => 5), loginLimit = limiter(() => 10), codeLimit = limiter(() => 20);
   type B = Record<string, unknown> | null;
-  add('POST', '/v1/account/signup', (c) => { signupLimit(c.ip); return hub.accounts.signup(c.body); });
+  add('POST', '/v1/account/signup', async (c) => {
+    signupLimit(c.ip);
+    const r = await hub.accounts.signup(c.body, ua(c));
+    if (!r.verify) { setSession(c, r.session); return { email: r.email, verify: false }; } // HUB_SKIP_EMAIL_VERIFY: signed in now
+    return r;
+  });
   add('POST', '/v1/account/resend', (c) => { signupLimit(c.ip); return hub.accounts.resendVerify((c.body as B)?.email); });
   add('POST', '/v1/account/verify', (c) => { codeLimit(c.ip); const b = c.body as B; return setSession(c, hub.accounts.verifyEmail(b?.email, b?.code, ua(c))); });
   add('POST', '/v1/account/login', async (c) => { loginLimit(c.ip); const b = c.body as B; return setSession(c, await hub.accounts.login(b?.email, b?.password, ua(c))); });
