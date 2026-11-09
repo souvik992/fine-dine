@@ -165,9 +165,16 @@ The portal for DinePOS customers, at `portal.posinext.com` (any host name that r
 Sign up (business name, your name, email, mobile, password) → a 6-digit code by email → verified and signed in.
 - Passwords: scrypt (N=16384, salted), never stored or logged in clear. At least 8 characters.
 - Codes: 10 minutes, 5 wrong tries lock the code (ask for a new one), at most 5 codes an hour per person.
-- Sign-in: an HttpOnly, SameSite=Lax cookie `dp_account` (Secure over https), 30 days, rolling. Only its SHA-256 is
-  stored. Someone whose email is not verified never gets one. A password reset ends every sign-in of that person; a
-  password change ends the others.
+- Sign-in: a random 256-bit token in an HttpOnly, SameSite=Lax cookie: over https `__Host-dp_account` (Secure, Path=/,
+  no Domain: kept to that exact host), else `dp_account`. Only its SHA-256 is stored. It stays while used: each visit
+  (`GET /v1/account/me`) moves the end 400 days on and renews the cookie, so a sign-in ends only after 400 days without
+  a visit (the longest browsers keep a cookie), on sign-out, or as below. Someone whose email is not verified never
+  gets one. A password reset ends every sign-in of that person; a password change ends the others.
+- Devices: `GET /v1/account/sessions` (last used, browser, which is this one; a 16-hex reference, never the token),
+  `POST /v1/account/sessions/<id>/revoke`, `POST /v1/account/sessions/revoke-others` (portal: My account).
+- Other websites: changes (`POST /v1/account/...`) whose `Origin` is another host are refused (403), and these routes
+  send no CORS headers. Portal pages are served with a Content-Security-Policy (own scripts only, no framing),
+  Permissions-Policy, and HSTS over https.
 - Limits per IP: sign-up, resend and forgot 5 a minute; sign-in 10; codes 20. 10 wrong passwords for one email lock it
   for 15 minutes.
 

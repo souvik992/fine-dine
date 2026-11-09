@@ -22,6 +22,17 @@ export interface PortalOptions {
   hosts?: string[];
 }
 
+/**
+ * The portal's pages: only its own scripts, styles, fonts and API (no inline scripts, nothing from other sites), never
+ * inside another site's frame, no camera / microphone / location.
+ */
+const PAGE_SECURITY = {
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+  'X-Frame-Options': 'DENY',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+};
+
 export class Portal {
   private dir: string;
   private hosts: Set<string>;
@@ -61,7 +72,9 @@ export class Portal {
       'Cache-Control': !isIndex && path.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'strict-origin-when-cross-origin',
-      ...(isIndex || target.endsWith('.html') ? { 'X-Frame-Options': 'DENY' } : {}),
+      ...(isIndex || target.endsWith('.html') ? PAGE_SECURITY : {}),
+      // over https: browsers use https only for this host for a year (no downgrade to http)
+      ...(String(req.headers['x-forwarded-proto'] ?? '').split(',')[0]!.trim() === 'https' ? { 'Strict-Transport-Security': 'max-age=31536000' } : {}),
     });
     res.end(req.method === 'HEAD' ? undefined : body);
     return true;

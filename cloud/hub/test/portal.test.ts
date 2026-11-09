@@ -35,6 +35,10 @@ test('portal: pages and files on the portal address; the browser routes the rest
     const home = await get(h.base, '/', 'portal.posinext.com');
     assert.deepEqual([home.status, home.headers['content-type'], home.headers['cache-control'], home.headers['x-frame-options']], [200, 'text/html; charset=utf-8', 'no-cache', 'DENY']);
     assert.match(home.body, /posinext/);
+    // only the portal's own code runs, never inside another site's frame
+    assert.match(String(home.headers['content-security-policy']), /default-src 'self'; script-src 'self';.*frame-ancestors 'none'/);
+    assert.equal(home.headers['permissions-policy'], 'camera=(), microphone=(), geolocation=(), payment=()');
+    assert.equal(home.headers['strict-transport-security'], undefined, 'plain http: no HSTS');
     const js = await get(h.base, '/assets/index-abc123.js', 'portal.posinext.com');
     assert.deepEqual([js.status, js.headers['content-type'], js.headers['cache-control']], [200, 'text/javascript; charset=utf-8', 'public, max-age=31536000, immutable']);
     assert.equal((await get(h.base, '/fonts/manrope-latin.woff2', 'portal.posinext.com')).headers['content-type'], 'font/woff2');

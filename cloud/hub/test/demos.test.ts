@@ -67,7 +67,7 @@ async function signedIn(h: TestHub, email = 'asha@spicegarden.in') {
     if (cookie) headers.cookie = cookie;
     const r = await fetch(h.base + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     const set = r.headers.get('set-cookie');
-    if (set) cookie = /^(dp_account=[^;]*)/.exec(set)![1]!;
+    if (set) cookie = /^((?:__Host-)?dp_account=[^;]*)/.exec(set)![1]!;
     const t = await r.text();
     return { status: r.status, json: t ? JSON.parse(t) : null };
   };

@@ -12,7 +12,9 @@ import type { Mailer } from './mailer.ts';
  * never gets a session, so cannot reach the portal.
  */
 
-const SESSION_MS = 30 * 86_400_000;
+/** A portal sign-in ends only after this long without a visit (each visit moves the end on): 400 days, the longest a
+ *  browser keeps a cookie. Changing or resetting the password, or signing a device out, ends sessions at once. */
+const SESSION_MS = 400 * 86_400_000;
 const CODE_MS = 10 * 60_000;
 const CODE_ATTEMPTS = 5;
 const SENDS_PER_HOUR = 5;
@@ -180,7 +182,7 @@ export class Accounts {
     return { ok: true };
   }
 
-  /** The signed-in person. Sessions roll: each use (at most hourly) moves the end 30 days on. */
+  /** The signed-in person. Sessions roll: each use (at most hourly) moves the end 400 days on. */
   session(token: string | undefined): UserRow {
     const s = token ? one<{ user_id: string; expires_at: number; last_used_at: number }>(this.db, 'SELECT user_id, expires_at, last_used_at FROM account_session WHERE token_hash = ?', hash(token)) : undefined;
     const now = this.now();
@@ -189,6 +191,39 @@ export class Accounts {
     if (!u || u.verified_at === null) throw new HubError('UNAUTHENTICATED', 'Please sign in.', 401);
     if (now - s.last_used_at > 3_600_000) exec(this.db, 'UPDATE account_session SET last_used_at = ?, expires_at = ? WHERE token_hash = ?', now, now + SESSION_MS, hash(token!));
     return u;
+  }
+
+  /** When this sign-in ends (for renewing the cookie), or null. */
+  sessionExpiry(token: string | undefined): number | null {
+    if (!token) return null;
+    return one<{ expires_at: number }>(this.db, 'SELECT expires_at FROM account_session WHERE token_hash = ?', hash(token))?.expires_at ?? null;
+  }
+
+  /** The person's signed-in devices, newest use first. `id` is a short reference (not usable as a sign-in). */
+  sessions(token: string | undefined): Array<{ id: string; createdAt: number; lastUsedAt: number; userAgent: string; current: boolean }> {
+    const u = this.session(token);
+    const mine = hash(token!);
+    return many<{ token_hash: string; created_at: number; last_used_at: number; user_agent: string | null }>(this.db,
+      'SELECT token_hash, created_at, last_used_at, user_agent FROM account_session WHERE user_id = ? AND expires_at >= ? ORDER BY last_used_at DESC', u.id, this.now())
+      .map((s) => ({ id: s.token_hash.slice(0, 16), createdAt: s.created_at, lastUsedAt: s.last_used_at, userAgent: s.user_agent ?? '', current: s.token_hash === mine }));
+  }
+
+  /** Signs one of the person's devices out (by its `id` from sessions()). */
+  revokeSession(token: string | undefined, id: unknown): { ok: true } {
+    const u = this.session(token);
+    if (typeof id !== 'string' || !/^[0-9a-f]{16}$/.test(id)) throw new HubError('NOT_FOUND', 'No such device.', 404);
+    const n = many<{ token_hash: string }>(this.db, 'SELECT token_hash FROM account_session WHERE user_id = ?', u.id).filter((s) => s.token_hash.startsWith(id));
+    if (n.length !== 1) throw new HubError('NOT_FOUND', 'No such device.', 404);
+    exec(this.db, 'DELETE FROM account_session WHERE token_hash = ? AND user_id = ?', n[0]!.token_hash, u.id);
+    return { ok: true };
+  }
+
+  /** Signs out every other device of this person (this one stays signed in). */
+  revokeOtherSessions(token: string | undefined): { ok: true; signedOut: number } {
+    const u = this.session(token);
+    const before = many(this.db, 'SELECT 1 FROM account_session WHERE user_id = ? AND token_hash != ?', u.id, hash(token!)).length;
+    exec(this.db, 'DELETE FROM account_session WHERE user_id = ? AND token_hash != ?', u.id, hash(token!));
+    return { ok: true, signedOut: before };
   }
 
   me(token: string | undefined): Me {
