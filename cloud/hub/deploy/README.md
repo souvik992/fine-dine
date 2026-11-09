@@ -67,8 +67,9 @@ Tiffin's sites are never rewritten, and `deploy/domain.sh` checks the combined c
 reloading; if Caddy does not accept it, everything is put back as it was.
 
 1. Over SSH: `curl -fsSL https://raw.githubusercontent.com/souvik992/fine-dine/main/cloud/hub/deploy/install.sh | sudo bash`
-2. It prints the admin key (keep it) and the addresses: `https://cloud.<ip-with-dashes>.sslip.io` (admin, API, uploads)
-   and `https://portal.<ip-with-dashes>.sslip.io` (the customer portal).
+2. It prints the admin key (keep it) and the addresses: `https://cloud-<ip-with-dashes>.sslip.io` (admin, API, uploads)
+   and `https://portal-<ip-with-dashes>.sslip.io` (the customer portal). Dashes, not dots: names under
+   `*.<ip>.sslip.io` belong to the Tiffin hub's on-demand certificates, which only it approves.
 3. Own domains later: set `HUB_DOMAIN=` and `HUB_PORTAL_DOMAIN=` in `/etc/dinepos-cloud.env` (DNS pointing at the
    server), then `sudo dinepos-cloud-domain`.
 
