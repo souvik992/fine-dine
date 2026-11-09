@@ -17,7 +17,7 @@ test('demo requests: saved, emailed to the sales address only, which no response
     assert.equal(r.headers.get('access-control-allow-origin'), '*');
     assert.ok(!text.includes(SALES));
     const mail = h.mail.at(-1)!;
-    assert.deepEqual([mail.to, mail.subject], [SALES, 'Demo request: Spice Garden (Asha Rao)']);
+    assert.deepEqual([mail.to, mail.subject, mail.replyTo], [SALES, 'Demo request: Spice Garden (Asha Rao)', form.email]);
     for (const v of [form.name, form.phone, form.email, form.restaurant, form.city, form.outlets, form.message]) assert.ok(mail.text.includes(v), v);
     const list = await h.call('GET', '/v1/admin/demo-requests', { admin: true });
     assert.deepEqual(list.json.requests.map((x: any) => [x.restaurant, x.phone, x.mailed]), [['Spice Garden', '+91 98765 43210', true]]);

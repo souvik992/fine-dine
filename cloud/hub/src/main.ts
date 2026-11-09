@@ -17,7 +17,9 @@
 //   HUB_SKIP_EMAIL_VERIFY=1  sign-up without the emailed code (signed in at once); for getting started before email is set up
 //   HUB_ALERT_WEBHOOK  Slack / Discord / Google Chat webhook for alerts (hosted outlet down, backups failing)
 //   HUB_PORTAL_DIR     P8-09: the built customer portal (deploy/portal.sh fetches it); HUB_PORTAL_DOMAIN: its address
-//   HUB_DEMO_REQUEST_TO  where posinext.com "Book a Demo" requests are emailed (needs Brevo above); never shown on the site
+//   HUB_SMTP_HOST, HUB_SMTP_USER, HUB_SMTP_PASS (+ HUB_SMTP_PORT, default 465)  email through a mailbox's SMTP server
+//                      instead of Brevo (e.g. Zoho: smtppro.zoho.in, support@posinext.com, an app password)
+//   HUB_DEMO_REQUEST_TO  where posinext.com "Book a Demo" requests are emailed (needs Brevo or SMTP above); never shown on the site
 //   GITHUB_TOKEN       P8-04: optional; downloads not uploaded yet come from GitHub Releases (60 requests an hour without it)
 // Installers uploaded with `npm run release` (P8-11) are kept in <HUB_DATA_DIR>/downloads (the newest 3 of each).
 import { existsSync, mkdirSync } from 'node:fs';
