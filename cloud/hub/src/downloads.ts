@@ -36,6 +36,7 @@ export interface DownloadItem {
 export const CATALOGUE: readonly DownloadItem[] = [
   { id: 'dinepos', product: 'fine_dine', kind: 'app', name: 'DinePOS for Windows', description: 'Billing, tables, KOTs and the kitchen. Install it on the outlet’s main PC first.', repo: 'souvik992/fine-dine', tagPrefix: 'dinepos-build-', asset: /^DinePOS-Setup-(.+)\.exe$/ },
   { id: 'dinepos-tableqr', product: 'fine_dine', kind: 'addon', name: 'Table QR', description: 'Guests order and call a waiter from a QR code on the table. Install after DinePOS.', repo: 'souvik992/fine-dine', tagPrefix: 'dinepos-build-', asset: /^DinePOS-TableQR-Setup-(.+)\.exe$/ },
+  { id: 'dinepos-kitchen', product: 'fine_dine', kind: 'addon', name: 'Kitchen display (KDS)', description: 'DinePOS Kitchen: KOTs as tickets on a kitchen PC or screen, bumped when ready. Install on the kitchen PC; DinePOS runs on the main PC.', repo: 'souvik992/fine-dine', tagPrefix: 'dinepos-build-', asset: /^DinePOS-Kitchen-Setup-(.+)\.exe$/ },
   { id: 'tiffin', product: 'tiffin_qsr', kind: 'app', name: 'Tiffin POS for Windows', description: 'Quick billing, kitchen tickets and stock for counter service.', repo: 'souvik992/tiffin', tagPrefix: 'tiffin-build-', asset: /^TiffinPOS-Setup-(.+)\.exe$/ },
   { id: 'tiffin-ods', product: 'tiffin_qsr', kind: 'addon', name: 'ODS (online orders)', description: 'Online orders from your website, app, Swiggy and Zomato on an order display screen. Install after Tiffin POS.', repo: 'souvik992/tiffin', tagPrefix: 'tiffin-build-', asset: /^TiffinPOS-ODS-Setup-(.+)\.exe$/ },
 ];

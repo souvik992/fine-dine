@@ -1,9 +1,9 @@
 // P8-11: builds the Windows installers on this PC and uploads them to DinePOS Cloud, which offers them in the customer
 // portal (Client area > Downloads). CI only tests; installers are built here.
 //
-//   npm run release                 build DinePOS + Table QR, then upload both
+//   npm run release                 build DinePOS, Table QR and DinePOS Kitchen (KDS), then upload them
 //   npm run release -- --no-build   upload the installers already built (the newest version of each)
-//   npm run release -- --only dinepos   (or --only tableqr)
+//   npm run release -- --only dinepos   (or --only tableqr, --only kitchen)
 //   npm run release -- --allow-dirty    build even with uncommitted changes (not recommended)
 //
 // Where to upload: %USERPROFILE%\.dinepos\release.json  {"hubUrl": "https://cloud.example.com", "adminKey": "..."}
@@ -31,8 +31,10 @@ const ITEMS = [
     build: ['run', 'installer', '-w', '@dinepos/addon-tableqr'],
     needs: () => process.env.DINEPOS_ADDON_SIGNING_KEY ?? path.join(homedir(), '.dinepos', 'addon-signing', 'private.pem'),
   },
+  // the kitchen display (KDS) for a kitchen PC: apps/kitchen
+  { id: 'dinepos-kitchen', name: 'DinePOS Kitchen (KDS)', dir: path.join(repo, 'apps', 'kitchen', 'release'), file: /^DinePOS-Kitchen-Setup-(.+)\.exe$/, build: ['run', 'dist', '-w', '@dinepos/kitchen'] },
 ].filter((i) => !only || i.id === only || i.id === `dinepos-${only}`);
-if (!ITEMS.length) fail(`--only must be dinepos or tableqr`);
+if (!ITEMS.length) fail('--only must be dinepos, tableqr or kitchen');
 
 function fail(msg) { console.error(`\n✖ ${msg}\n`); process.exit(1); }
 
