@@ -14,6 +14,7 @@
 //   HUB_BROWSER_DEMO=1 P7-04: offer the browser demo (off by default since P8-05: the trial is the Windows app)
 //   HUB_MAX_DEMOS      P7-04: browser demos running at once (default 10); HUB_DEMO_SEED: the sample outlet (default ../../outlet-server/demo-seed.json)
 //   HUB_DEV_MAIL=1     P7-01: development only: no email provider, codes go to this log and sign-up is open
+//   HUB_SKIP_EMAIL_VERIFY=1  sign-up without the emailed code (signed in at once); for getting started before email is set up
 //   HUB_ALERT_WEBHOOK  Slack / Discord / Google Chat webhook for alerts (hosted outlet down, backups failing)
 //   HUB_PORTAL_DIR     P8-09: the built customer portal (deploy/portal.sh fetches it); HUB_PORTAL_DOMAIN: its address
 //   GITHUB_TOKEN       P8-04: optional; downloads not uploaded yet come from GitHub Releases (60 requests an hour without it)
@@ -40,7 +41,9 @@ const hub = new Hub({
   dbPath: join(dir, 'hub.db'), devOtp: process.env.HUB_DEV_OTP === '1', onlinePayments: process.env.HUB_ONLINE_PAYMENTS === '1', log,
   settingDefaults: { routingUrl: process.env.HUB_ROUTING_URL ?? '' },
   mailer: mailerFromEnv(process.env, log), licenceSigningKey: signingKeyFile(), allowLogMailer: process.env.HUB_DEV_MAIL === '1',
+  skipEmailVerify: process.env.HUB_SKIP_EMAIL_VERIFY === '1',
 });
+if (process.env.HUB_SKIP_EMAIL_VERIFY === '1') log.warn('HUB_SKIP_EMAIL_VERIFY=1: sign-up does not check email addresses (set up email, then remove it)');
 if (!process.env.HUB_ADMIN_KEY) log.warn('HUB_ADMIN_KEY is not set: store admin is disabled (use scripts/admin.ts on this machine)');
 else log.info('hub admin page: /admin');
 const urbanpiper = new UrbanPiper(hub, { log }); // Swiggy / Zomato (set up per store on the admin page)
