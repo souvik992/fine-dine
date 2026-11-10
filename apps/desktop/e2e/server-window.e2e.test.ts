@@ -22,7 +22,7 @@ describe('DinePOS Server window', () => {
     const electron = createRequire(import.meta.url)('electron') as unknown as string;
     app = await _electron.launch({
       executablePath: electron,
-      args: [here, '--server'],
+      args: [here, '--server', '--show'], // --show: the window at start (normally only the tray icon)
       cwd: here,
       env: {
         ...env,

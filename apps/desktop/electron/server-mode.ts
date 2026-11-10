@@ -1,12 +1,13 @@
 // DinePOS Server window (`DinePOS.exe --server`, the "DinePOS Server" shortcut on the master PC): runs the outlet server
 // under a ServerSupervisor and shows it: status, addresses and QR codes for phones and kitchen screens, devices,
-// printers, backups, the cloud and the live log. Closing the window keeps the server running (tray icon); Quit stops it.
+// printers, backups, the cloud and the live log. It starts in the tray only (icon by the clock): a click on the icon,
+// or opening the shortcut again, shows the window. Closing the window keeps the server running; Quit stops it.
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { deflateSync } from 'node:zlib';
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray, type IpcMainInvokeEvent } from 'electron';
 import { ORIGIN } from './protocol.js';
-import { ServerSupervisor, type ServerCommand } from './server-supervisor.js';
+import { opensWindowAtStart, ServerSupervisor, type ServerCommand } from './server-supervisor.js';
 
 /** How to run the server: the installed bundle, or (development and tests) DINEPOS_SERVER_NODE / _ARGS / _CWD. */
 export function serverCommand(env: NodeJS.ProcessEnv = process.env, resources = process.resourcesPath): ServerCommand {
@@ -160,8 +161,9 @@ export function runServerMode(devUrl: string | undefined): void {
       ]),
     );
     tray.on('click', show);
-    // started minimised (Windows start-up): only the tray icon; otherwise the window
-    if (!process.argv.includes('--minimized')) show();
+    // only the tray icon (after install, at Windows start, from the shortcut); --show opens the window too
+    if (opensWindowAtStart()) show();
+    else tray.displayBalloon({ title: 'DinePOS Server is running', content: 'It runs in the background. Click the DinePOS icon by the clock to open it.', noSound: true });
     await supervisor.start();
     setInterval(() => void supervisor.poll(), 3000).unref();
     void supervisor.poll();

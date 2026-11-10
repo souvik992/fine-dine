@@ -1,7 +1,7 @@
 import http from 'node:http';
 import net from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
-import { lanAddresses, parseLogLine, ServerSupervisor } from './server-supervisor.js';
+import { lanAddresses, opensWindowAtStart, parseLogLine, ServerSupervisor } from './server-supervisor.js';
 
 // The DinePOS Server window's supervisor: starts the server, reads its state, restarts it when it stops by itself,
 // stops it on request, and does not start a second one when a server already answers on the port.
@@ -102,5 +102,16 @@ describe('DinePOS Server supervisor', () => {
     expect(parseLogLine(JSON.stringify({ level: 30, msg: 'request completed', res: { statusCode: 500 } }))).not.toBeNull();
     expect(parseLogLine('  Close it (or press Ctrl+C) to stop the server safely.')).toBeNull();
     expect(lanAddresses({ eth: [{ address: '192.168.1.20', family: 'IPv4', internal: false } as never, { address: '127.0.0.1', family: 'IPv4', internal: true } as never, { address: '169.254.1.1', family: 'IPv4', internal: false } as never] })).toEqual(['192.168.1.20']);
+  });
+});
+
+describe('DinePOS Server at start', () => {
+  it('sits in the tray only: after install, from the shortcut and at Windows start', () => {
+    expect(opensWindowAtStart(['DinePOS.exe', '--server'])).toBe(false);
+    expect(opensWindowAtStart(['DinePOS.exe', '--server', '--minimized'])).toBe(false);
+  });
+
+  it('opens the window at start only with --show', () => {
+    expect(opensWindowAtStart(['DinePOS.exe', '--server', '--show'])).toBe(true);
   });
 });

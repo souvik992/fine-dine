@@ -110,8 +110,8 @@
       ; The server runs as whoever is signed in: every local user may write the data folder (S-1-5-32-545 = Users).
       nsExec::ExecToLog 'icacls "$APPDATA\DinePOS" /grant *S-1-5-32-545:(OI)(CI)M /T /Q'
       Pop $0
-      ; The DinePOS Server window (DinePOS.exe --server) runs node.exe + server.mjs and shows its status; at Windows
-      ; start it opens in the tray (--minimized). The server itself is unchanged.
+      ; The DinePOS Server (DinePOS.exe --server) runs node.exe + server.mjs from the tray: no window at start (after
+      ; install, at Windows start or from the shortcut); a click on the tray icon shows its status window.
       CreateShortCut "$SMPROGRAMS\${DINEPOS_SERVER_LNK}" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "--server" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 SW_SHOWNORMAL "" "Run the DinePOS outlet server"
       CreateShortCut "$DESKTOP\${DINEPOS_SERVER_LNK}" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "--server" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 SW_SHOWNORMAL "" "Run the DinePOS outlet server"
       ${If} $DinePosAutostart == "1"
