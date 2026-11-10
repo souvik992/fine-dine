@@ -74,7 +74,8 @@ archive holds node_modules or `resources/server` misses anything the server need
   keep the previous choices in `HKLM\Software\DinePOS`). Unattended: `DinePOS-Setup.exe /S /MASTER=1 /AUTOSTART=1`.
 - Master: creates `%ProgramData%\DinePOS` (Users: modify), adds **DinePOS Server** shortcuts (Start menu, desktop,
   and Startup when chosen), opens TCP 7420 on private/domain networks, and starts the server as the signed-in user
-  (not elevated). The server runs standalone in its own window, like the order hub. The desktop app defaults to
+  (not elevated). The server runs standalone in the tray (icon by the clock, no window at start; a click on the icon
+  or opening the shortcut again shows the DinePOS Server window; `--show` opens it at start). The desktop app defaults to
   `http://127.0.0.1:7420`, so it connects with no setup. Terminals: untick master, then enter the master's address
   (shown in the server window) in Settings.
 - Uninstall/upgrade: `resources\server\stop-server.ps1` stops only the server running from this folder (a forced
@@ -90,7 +91,7 @@ archive holds node_modules or `resources/server` misses anything the server need
 1. Run `DinePOS-Setup-0.1.0.exe`, keep "Install as master" and "Start with Windows" ticked, finish.
 2. The "DinePOS Server" window opens (Running, the addresses and QR codes for phones and kitchen screens); DinePOS
    opens and the floor says "Live" with no setup.
-3. Reboot and sign in. The server window appears by itself; `http://127.0.0.1:7420/v1/health` → `"ok":true`;
+3. Reboot and sign in. Only the tray icon appears (no window); `http://127.0.0.1:7420/v1/health` → `"ok":true`;
    DinePOS shows "Live".
 4. From another PC on the LAN: `http://<master-ip>:7420/v1/health` answers (firewall rule).
 5. In the DinePOS Server window press Stop → DinePOS shows "Offline"; press Start → "Live" again. Closing the window

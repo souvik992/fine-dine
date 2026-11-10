@@ -248,3 +248,8 @@ export class ServerSupervisor {
     this.o.onChange?.();
   }
 }
+
+/** The DinePOS Server opens its window at start only with --show (tests, support); otherwise it sits in the tray. */
+export function opensWindowAtStart(argv: readonly string[] = process.argv): boolean {
+  return argv.includes('--show');
+}

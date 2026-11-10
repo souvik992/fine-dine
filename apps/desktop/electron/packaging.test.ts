@@ -23,7 +23,7 @@ describe('installer script (NSIS): standalone server like the order hub', () => 
 
   it('starts the bundled server through a "DinePOS Server" shortcut: the DinePOS Server window (no Windows service)', () => {
     expect(nsh).toContain('CreateShortCut "$SMPROGRAMS\\${DINEPOS_SERVER_LNK}" "$INSTDIR\\${APP_EXECUTABLE_FILENAME}" "--server"');
-    // at Windows start: in the tray
+    // at Windows start: in the tray (every start is tray-only now; --minimized is kept for older Startup shortcuts)
     expect(nsh).toContain('CreateShortCut "$SMSTARTUP\\${DINEPOS_SERVER_LNK}" "$INSTDIR\\${APP_EXECUTABLE_FILENAME}" "--server --minimized"');
     expect(nsh).not.toMatch(/WinSW|sc\.exe|New-Service/i);
   });
