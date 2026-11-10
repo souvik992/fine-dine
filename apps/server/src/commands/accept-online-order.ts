@@ -97,7 +97,7 @@ export const acceptOnlineOrder = defineCommand({
     // 5. Accepted here; the hub hears it after commit (retried until it answers).
     db.prepare('UPDATE online_order SET bill_id = ?, pos_total_paise = ?, accepted_by = ? WHERE id = ?').run(billId, totalPaise, ctx.actor.userId, oo.id);
     const alert = totalPaise !== order.total ? `Billed at the DinePOS price ${formatINR(totalPaise)} (the customer was shown ${formatINR(order.total)}).` : null;
-    setOnlineState(ctx, oo.id, 'ACCEPTED', { alert, prepMinutes: prep });
+    setOnlineState(ctx, oo.id, 'ACCEPTED', { alert, prepMinutes: prep, etaAt: ctx.now.getTime() + prep * 60_000 }); // etaAt: the preparation clock on the screens
     enqueueHubAction(ctx, oo.id, 'accept', { prepMinutes: prep, posBillNo: billNo }, `acc-${oo.id}`);
     ctx.audit({ entity: 'online_order', entityId: oo.id, action: 'online.accept', after: { orderId, billNo, totalPaise, customerTotalPaise: order.total, prepMinutes: prep, priceAccepted: p.acceptPriceChange } });
     return { orderId, result: { orderId, billId, billNo, totalPaise } };

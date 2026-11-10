@@ -22,6 +22,8 @@ export interface KotTicket {
   tableLabel?: string | null;
   /** P4-06: an online order's number and how it goes out, e.g. "W-1042 · DELIVERY · PAID ONLINE". */
   orderRef?: string | null;
+  /** The customer's note for the whole order (online orders), e.g. "Allergic to peanuts"; prints after the dishes. */
+  orderNote?: string | null;
   areaName?: string | null;
   covers?: number | null;
   captainName?: string | null;
@@ -80,6 +82,7 @@ export function renderKot(t: KotTicket, opts: RenderOptions): { bytes: Uint8Arra
       if (l.note) p.wrapped(`! ${l.note}`, 5);
     }
   }
+  if (t.orderNote) p.bold(true).wrapped(`NOTE: ${t.orderNote}`).bold(false);
   p.rule();
   if (t.reason) p.wrapped(`Reason: ${t.reason}`);
   p.feed(opts.feed ?? 3).cut();

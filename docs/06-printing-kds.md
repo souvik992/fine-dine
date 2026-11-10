@@ -92,6 +92,14 @@ Sales by mode, by area, by category; discounts; voids; cancelled-after-fire coun
    without waiting for a failed print. When the check itself cannot run, nothing is reported (no false alarm).
    Optional later: ESC/POS status poll (DLE EOT 4) for paper-end on network printers.
 
+## Print alarm (terminals)
+`GET /v1/print-jobs/failed`: jobs in state `failed` from the last 30 minutes, oldest first, with the printer and a label
+("KOT 0012 · Table T4", "KOT 0013 · W-1042", "Bill B/26-27/000031"); a job already sent again (`print.retry`) or
+copied to the backup printer (`print.reroute`) is left out: its copy rings itself if it fails too. The desktop shows a
+red card on every screen and sounds an alarm every 4 s until **Retry** (`RetryPrintJobs`: same bytes on the same
+printer, not a DUPLICATE) or dismiss. Refreshed by the `printers` topic and every 10 s. Before, a failed KOT only
+showed as "N printers down" in the top bar.
+
 ## Fake printer (dev)
 `transport: fake` writes a rendered text preview to `data/prints/<printerId>/<jobId>.txt` and logs it. Tests
 assert on the text preview, not raw bytes.

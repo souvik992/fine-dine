@@ -50,6 +50,7 @@ import { recallKot } from './recall-kot.js';
 import { reprintBill } from './reprint-bill.js';
 import { requestBill } from './request-bill.js';
 import { reprintKot } from './reprint-kot.js';
+import { retryPrintJobs } from './retry-print-jobs.js';
 import { revokeDevice } from './revoke-device.js';
 import { removeHeldItem } from './remove-held-item.js';
 import { setCaptainSection } from './set-captain-section.js';
@@ -127,6 +128,7 @@ export const coreHandlers: readonly CommandHandler<unknown, unknown>[] = [
   modifyFiredItem,
   cancelFiredItem,
   reprintKot,
+  retryPrintJobs,
   reprintBill,
   // kitchen display (P4-02)
   markKotReady,

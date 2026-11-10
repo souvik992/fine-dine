@@ -11,10 +11,18 @@ export type PaperWidth = 58 | 80;
 /** Characters per line in font A. */
 export const COLUMNS: Record<PaperWidth, number> = { 58: 32, 80: 48 };
 
-/** Printable ASCII only: typographic quotes/dashes are simplified, ₹ → "Rs", anything else → "?". */
+/**
+ * Printable ASCII only: typographic quotes/dashes/separators are simplified, accents dropped (é → e), ₹ → "Rs",
+ * anything else → "?". The `·` and `•` separators print as "-" (they printed as "?" on online orders' KOT and bill).
+ */
 export function sanitize(s: string): string {
   return s
-    .replace(/[–—]/g, '-')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[–—·•]/g, '-')
+    .replace(/×/g, 'x')
+    .replace(/…/g, '...')
+    .replace(/\u00a0/g, ' ')
     .replace(/[‘’]/g, "'")
     .replace(/[“”]/g, '"')
     .replace(/₹/g, 'Rs')

@@ -84,3 +84,36 @@ export function autoAcceptedSince(seen: ReadonlySet<string> | null, orders: read
   if (!seen) return [];
   return orders.filter((o) => !seen.has(o.id) && COLUMN[o.state] === 'kitchen').map((o) => o.id);
 }
+
+/**
+ * The online-order chime after each update of the list: `ringing` while any order waits to be accepted (the chime
+ * repeats until none waits, also for orders already waiting when the app starts); `chimeOnce` when an order arrived
+ * already accepted automatically (nothing to answer, so one chime). `seen` is the next update's `seen`.
+ */
+export function chimeUpdate(seen: ReadonlySet<string> | null, orders: readonly OnlineOrderView[]): { ringing: boolean; chimeOnce: boolean; seen: Set<string> } {
+  return {
+    ringing: waitingCount(orders) > 0,
+    chimeOnce: autoAcceptedSince(seen, orders).length > 0,
+    seen: new Set([...(seen ?? []), ...orders.map((o) => o.id)]),
+  };
+}
+
+const COOKING: ReadonlySet<HubOrderState> = new Set(['ACCEPTED', 'PREPARING']);
+
+/**
+ * The preparation clock on an accepted order: time left until the ready time promised on accepting ("Ready in 9:57",
+ * `soon` in the last 2 minutes), then how late it is ("Late by 3 min", at least 1). Null outside the kitchen or
+ * without a ready time.
+ */
+export function prepClock(state: HubOrderState, etaAt: number | null | undefined, nowMs: number): { text: string; soon: boolean; late: boolean } | null {
+  if (!COOKING.has(state) || typeof etaAt !== 'number') return null;
+  const ms = etaAt - nowMs;
+  if (ms > 0) {
+    const s = Math.ceil(ms / 1000);
+    return { text: `Ready in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`, soon: ms <= 2 * 60_000, late: false };
+  }
+  return { text: `Late by ${Math.max(1, Math.ceil(-ms / 60_000))} min`, soon: false, late: true };
+}
+
+/** Orders in the kitchen past their promised ready time (not yet marked Ready): the late alarm. */
+export const lateOrders = (orders: readonly OnlineOrderView[], nowMs: number) => orders.filter((o) => prepClock(o.state, o.order.etaAt, nowMs)?.late === true);

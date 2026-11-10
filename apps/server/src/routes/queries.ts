@@ -12,6 +12,7 @@ import { getReservationDay, getWaitlist } from '../queries/reservations.js';
 import { getMenu } from '../queries/menu.js';
 import { getOrderSnapshot } from '../queries/order-snapshot.js';
 import { getPrinters } from '../queries/printers.js';
+import { getFailedPrintJobs } from '../queries/print-jobs.js';
 import type { PrinterStatus } from '../print/print-queue.js';
 
 export interface QueryDeps {
@@ -100,6 +101,12 @@ export function queryRoutes(app: FastifyInstance, deps: QueryDeps): void {
 
   app.get('/v1/printers', (_req, reply) => {
     void reply.header('cache-control', 'no-store').send({ printers: getPrinters(deps.db, deps.printerStatus, deps.now(), deps.printerError) });
+    return reply;
+  });
+
+  // The print alarm: tickets that did not print in the last 30 minutes (not yet sent again).
+  app.get('/v1/print-jobs/failed', (_req, reply) => {
+    void reply.header('cache-control', 'no-store').send({ jobs: getFailedPrintJobs(deps.db, deps.now()) });
     return reply;
   });
 

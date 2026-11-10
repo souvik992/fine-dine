@@ -86,6 +86,7 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 | `Settle` | billId, tenders[{mode, amountPaise, ref?}] | bill.settle | | payment rows; when all parts paid → settled, table FREE | |
 | `VoidBill` | billId, reason | bill.void | yes | reversal, order → void | yes |
 | `ReprintKOT` / `ReprintBill` | kotId / billId | reprint | cfg | print job with DUPLICATE | yes |
+| `RetryPrintJobs` | jobIds (1-50, each `failed`, not yet sent again) | kot.fire | - | a new print job per id with the same bytes (no DUPLICATE: it never printed); audit `print.retry` | no |
 | `MarkKotReady` / `MarkKotServed` / `RecallKot` | kotId | kds.bump | | KOT timestamps only (no order version), `kot.status` | |
 | `SetItemAvailability` | itemId, available | menu.stock | | menu.changed | |
 | `OpenDrawer` | reason | drawer.open | cfg | ESC/POS drawer kick | yes |
