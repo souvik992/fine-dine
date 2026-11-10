@@ -50,8 +50,9 @@ test('downloads: the newest build of each app and add-on, per product; an add-on
     const r = await h.call('GET', '/v1/downloads');
     assert.equal(r.status, 200);
     const by = Object.fromEntries((r.json.downloads as Array<{ id: string }>).map((d) => [d.id, d])) as Record<string, Record<string, unknown>>;
-    assert.deepEqual(Object.keys(by), ['dinepos', 'dinepos-tableqr', 'dinepos-kitchen', 'tiffin', 'tiffin-ods']);
+    assert.deepEqual(Object.keys(by), ['dinepos', 'dinepos-tableqr', 'dinepos-kitchen', 'dinepos-captain', 'tiffin', 'tiffin-ods']);
     assert.deepEqual([by['dinepos-kitchen']!.kind, by['dinepos-kitchen']!.product, by['dinepos-kitchen']!.available], ['addon', 'fine_dine', false], 'KDS: listed, not built yet');
+    assert.deepEqual([by['dinepos-captain']!.kind, by['dinepos-captain']!.product, by['dinepos-captain']!.available], ['addon', 'fine_dine', false], 'Captain APK: listed, not built yet');
     assert.deepEqual([by.dinepos!.version, by.dinepos!.build, by.dinepos!.product, by.dinepos!.app], ['0.1.7', '12', 'fine_dine', 'DinePOS']);
     assert.deepEqual([by['dinepos-tableqr']!.version, by['dinepos-tableqr']!.build, by['dinepos-tableqr']!.kind], ['1.2.0', '11', 'addon']);
     assert.deepEqual([by.tiffin!.version, by.tiffin!.productName, by['tiffin-ods']!.version], ['0.3.12', 'QSR', '1.0.13']);
@@ -84,7 +85,7 @@ test('downloads: GitHub down keeps the last list (also after a restart); nothing
   const e = await startHub(undefined, undefined, undefined, { githubFetch: empty.f });
   try {
     const r = await e.call('GET', '/v1/downloads');
-    assert.deepEqual((r.json.downloads as Array<{ available: boolean; version: unknown }>).map((d) => [d.available, d.version]), [[false, null], [false, null], [false, null], [false, null], [false, null]]);
+    assert.deepEqual((r.json.downloads as Array<{ available: boolean; version: unknown }>).map((d) => [d.available, d.version]), [[false, null], [false, null], [false, null], [false, null], [false, null], [false, null]]);
   } finally { await e.close(); cleanup(e.dir); }
 });
 
@@ -134,10 +135,18 @@ test('P8-11: an uploaded installer is offered instead of GitHub and streamed fro
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('content-disposition'), 'attachment; filename="DinePOS-Setup-0.1.8.exe"');
     assert.equal(res.headers.get('x-content-sha256'), sha(exe));
+    assert.equal(res.headers.get('content-type'), 'application/vnd.microsoft.portable-executable');
     assert.ok(Buffer.from(await res.arrayBuffer()).equals(exe));
+    // the captain app is an Android APK: a phone's browser offers to install it
+    const apk = randomBytes(5_000);
+    assert.equal((await upload(h, 'dinepos-captain', 'DinePOS-Captain-0.1.0.apk', apk)).status, 200);
+    assert.equal((await upload(h, 'dinepos-captain', 'DinePOS-Captain-0.1.0.exe', apk)).status, 400, 'only the APK');
+    const a = await fetch(`${h.base}/v1/account/downloads/dinepos-captain`, { headers: { cookie } });
+    assert.equal(a.headers.get('content-type'), 'application/vnd.android.package-archive');
+    assert.ok(Buffer.from(await a.arrayBuffer()).equals(apk));
     const stats = await h.call('GET', '/v1/admin/downloads', { admin: true });
-    assert.deepEqual((stats.json.stats as Array<{ item: string; version: string }>).map((s) => [s.item, s.version]), [['dinepos', '0.1.8']]);
-    assert.deepEqual((stats.json.files as Array<{ fileName: string }>).map((f) => f.fileName), ['DinePOS-Setup-0.1.8.exe']);
+    assert.deepEqual((stats.json.stats as Array<{ item: string; version: string }>).map((s) => [s.item, s.version]).sort(), [['dinepos', '0.1.8'], ['dinepos-captain', '0.1.0']]);
+    assert.deepEqual((stats.json.files as Array<{ fileName: string }>).map((f) => f.fileName).sort(), ['DinePOS-Captain-0.1.0.apk', 'DinePOS-Setup-0.1.8.exe']);
 
     // the file gone from the disk: a clear answer, not a broken download
     rmSync(join(files, 'dinepos', 'DinePOS-Setup-0.1.8.exe'));

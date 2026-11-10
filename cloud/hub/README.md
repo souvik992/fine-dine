@@ -238,20 +238,21 @@ missing = `fine_dine`, for DinePOS builds before P8-02):
 ## Windows downloads (P8-04)
 
 The portal's downloads (`src/downloads.ts`; ADR-0007): for **Fine Dine** the DinePOS installer and the Table QR and
-Kitchen display (DinePOS Kitchen, `apps/kitchen`) add-ons,
+Kitchen display (DinePOS Kitchen, `apps/kitchen`) add-ons, and the Captain app for waiters' phones (Android APK,
+`apps/captain-android`),
 for **QSR** the Tiffin POS installer and the ODS add-on, always the newest build.
 
 **Releasing (P8-11).** Installers are built on the vendor's Windows PC and uploaded here; CI does not publish them.
 1. Once: create `%USERPROFILE%\.dinepos\release.json` with `{"hubUrl": "https://<this cloud>", "adminKey": "<HUB_ADMIN_KEY>"}`
    (never in a repository). Add-ons are signed with the keys already on that PC (`%USERPROFILE%\.dinepos\addon-signing`,
    `%USERPROFILE%\.tiffinpos\addon-signing`).
-2. In fine-dine: `npm run release` (DinePOS + Table QR). In tiffin: `npm run release` (Tiffin POS + ODS). Each builds
+2. In fine-dine: `npm run release` (DinePOS, Table QR, Kitchen and the Captain APK). In tiffin: `npm run release` (Tiffin POS + ODS). Each builds
    from a clean commit, checks the address and key first, then uploads with progress. `-- --no-build` uploads what is
-   already built; `-- --only tableqr` (or `dinepos`, `tiffin`, `ods`) one item.
+   already built; `-- --only tableqr` (or `dinepos`, `kitchen`, `captain`, `tiffin`, `ods`) one item.
 3. The portal offers the new version at once.
 
 - `PUT /v1/admin/downloads/<item>/<file name>` (admin key, raw body, `X-Content-SHA256`): the file must be that item's
-  installer (`DinePOS-Setup-<v>.exe`, ...); it is streamed to `<HUB_DATA_DIR>/downloads/<item>/` and kept only if its
+  installer (`DinePOS-Setup-<v>.exe`, `DinePOS-Captain-<v>.apk`, ...); it is streamed to `<HUB_DATA_DIR>/downloads/<item>/` and kept only if its
   SHA-256 matches. The same version again replaces it; the newest 3 versions of each item are kept.
 - `DELETE /v1/admin/downloads/<item>/<version>` (admin key): withdraw a version; the newest one left is offered.
 - Uploaded files are not in the nightly backup (they can be uploaded again from the build PC).
