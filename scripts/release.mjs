@@ -1,9 +1,9 @@
 // P8-11: builds the Windows installers on this PC and uploads them to DinePOS Cloud, which offers them in the customer
 // portal (Client area > Downloads). CI only tests; installers are built here.
 //
-//   npm run release                 build DinePOS, Table QR and DinePOS Kitchen (KDS), then upload them
+//   npm run release                 build DinePOS, Table QR, DinePOS Kitchen (KDS) and the Captain APK, then upload them
 //   npm run release -- --no-build   upload the installers already built (the newest version of each)
-//   npm run release -- --only dinepos   (or --only tableqr, --only kitchen)
+//   npm run release -- --only dinepos   (or --only tableqr, --only kitchen, --only captain)
 //   npm run release -- --allow-dirty    build even with uncommitted changes (not recommended)
 //
 // Where to upload: %USERPROFILE%\.dinepos\release.json  {"hubUrl": "https://cloud.example.com", "adminKey": "..."}
@@ -33,8 +33,13 @@ const ITEMS = [
   },
   // the kitchen display (KDS) for a kitchen PC: apps/kitchen
   { id: 'dinepos-kitchen', name: 'DinePOS Kitchen (KDS)', dir: path.join(repo, 'apps', 'kitchen', 'release'), file: /^DinePOS-Kitchen-Setup-(.+)\.exe$/, build: ['run', 'dist', '-w', '@dinepos/kitchen'] },
+  // the captain app for waiters' Android phones: apps/captain-android (needs Android Studio's JDK and SDK; signed with its keystore)
+  {
+    id: 'dinepos-captain', name: 'DinePOS Captain (Android)', dir: path.join(repo, 'apps', 'captain-android', 'release'), file: /^DinePOS-Captain-(.+)\.apk$/,
+    build: ['run', 'apk', '-w', '@dinepos/captain-android'], needs: () => path.join(repo, 'apps', 'captain-android', 'keystore.properties'),
+  },
 ].filter((i) => !only || i.id === only || i.id === `dinepos-${only}`);
-if (!ITEMS.length) fail('--only must be dinepos, tableqr or kitchen');
+if (!ITEMS.length) fail('--only must be dinepos, tableqr, kitchen or captain');
 
 function fail(msg) { console.error(`\n✖ ${msg}\n`); process.exit(1); }
 

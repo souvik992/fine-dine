@@ -97,3 +97,4 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-09 Cloud: POST /v1/demo-requests for the posinext.com "Book a Demo" form (saved, emailed to HUB_DEMO_REQUEST_TO set on the server only; GET /v1/admin/demo-requests)
 - 2026-11-09 Cloud: email through a mailbox's SMTP server (HUB_SMTP_HOST/USER/PASS, TLS 465; e.g. Zoho for support@posinext.com) when Brevo is not set; demo request emails reply to the restaurant
 - 2026-11-10 Desktop: DinePOS Server starts in the tray only (after install, at Windows start, from the shortcut) with a "running" note; a click on the tray icon opens the window (`--show` opens it at start); desktop 0.1.7
+- 2026-11-10 P8-04 Captain app (Android APK) as a Fine Dine add-on download in the portal; npm run release builds and uploads it (--only captain)

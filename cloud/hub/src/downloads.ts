@@ -8,8 +8,8 @@ import { HubError } from './hub.ts';
 import { PRODUCTS, type ProductCode } from './products.ts';
 
 /**
- * The Windows downloads offered in the customer portal (P8-04, ADR-0007): each product's app and add-ons, always the
- * newest build, and which signed-in account downloaded what.
+ * The downloads offered in the customer portal (P8-04, ADR-0007): each product's app and add-ons (Windows installers, and
+ * the captain app's Android APK), always the newest build, and which signed-in account downloaded what.
  *
  * Installers are built on the vendor's PC and uploaded here (`npm run release` in fine-dine and in tiffin:
  * PUT /v1/admin/downloads/<item>/<file name>, admin key). The files live on disk in <downloadsDir>/<item>/, checked
@@ -37,6 +37,7 @@ export const CATALOGUE: readonly DownloadItem[] = [
   { id: 'dinepos', product: 'fine_dine', kind: 'app', name: 'DinePOS for Windows', description: 'Billing, tables, KOTs and the kitchen. Install it on the outlet’s main PC first.', repo: 'souvik992/fine-dine', tagPrefix: 'dinepos-build-', asset: /^DinePOS-Setup-(.+)\.exe$/ },
   { id: 'dinepos-tableqr', product: 'fine_dine', kind: 'addon', name: 'Table QR', description: 'Guests order and call a waiter from a QR code on the table. Install after DinePOS.', repo: 'souvik992/fine-dine', tagPrefix: 'dinepos-build-', asset: /^DinePOS-TableQR-Setup-(.+)\.exe$/ },
   { id: 'dinepos-kitchen', product: 'fine_dine', kind: 'addon', name: 'Kitchen display (KDS)', description: 'DinePOS Kitchen: KOTs as tickets on a kitchen PC or screen, bumped when ready. Install on the kitchen PC; DinePOS runs on the main PC.', repo: 'souvik992/fine-dine', tagPrefix: 'dinepos-build-', asset: /^DinePOS-Kitchen-Setup-(.+)\.exe$/ },
+  { id: 'dinepos-captain', product: 'fine_dine', kind: 'addon', name: 'Captain app (Android)', description: 'DinePOS Captain: waiters take orders and fire KOTs from their Android phones. Install the APK on each phone; it connects to DinePOS on the main PC over the Wi-Fi.', repo: 'souvik992/fine-dine', tagPrefix: 'dinepos-build-', asset: /^DinePOS-Captain-(.+)\.apk$/ },
   { id: 'tiffin', product: 'tiffin_qsr', kind: 'app', name: 'Tiffin POS for Windows', description: 'Quick billing, kitchen tickets and stock for counter service.', repo: 'souvik992/tiffin', tagPrefix: 'tiffin-build-', asset: /^TiffinPOS-Setup-(.+)\.exe$/ },
   { id: 'tiffin-ods', product: 'tiffin_qsr', kind: 'addon', name: 'ODS (online orders)', description: 'Online orders from your website, app, Swiggy and Zomato on an order display screen. Install after Tiffin POS.', repo: 'souvik992/tiffin', tagPrefix: 'tiffin-build-', asset: /^TiffinPOS-ODS-Setup-(.+)\.exe$/ },
 ];
