@@ -57,16 +57,40 @@ const optionalProduct = (v: unknown): ProductCode | null => {
 
 export class Support {
   private hub: Hub;
+  private notifyTo: string | undefined;
+  private log: { warn(m: string): void };
   private get db(): Db { return this.hub.db; }
-  constructor(hub: Hub) {
+  /** `notifyTo`: the support inbox that gets each new ticket and each customer reply (HUB_SUPPORT_NOTIFY_TO). Not set: none. */
+  constructor(hub: Hub, notifyTo?: string, log: { warn(m: string): void } = console) {
     this.hub = hub;
+    this.notifyTo = notifyTo?.trim() || undefined;
+    this.log = log;
     hub.db.exec(SCHEMA);
+  }
+
+  /** Emails the support inbox about a customer's message; "Reply" there goes to the customer. Saved either way. */
+  private async notify(t: Ticket, body: string, isNew: boolean): Promise<void> {
+    if (!this.notifyTo) return;
+    const account = one<{ name: string; phone: string }>(this.db, 'SELECT a.name, a.phone FROM ticket t JOIN account a ON a.id = t.account_id WHERE t.id = ?', t.id);
+    const by = t.openedBy;
+    const text = [
+      isNew ? `New support ticket #${t.number} from the customer portal` : `New reply on ticket #${t.number}`, '',
+      `Business:  ${account?.name ?? '-'}`, `Phone:     ${account?.phone ?? '-'}`,
+      `From:      ${by ? `${by.name} <${by.email}>` : '-'}`, `Product:   ${t.product ?? '-'}`, `Subject:   ${t.subject}`, '',
+      body, '',
+      'Answer on the admin page (Support), so the customer sees it in the portal too.',
+    ].join('\n');
+    try {
+      await this.hub.mailer.send({ to: this.notifyTo, subject: `${isNew ? '' : 'Re: '}[Ticket #${t.number}] ${t.subject}`, text, ...(by ? { replyTo: by.email } : {}) });
+    } catch (e) {
+      this.log.warn(`ticket #${t.number} saved but the support inbox was not emailed: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   // ---------------------------------------------------------------- tickets (customer)
 
   /** A customer's new ticket: the subject, the product it is about (optional) and the first message. */
-  open(token: string | undefined, input: unknown): Ticket {
+  async open(token: string | undefined, input: unknown): Promise<Ticket> {
     const u = this.hub.accounts.session(token);
     const b = (input ?? {}) as Record<string, unknown>;
     const subject = text(b.subject, 'a subject', 'subject', 120);
@@ -78,7 +102,9 @@ export class Support {
       exec(this.db, "INSERT INTO ticket (id, number, account_id, user_id, subject, product, status, created_at, updated_at) VALUES (?,?,?,?,?,?,'open',?,?)", id, number, u.account_id, u.id, subject, product, at, at);
       exec(this.db, "INSERT INTO ticket_message (id, ticket_id, author, author_name, body, at) VALUES (?,?,'customer',?,?,?)", randomUUID(), id, u.name, body, at);
     });
-    return this.ticket(id, true);
+    const t = this.ticket(id, true);
+    await this.notify(t, body, true);
+    return t;
   }
 
   mine(token: string | undefined): Ticket[] {
@@ -94,7 +120,7 @@ export class Support {
   }
 
   /** A customer's reply opens a closed or answered ticket again. */
-  reply(token: string | undefined, id: string, input: unknown): Ticket {
+  async reply(token: string | undefined, id: string, input: unknown): Promise<Ticket> {
     const t = this.oneOfMine(token, id);
     const u = this.hub.accounts.session(token);
     const body = text((input as Record<string, unknown> | null)?.body, 'your message', 'body', 5000);
@@ -103,7 +129,9 @@ export class Support {
       exec(this.db, "INSERT INTO ticket_message (id, ticket_id, author, author_name, body, at) VALUES (?,?,'customer',?,?,?)", randomUUID(), t.id, u.name, body, at);
       exec(this.db, "UPDATE ticket SET status = 'open', updated_at = ? WHERE id = ?", at, t.id);
     });
-    return this.ticket(t.id, true);
+    const after = this.ticket(t.id, true);
+    await this.notify(after, body, false);
+    return after;
   }
 
   closeMine(token: string | undefined, id: string): Ticket {

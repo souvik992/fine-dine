@@ -20,6 +20,7 @@
 //   HUB_SMTP_HOST, HUB_SMTP_USER, HUB_SMTP_PASS (+ HUB_SMTP_PORT, default 465)  email through a mailbox's SMTP server
 //                      instead of Brevo (e.g. Zoho: smtppro.zoho.in, support@posinext.com, an app password)
 //   HUB_DEMO_REQUEST_TO  where posinext.com "Book a Demo" requests are emailed (needs Brevo or SMTP above); never shown on the site
+//   HUB_SUPPORT_NOTIFY_TO  the support inbox (e.g. support@posinext.com): gets each new portal ticket and customer reply
 //   GITHUB_TOKEN       P8-04: optional; downloads not uploaded yet come from GitHub Releases (60 requests an hour without it)
 // Installers uploaded with `npm run release` (P8-11) are kept in <HUB_DATA_DIR>/downloads (the newest 3 of each).
 import { existsSync, mkdirSync } from 'node:fs';
@@ -69,7 +70,7 @@ const downloads = new Downloads(hub.db, { dir: join(dir, 'downloads'), githubTok
 const browserDemo = process.env.HUB_BROWSER_DEMO === '1' ? { seed: process.env.HUB_DEMO_SEED ?? join(outletServerDir, 'demo-seed.json'), max: Number(process.env.HUB_MAX_DEMOS ?? 10) || 10 } : undefined;
 // P8-09: the customer portal on its own address (HUB_PORTAL_DOMAIN; else any portal.<host>)
 const portal = process.env.HUB_PORTAL_DIR ? new Portal({ dir: process.env.HUB_PORTAL_DIR, hosts: (process.env.HUB_PORTAL_DOMAIN ?? '').split(',') }) : undefined;
-const server = createHubServer(hub, { downloads, ...(portal ? { portal } : {}), ...(browserDemo ? { demo: browserDemo } : {}), hosted, monitor, adminKey: process.env.HUB_ADMIN_KEY, publicUrl: process.env.HUB_PUBLIC_URL || undefined, deviceDomain: process.env.HUB_DEVICE_DOMAIN || undefined, urbanpiper, demoRequestTo: process.env.HUB_DEMO_REQUEST_TO || undefined, log });
+const server = createHubServer(hub, { downloads, ...(portal ? { portal } : {}), ...(browserDemo ? { demo: browserDemo } : {}), hosted, monitor, adminKey: process.env.HUB_ADMIN_KEY, publicUrl: process.env.HUB_PUBLIC_URL || undefined, deviceDomain: process.env.HUB_DEVICE_DOMAIN || undefined, urbanpiper, demoRequestTo: process.env.HUB_DEMO_REQUEST_TO || undefined, supportNotifyTo: process.env.HUB_SUPPORT_NOTIFY_TO || undefined, log });
 const sweeper = setInterval(() => { try { hub.sweep(); } catch (e) { log.warn('sweep failed', String(e)); } void urbanpiper.pump().catch((e) => log.warn('urbanpiper outbox failed', String(e))); }, 5000);
 // P7-04: browser demos past their 72 hours are stopped and deleted
 const demoSweeper = setInterval(() => void server.demos?.sweep().catch((e) => log.warn('demo sweep failed', String(e))), 60_000);

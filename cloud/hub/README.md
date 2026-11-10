@@ -290,7 +290,10 @@ The portal (souvik992/saas-portal `cloud/saas-web`; ADR-0007) reads all of this 
 - `POST /v1/account/products` `{products}`: QSR (`tiffin_qsr`), Fine Dine (`fine_dine`) or both (owner or admin).
 - Tickets (`src/support.ts`): `GET|POST /v1/account/tickets`, `GET /v1/account/tickets/<id>`, `POST .../reply`,
   `POST .../close`. Numbered from #1001; private to the account. Admin page › **Support**: tickets waiting for an
-  answer first; an answer is emailed to the customer who opened the ticket (`/v1/admin/tickets...`).
+  answer first; an answer is emailed to the customer who opened the ticket (`/v1/admin/tickets...`). Set
+  `HUB_SUPPORT_NOTIFY_TO=support@posinext.com` in `/etc/dinepos-cloud.env` (needs Brevo or SMTP email) and each new
+  ticket and each customer reply is emailed there too; replying to that email goes to the customer by email only, so
+  answer on the admin page for it to show in the portal.
 - Announcements: `GET /v1/announcements` (`?product=`), written on the admin page (`/v1/admin/announcements`).
 - Knowledge base: `GET /v1/kb`, `GET /v1/kb/<slug>` (plain text; blank lines make paragraphs), written on the admin page.
 - `GET /v1/status`: sign-in, licence activation, downloads published, online orders relay.
