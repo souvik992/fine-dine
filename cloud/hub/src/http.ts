@@ -62,6 +62,8 @@ export interface HttpOptions {
   portal?: Portal;
   /** posinext.com "Book a Demo" requests are emailed here (HUB_DEMO_REQUEST_TO; never shown anywhere). Not set: only saved. */
   demoRequestTo?: string;
+  /** New support tickets and customer replies are emailed here (HUB_SUPPORT_NOTIFY_TO, e.g. support@posinext.com). Not set: none. */
+  supportNotifyTo?: string;
   /** Warnings from the demo requests (an email that could not be sent). */
   log?: { warn(m: string): void };
 }
@@ -291,7 +293,7 @@ export function createHubServer(hub: Hub, o: HttpOptions = {}): http.Server & { 
   add('GET', '/v1/admin/demo-requests', (c) => { admin(c); return { requests: demoRequests.list() }; });
 
   // ---- P8-08: support tickets, announcements, knowledge base, service status (src/support.ts)
-  const support = new Support(hub);
+  const support = new Support(hub, o.supportNotifyTo, o.log);
   const ticketLimit = limiter(() => 10);
   add('GET', '/v1/account/tickets', (c) => ({ tickets: support.mine(accountToken(c)) }));
   add('POST', '/v1/account/tickets', (c) => { ticketLimit(c.ip); return support.open(accountToken(c), c.body); });

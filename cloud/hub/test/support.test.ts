@@ -40,6 +40,33 @@ test('support: a ticket opened in the portal is answered from the admin page; th
   } finally { await h.close(); cleanup(h.dir); }
 });
 
+test('support: new tickets and customer replies are emailed to the support inbox (HUB_SUPPORT_NOTIFY_TO); "Reply" goes to the customer', async () => {
+  const INBOX = 'support@posinext.com';
+  const h = await startHub(undefined, undefined, undefined, { supportNotifyTo: INBOX });
+  try {
+    const a = await customer(h, 'asha@spicegarden.in', '9876543210');
+    const t = (await a.call('POST', '/v1/account/tickets', { subject: 'Growth plan', product: 'fine_dine', body: 'I would like the Growth plan.' })).json;
+    const m = h.mail.at(-1)!;
+    assert.deepEqual([m.to, m.subject, m.replyTo], [INBOX, '[Ticket #1001] Growth plan', 'asha@spicegarden.in']);
+    assert.match(m.text, /Spice Garden/);
+    assert.match(m.text, /9876543210/);
+    assert.match(m.text, /I would like the Growth plan\./);
+    await a.call('POST', `/v1/account/tickets/${t.id}/reply`, { body: 'Two outlets, please.' });
+    assert.deepEqual([h.mail.at(-1)!.to, h.mail.at(-1)!.subject], [INBOX, 'Re: [Ticket #1001] Growth plan']);
+    assert.match(h.mail.at(-1)!.text, /Two outlets, please\./);
+  } finally { await h.close(); cleanup(h.dir); }
+});
+
+test('support: without HUB_SUPPORT_NOTIFY_TO no inbox email is sent', async () => {
+  const h = await startHub();
+  try {
+    const a = await customer(h, 'asha@spicegarden.in', '9876543210');
+    const before = h.mail.length;
+    await a.call('POST', '/v1/account/tickets', { subject: 'Help', body: 'Question' });
+    assert.equal(h.mail.length, before);
+  } finally { await h.close(); cleanup(h.dir); }
+});
+
 test('support: tickets are private to their account; checked; admin routes need the admin key', async () => {
   const h = await startHub();
   try {
