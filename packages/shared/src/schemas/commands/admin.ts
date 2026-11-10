@@ -129,3 +129,7 @@ export type UpsertStationPayload = z.infer<typeof upsertStationSchema>;
 export type UpsertCategoryPayload = z.infer<typeof upsertCategorySchema>;
 export type UpsertAddonGroupPayload = z.infer<typeof upsertAddonGroupSchema>;
 export type UpsertMenuItemPayload = z.infer<typeof upsertMenuItemSchema>;
+
+/** Print alarm: send failed print jobs again, exactly as they were (not a DUPLICATE: they never printed). */
+export const retryPrintJobsSchema = z.object({ jobIds: z.array(ulidSchema).min(1).max(50) }).strict();
+export type RetryPrintJobsPayload = z.infer<typeof retryPrintJobsSchema>;

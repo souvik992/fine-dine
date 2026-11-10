@@ -561,3 +561,16 @@ export interface LicenceInfo {
   used: { terminals: number; captains: number; kds: number };
 }
 
+
+/** A ticket that did not print after the print queue's retries (the print alarm on the terminals). */
+export interface FailedPrintJob {
+  id: string;
+  printerId: string;
+  printerName: string;
+  docKind: 'kot' | 'bill' | 'zreport' | 'drawer' | 'test';
+  /** What it was, e.g. "KOT 0012 · Table T4", "KOT 0013 · W-1042", "Bill B/26-27/000031". */
+  label: string;
+  error: string | null;
+  createdAt: string;
+  failedAt: string | null;
+}

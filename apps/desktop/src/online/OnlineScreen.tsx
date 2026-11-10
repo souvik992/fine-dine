@@ -8,7 +8,7 @@ import { Modal } from '../components/Modal.js';
 import { SettleDialog } from '../billing/SettleDialog.js';
 import { ChannelBadge } from './ChannelBadge.js';
 import { DeliveryMap } from './DeliveryMap.js';
-import { board, nextSteps, REJECT_LABEL, STATE_LABEL, timeLeft, type Column } from './online-model.js';
+import { board, nextSteps, prepClock, REJECT_LABEL, STATE_LABEL, timeLeft, type Column } from './online-model.js';
 
 const COLUMNS: Array<[Column, string]> = [
   ['new', 'New'],
@@ -68,9 +68,10 @@ export function OnlineScreen({ onBack, onOpenOrder }: { onBack: () => void; onOp
   const card = (o: OnlineOrderView) => {
     const ord = o.order;
     const left = o.state === 'SENT_TO_STORE' || o.state === 'RECEIVED' ? timeLeft(ord.acceptBy, now) : null;
+    const clock = prepClock(o.state, ord.etaAt, now);
     const differs = o.posTotalPaise !== null && o.posTotalPaise !== ord.total;
     return (
-      <li key={o.id} className="rounded-xl border border-border bg-card shadow-sm" data-online={o.number}>
+      <li key={o.id} className={`rounded-xl border bg-card shadow-sm ${clock?.late ? 'border-2 border-danger' : 'border-border'}`} data-online={o.number}>
         <div className="flex items-start justify-between gap-2 border-b border-border px-3 py-2">
           <div>
             <p className="flex items-center gap-2">
@@ -86,6 +87,15 @@ export function OnlineScreen({ onBack, onOpenOrder }: { onBack: () => void; onOp
             <p className="font-semibold">{STATE_LABEL[o.state]}</p>
             <p className="text-muted-foreground">{time(ord.placedAt)}</p>
             {left ? <p className={`font-bold tabular-nums ${left.urgent ? 'text-danger' : 'text-warn'}`}>{left.text}</p> : null}
+            {clock ? (
+              <p
+                className={`mt-0.5 inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-bold tabular-nums ${clock.late ? 'animate-pulse bg-danger text-white' : clock.soon ? 'text-danger' : 'text-primary'}`}
+                aria-label={`Preparation time for ${o.number}: ${clock.text}`}
+                data-prep-clock
+              >
+                <Clock className="h-3.5 w-3.5" /> {clock.text}
+              </p>
+            ) : null}
           </div>
         </div>
         {o.alert ? (

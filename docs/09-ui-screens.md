@@ -142,7 +142,13 @@ The button shows how many materials are low or need a count. Tabs:
   and the bill (red when they differ), and any alert. Actions: Accept (or "Accept at ₹… " after a price refusal),
   Reject (reason, a word for the customer), Preparing, Ready, Out for delivery (rider name and phone), Delivered /
   Collected, Bill (opens the order), Cancel order (voids the bill).
-- On every other screen: "N new online orders" with a chime when one arrives.
+- On every other screen: "N new online orders". The chime repeats every 3 s on every screen (the Online orders screen
+  too) until no order waits to be accepted, also for orders already waiting when the app starts; an order accepted
+  automatically chimes once. The window plays it without a tap first (`autoplayPolicy`).
+- Accepted online orders: the card counts down to the ready time promised on accepting ("Ready in 9:57", red in the
+  last 2 minutes), then "Late by n min" with a red card; on every other screen a "Running late: W-1042" card with
+  Silence, and a falling alarm when an order goes late and every minute after, until it is marked Ready.
+- The customer's note for the whole order prints on the KOT ("NOTE: ..." after the dishes).
 - Settings › Online orders: the hub link (paste the connection link / Disconnect, live status), take online orders,
   accepting by hand or automatically, the hub's reject-after minutes, kitchen time, website/app/Swiggy/Zomato (P6-06), pickup/delivery, pay
   online / cash, GST on charges, pickup minimum and time, packaging charge, store location and address, up to six

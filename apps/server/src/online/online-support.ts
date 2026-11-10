@@ -43,12 +43,13 @@ export function requireOnline(ctx: CommandContext, id: string): OnlineOrderRow {
 export const hubOrder = (o: OnlineOrderRow) => JSON.parse(o.order_json) as HubOrder;
 
 /** Changes the order's state (and what staff must know); the screens refresh. */
-export function setOnlineState(ctx: CommandContext, id: string, state: HubOrderState, patch: { alert?: string | null; prepMinutes?: number; rider?: HubOrder['rider']; reasonText?: string | null } = {}): void {
+export function setOnlineState(ctx: CommandContext, id: string, state: HubOrderState, patch: { alert?: string | null; prepMinutes?: number; etaAt?: number; rider?: HubOrder['rider']; reasonText?: string | null } = {}): void {
   const o = requireOnline(ctx, id);
   const order = hubOrder(o);
   const next: HubOrder = {
     ...order,
     state,
+    ...(patch.etaAt !== undefined ? { etaAt: patch.etaAt } : {}),
     ...(patch.rider !== undefined ? { rider: patch.rider } : {}),
     ...(patch.reasonText !== undefined ? { reasonText: patch.reasonText } : {}),
     ...(patch.prepMinutes !== undefined ? { prepMinutes: patch.prepMinutes } : {}),
@@ -96,4 +97,11 @@ export function onlineRef(db: Db, localOrderId: string): string | null {
   const o = JSON.parse(r.order_json) as HubOrder;
   const pay = o.payment === 'COD' ? (o.fulfilment === 'DELIVERY' ? 'CASH ON DELIVERY' : 'PAY AT PICKUP') : 'PAID ONLINE';
   return `${r.number} · ${o.fulfilment === 'DELIVERY' ? 'DELIVERY' : 'PICKUP'} · ${pay}`;
+}
+
+/** The customer's note for the whole order ("Allergic to peanuts"), for the KOT; null when none. */
+export function onlineNote(db: Db, localOrderId: string): string | null {
+  const json = db.prepare('SELECT order_json FROM online_order WHERE local_order_id = ?').pluck().get(localOrderId) as string | undefined;
+  const note = json ? (JSON.parse(json) as HubOrder).note?.trim() : null;
+  return note ? note.slice(0, 300) : null;
 }

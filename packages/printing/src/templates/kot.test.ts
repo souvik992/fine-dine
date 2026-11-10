@@ -20,6 +20,26 @@ const ticket: KotTicket = {
 };
 
 describe('renderKot', () => {
+  it('an online order: the customer’s note for the whole order prints after the dishes, in bold', () => {
+    const t: KotTicket = { ...ticket, orderType: 'online', tableLabel: null, areaName: null, covers: null, captainName: null, orderRef: 'W-1001 · PICKUP · PAY AT PICKUP', orderNote: 'Allergic to peanuts' };
+    expect(renderKot(t, { paper: 80 }).preview).toBe(
+      [
+        'KOT 0042',
+        'Station: Tandoor                          ONLINE',
+        'W-1001 - PICKUP - PAY AT PICKUP',
+        '                                 20:14  02-11-26',
+        '------------------------------------------------',
+        '2  Paneer Tikka',
+        '     + Mild',
+        '     ! less spicy',
+        '1  Tandoori Chicken (Half)',
+        'NOTE: Allergic to peanuts',
+        '------------------------------------------------',
+        '',
+      ].join('\n'),
+    );
+  });
+
   it('80 mm preview', () => {
     expect(renderKot(ticket, { paper: 80 }).preview).toBe(
       [
@@ -80,7 +100,11 @@ describe('renderKot', () => {
 
 describe('text helpers', () => {
   it('sanitize keeps printable ASCII only', () => {
-    expect(sanitize('Café ₹120 “hot” – now')).toBe('Caf? Rs120 "hot" - now');
+    expect(sanitize('Café ₹120 “hot” – now')).toBe('Cafe Rs120 "hot" - now');
+    // online orders' header: the separators printed as "?" before
+    expect(sanitize('W-1042 · PICKUP · PAY AT PICKUP')).toBe('W-1042 - PICKUP - PAY AT PICKUP');
+    expect(sanitize('2 × Naan… • extra butter')).toBe('2 x Naan... - extra butter');
+    expect(sanitize('दाल 😀')).toBe('??? ??'); // other scripts and emoji (two code units) still cannot print as text
   });
 
   it('wrapText splits long words', () => {

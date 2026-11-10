@@ -54,6 +54,7 @@ function createWindow(): BrowserWindow {
       webviewTag: false,
       spellcheck: false,
       devTools: !app.isPackaged,
+      autoplayPolicy: 'no-user-gesture-required', // the online-order chime must sound without a tap first
     },
   });
   win.once('ready-to-show', () => win.show());

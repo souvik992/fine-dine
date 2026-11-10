@@ -95,6 +95,18 @@ describe('online orders', () => {
     expect(h.count('bill')).toBe(1);
   });
 
+  it('the customer’s note for the whole order prints on the KOT; accepting keeps the ready time for the preparation clock', () => {
+    const o = receive(hubOrder({ id: 'ord_note_1', number: 'W-1043', note: 'Allergic to peanuts' }));
+    h.run('AcceptOnlineOrder', { onlineOrderId: o.id, prepMinutes: 15 });
+    const kot = h.db.prepare("SELECT ticket_json FROM kot_document LIMIT 1").pluck().get() as string;
+    expect((JSON.parse(kot) as { orderNote: string }).orderNote).toBe('Allergic to peanuts');
+    const preview = h.db.prepare("SELECT preview_text FROM print_job WHERE doc_kind = 'kot' LIMIT 1").pluck().get() as string;
+    expect(preview).toContain('NOTE: Allergic to peanuts');
+    expect(preview).toContain('W-1043 - PICKUP - PAID ONLINE'); // the separators no longer print as "?"
+    const view = JSON.parse((row(o.id) as unknown as { order_json: string }).order_json) as HubOrder;
+    expect(view.etaAt).toBe(TEST_NOW().getTime() + 15 * 60_000);
+  });
+
   it('a delivery order is billed with the delivery charge and its GST; cash on delivery is settled in cash when delivered', () => {
     // One dal (₹294 with GST): under the ₹500 free-delivery mark of the first band, so the ₹20 charge applies.
     const lines = [{ itemId: S.dalMakhani, name: 'Dal Makhani', qtyMilli: 1000, unitPrice: 28_000, modifiers: [], note: null, lineTotal: 0 }];
