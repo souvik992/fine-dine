@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -19,11 +19,11 @@ import type { Db } from '../db/connection.js';
 import { devSeedCommands, devSetupCommand } from '../seed/dev-seed.js';
 import { createTestDb } from '../testing/test-db.js';
 
-// P6-02 end to end: the real DinePOS Cloud (cloud/hub) and a real DinePOS server with device pairing on, as installed.
+// P6-02 end to end: the real PosiNext Cloud (repository posinext-cloud next to this one, or POSINEXT_CLOUD_DIR) and a real DinePOS server with device pairing on, as installed.
 // The outlet connects its tunnel out; a device at https://<store>.<cloud> is answered by the outlet, never as the
 // trusted master PC: without its own device token it is refused, with it the floor and the live stream work.
 const here = path.dirname(fileURLToPath(import.meta.url));
-const cloudSrc = path.resolve(here, '..', '..', '..', '..', 'cloud', 'hub', 'src');
+const cloudSrc = path.join(process.env.POSINEXT_CLOUD_DIR ?? path.resolve(here, '..', '..', '..', '..', '..', 'posinext-cloud'), 'hub', 'src');
 
 interface CloudHub {
   close(): void;
@@ -93,7 +93,7 @@ function stream(origin: string) {
   });
 }
 
-describe('devices through DinePOS Cloud (P6-02)', () => {
+describe.runIf(existsSync(path.join(cloudSrc, 'tunnel.ts')))('devices through PosiNext Cloud (P6-02)', () => {
   let deviceToken = '';
 
   beforeAll(async () => {

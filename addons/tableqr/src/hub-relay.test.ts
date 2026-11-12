@@ -19,11 +19,12 @@ import { devSeedCommands, devSetupCommand } from '../../../apps/server/src/seed/
 import { testKeys, writePackage } from '../../../apps/server/src/testing/addon-package.js';
 import { createTestDb } from '../../../apps/server/src/testing/test-db.js';
 
-// P5-03 end to end with the real DinePOS Cloud hub (cloud/hub in this repository): DinePOS connects out to the hub
+// P5-03 end to end with the real PosiNext Cloud hub (repository posinext-cloud, checked out next to this one, or
+// POSINEXT_CLOUD_DIR): DinePOS connects out to the hub
 // as it does for online orders; a guest's phone talks only to the hub; each request goes down the outlet's connection
 // and the answer comes back.
 const here = path.dirname(fileURLToPath(import.meta.url));
-const hubSrc = path.resolve(here, '..', '..', '..', 'cloud', 'hub', 'src');
+const hubSrc = path.join(process.env.POSINEXT_CLOUD_DIR ?? path.resolve(here, '..', '..', '..', '..', 'posinext-cloud'), 'hub', 'src');
 const HAS_HUB = existsSync(path.join(hubSrc, 'relay.ts'));
 
 interface HubModule {
