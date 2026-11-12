@@ -1,7 +1,7 @@
 // P4-06 acceptance against the real order hub (pos-backend/hub, contract v1): DinePOS pairs with a connection link,
 // publishes its menu, a customer places a pickup order (cash at pickup), it appears on the Online orders screen, staff
 // accept it (KOT + GST bill at DinePOS prices), mark it ready and collected — and the customer sees each state.
-// Runs only where the hub's code is (HUB_DIR, default C:\Users\PL\Documents\pos-backend\hub) and Node 24+ runs it.
+// Runs only where PosiNext Cloud's hub is (HUB_DIR, default: the posinext-cloud repository next to this one) and Node 24+ runs it.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -13,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const here = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const repo = path.resolve(here, '..', '..');
-const HUB_DIR = process.env.HUB_DIR ?? 'C:\\Users\\PL\\Documents\\pos-backend\\hub';
+const HUB_DIR = process.env.HUB_DIR ?? path.join(process.env.POSINEXT_CLOUD_DIR ?? path.resolve(fileURLToPath(new URL('../../../..', import.meta.url)), 'posinext-cloud'), 'hub');
 const hubThere = existsSync(path.join(HUB_DIR, 'src', 'main.ts')) && Number(process.versions.node.split('.')[0]) >= 24;
 /** P4-05: hubs with the DinePOS sync endpoints (pos-backend branch dinepos-sync and later). */
 const hubSyncs = existsSync(path.join(HUB_DIR, 'src', 'sync.ts'));

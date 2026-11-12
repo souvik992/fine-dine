@@ -5,9 +5,6 @@
       "path": "packages/shared"
     },
     {
-      "path": "packages/licensing"
-    },
-    {
       "path": "packages/printing"
     },
     {

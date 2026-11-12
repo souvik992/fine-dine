@@ -1,5 +1,5 @@
 // P7-04: the DinePOS Cloud browser demo's sample outlet: the development seed (areas, tables, menu, fake printers,
-// staff with well-known PINs) as plain data. `npm run bundle:cloud` writes it to cloud/outlet-server/demo-seed.json;
+// staff with well-known PINs) as plain data. `npm run bundle:cloud` writes it to outlet-server/demo-seed.json in posinext-cloud;
 // the cloud sends it to a new demo outlet as ordinary commands, so the outlet server stays the only writer.
 // The PINs are shown to the visitor on purpose: a demo outlet holds no real data and is deleted after 72 hours.
 import { DEV_OWNER, DEV_STAFF, devSeedCommands, devSetupCommand, seedId, type SeedCommand } from './dev-seed.js';

@@ -75,7 +75,7 @@ active person must be able to manage staff; changing a PIN, role or active flag 
 - Seats enforced at device pairing.
 - Keygen CLI lives outside this repo (keep the private key off customer machines).
 - The key format, signing and hardware ids are also the licensing library `packages/licensing` (2026-11-08, ADR-0007),
-  shared by every product. DinePOS Cloud (`cloud/hub`) signs with it; the app keeps its own copy of the checks
+  shared by every product. PosiNext Cloud (repository posinext-cloud, which now holds this library in packages/licensing) signs with it; the app keeps its own copy of the checks
   (`apps/server/src/licence/`), and the library's tests prove both directions match. Keys may carry `product`
   (`fine_dine`, `tiffin_qsr`).
 - Tiffin POS (souvik992/tiffin, P8-10) uses the same keys and DinePOS Cloud for activation and renewals (product

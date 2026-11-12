@@ -18,9 +18,10 @@ import { build } from 'esbuild';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
-// P6-04: `npm run bundle:cloud` writes the same server for DinePOS Cloud's hosted outlets (Linux) to cloud/outlet-server.
+// P6-04: `npm run bundle:cloud` writes the same server for PosiNext Cloud's hosted outlets (Linux) to outlet-server/ in the
+// posinext-cloud repository (checked out next to this one, or POSINEXT_CLOUD_DIR); commit it there.
 const cloud = process.argv.includes('--cloud');
-const out = cloud ? `${repo}cloud/outlet-server/` : `${root}dist-bundle/`;
+const out = cloud ? `${process.env.POSINEXT_CLOUD_DIR ?? `${repo}../posinext-cloud`}/outlet-server/` : `${root}dist-bundle/`;
 const platforms = cloud ? ['linux-x64', 'linux-arm64'] : ['win32-x64'];
 const pkg = JSON.parse(readFileSync(`${root}package.json`, 'utf8'));
 
