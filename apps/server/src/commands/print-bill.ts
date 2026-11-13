@@ -7,6 +7,7 @@ import { billLogoBits, billOutlet } from './bill-design.js';
 import { billableItems, billPrinter, orderPlace, printedDateTime, toBillLines, userName } from './billing-support.js';
 import { onlineRef } from '../online/online-support.js';
 import { emitTableState, nextCounter } from './order-support.js';
+import { salesFacts } from './sales-facts.js';
 
 interface ExistingBill {
   id: string;
@@ -170,7 +171,8 @@ export const printBill = defineCommand({
       reason: overLimit ? 'discount above role limit (manager PIN)' : null,
       leakage: overLimit,
     });
-    ctx.outbox('bill.printed', { billId, orderId: o.id, billNo: billNoText, totalPaise: breakup.total, businessDate: ctx.businessDate });
+    // the last five fields feed the portal's Analytics page (sales-facts.ts)
+    ctx.outbox('bill.printed', { billId, orderId: o.id, billNo: billNoText, totalPaise: breakup.total, businessDate: ctx.businessDate, ...salesFacts(db, o, items, breakup, ctx.actor.deviceId) });
     emitTableState(ctx, o.table_id);
     return {
       result: {
