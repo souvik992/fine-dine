@@ -51,6 +51,25 @@ describe('PrintBill', () => {
     });
   });
 
+  it('sends the sale up with its order type, items by category, tax and discount (the portal\'s Analytics page)', () => {
+    const r = print({ discount: { kind: 'amount', value: 10_000, reason: 'Regular guest' } });
+    const sent = JSON.parse(h.db.prepare("SELECT payload_json FROM outbox WHERE kind = 'bill.printed'").pluck().get() as string) as Record<string, unknown>;
+    const b = bill(r.billId);
+    expect(sent).toMatchObject({
+      billId: r.billId,
+      totalPaise: r.totalPaise,
+      orderType: 'dine_in',
+      channel: 'pos',
+      terminal: null, // the test harness has no device; a terminal sends its name
+      covers: 4,
+      taxPaise: (b.cgst_paise as number) + (b.sgst_paise as number),
+      discountPaise: 10_000,
+    });
+    const lines = sent.lines as Array<{ name: string; category: string | null; qty: number; amountPaise: number }>;
+    expect(lines.map((l) => [l.qty, l.amountPaise])).toEqual([[2, 64_000], [1, 28_000], [3, 22_000]]); // naan 3 × ₹60 + cheese ₹40
+    expect(lines.every((l) => typeof l.name === 'string' && typeof l.category === 'string')).toBe(true);
+  });
+
   it('numbers bills B/<FY of the print date>/000001, 000002 …', () => {
     expect(print().billNo).toBe('B/26-27/000001');
     const second = o.open(S.t2).order!.id;
