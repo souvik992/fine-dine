@@ -11,7 +11,7 @@ import type { EventBus } from '../core/events.js';
 import type { Db } from '../db/connection.js';
 import type { Execute } from '../online/connector.js';
 import { linkRow } from '../online/online-support.js';
-import { pendingSummary, syncStream, unsentRows, type OutboxRow } from './sync-support.js';
+import { pendingSummary, stockSnapshot, syncStream, unsentRows, type OutboxRow } from './sync-support.js';
 
 export interface SyncAgentOptions {
   db: Db;
@@ -26,6 +26,8 @@ export interface SyncAgentOptions {
   /** Rows per batch (the hub takes at most 500) and the largest batch body (bytes; at least one row is sent). */
   batchSize?: number;
   maxBatchBytes?: number;
+  /** The stock list goes up when it changed, at most this often (ms). */
+  stockEveryMs?: number;
   log?: { info: (msg: string, data?: unknown) => void; warn: (msg: string, data?: unknown) => void };
 }
 
@@ -51,9 +53,12 @@ export class SyncAgent {
   private checking: Promise<void> | null = null;
   private unsubscribe: (() => void) | null = null;
   private debounce: NodeJS.Timeout | null = null;
+  /** The stock list last sent (as text) and when: it is sent again only when it differs. Kept in memory: after a restart it goes up once more, which does no harm. */
+  private stockSent: string | null = null;
+  private stockSentAt = 0;
 
   constructor(opts: SyncAgentOptions) {
-    this.o = { fetch: (input, init) => fetch(input, init), tickMs: 30_000, licenceEveryMs: 3_600_000, batchSize: 200, maxBatchBytes: 1_000_000, ...opts };
+    this.o = { fetch: (input, init) => fetch(input, init), tickMs: 30_000, licenceEveryMs: 3_600_000, batchSize: 200, maxBatchBytes: 1_000_000, stockEveryMs: 300_000, ...opts };
   }
 
   /** Sends whatever is waiting now and on every tick; a committed command (a bill, a day end) wakes it soon after. */
@@ -121,6 +126,7 @@ export class SyncAgent {
         this.sendAgain = false;
         await this.drain();
       } while (this.sendAgain);
+      await this.sendStock();
     })()
       .catch((e: unknown) => this.o.log?.warn('cloud sync failed', String(e)))
       .finally(() => {
@@ -185,6 +191,35 @@ export class SyncAgent {
       else if (r.status >= 500) this.fail('offline', `The hub had a problem (${r.status}). Trying again shortly.`);
       else this.fail('stuck', j?.error?.message ?? `The hub refused the sales records (${r.status}).`);
       return;
+    }
+  }
+
+  /**
+   * The stock list for the portal (PUT /v1/pos/inventory): the whole list, the latest one replacing the one before on
+   * the hub, so a lost or repeated send needs no bookkeeping. Sent only when it changed and not more often than
+   * stockEveryMs; an outlet that keeps no stock sends nothing. Failures are left for the next run: billing and the
+   * sales records never wait for this.
+   */
+  private async sendStock(): Promise<void> {
+    const hub = this.hub();
+    const nowMs = this.o.now().getTime();
+    if (!hub || this.conflict || (this.stockSent !== null && nowMs - this.stockSentAt < this.o.stockEveryMs)) return;
+    const snap = stockSnapshot(this.o.db, new Date(nowMs - 35 * 86_400_000).toISOString().slice(0, 10));
+    const text = JSON.stringify(snap);
+    if (text === this.stockSent || (snap.items.length === 0 && this.stockSent === null)) return;
+    try {
+      const r = await this.o.fetch(`${hub.url}/v1/pos/inventory`, {
+        method: 'PUT',
+        headers: { authorization: `Bearer ${hub.key}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ at: nowMs, ...snap }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (r.ok) {
+        this.stockSent = text;
+        this.stockSentAt = nowMs;
+      } else if (r.status !== 404) this.o.log?.warn('the stock list was not accepted by the hub', { status: r.status }); // 404: a hub from before this
+    } catch {
+      /* offline: the next run sends it */
     }
   }
 

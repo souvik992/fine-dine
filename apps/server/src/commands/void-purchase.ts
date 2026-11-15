@@ -19,6 +19,7 @@ export const voidPurchase = defineCommand({
     if (purchase.status === 'void') throw new PosError('INVALID_STATE', 'This purchase is already void.', { purchaseId: p.purchaseId });
 
     db.prepare("UPDATE purchase SET status = 'void', voided_by = ?, voided_at = ?, void_reason = ? WHERE id = ?").run(ctx.actor.userId, ctx.nowIso, p.reason, p.purchaseId);
+    ctx.outbox('purchase.voided', { purchaseId: p.purchaseId, businessDate: ctx.businessDate });
     const lines = db.prepare('SELECT stock_item_id, qty_milli, unit_cost_paise FROM purchase_line WHERE purchase_id = ? ORDER BY line_no').all(p.purchaseId) as Array<{
       stock_item_id: string;
       qty_milli: number;

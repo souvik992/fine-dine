@@ -6,6 +6,27 @@ export function syncStream(db: Db): { streamId: string; startedAt: string } {
   return { streamId: r.stream_id, startedAt: r.started_at };
 }
 
+/**
+ * The outlet's stock as it is now, for the portal's "Purchases & stock" page (PUT /v1/pos/inventory): every active
+ * material, and for each recent business day what sales used and what was wasted, valued at the material's last cost.
+ */
+export function stockSnapshot(db: Db, sinceDate: string): { items: Array<{ id: string; name: string; unit: string; onHandMilli: number; reorderMilli: number; unitCostPaise: number | null }>; usage: Array<{ date: string; usedPaise: number; wastePaise: number }> } {
+  return {
+    items: db
+      .prepare('SELECT id, name, unit, on_hand_milli AS onHandMilli, reorder_level_milli AS reorderMilli, last_unit_cost_paise AS unitCostPaise FROM stock_item WHERE active = 1 ORDER BY id')
+      .all() as ReturnType<typeof stockSnapshot>['items'],
+    usage: db
+      .prepare(
+        `SELECT m.business_date AS date,
+                max(0, sum(CASE WHEN m.kind = 'sale' THEN -m.delta_milli * COALESCE(s.last_unit_cost_paise, 0) ELSE 0 END) / 1000) AS usedPaise,
+                max(0, sum(CASE WHEN m.kind = 'wastage' THEN -m.delta_milli * COALESCE(s.last_unit_cost_paise, 0) ELSE 0 END) / 1000) AS wastePaise
+         FROM stock_movement m JOIN stock_item s ON s.id = m.stock_item_id
+         WHERE m.business_date >= ? AND m.kind IN ('sale', 'wastage') GROUP BY m.business_date ORDER BY m.business_date`,
+      )
+      .all(sinceDate) as ReturnType<typeof stockSnapshot>['usage'],
+  };
+}
+
 export interface OutboxRow {
   seq: number;
   kind: string;

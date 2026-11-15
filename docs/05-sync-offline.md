@@ -87,7 +87,9 @@ The "cloud" is the order hub (pos-backend `hub/`, `src/sync.ts`); the outlet use
 orders (Settings › Online orders), so one connection link sets up both. The agent is `apps/server/src/sync/sync-agent.ts`.
 - **Up.** The outbox (`day.closed`, `bill.printed`, `bill.settled`, `bill.voided`; bill payloads carry `businessDate`;
   `bill.printed` also carries the order type, channel, terminal, covers, tax, discount and the items with their
-  category, for the portal's Analytics page: `apps/server/src/commands/sales-facts.ts`)
+  category, for the portal's Analytics page: `apps/server/src/commands/sales-facts.ts`; `purchase.recorded` and
+  `purchase.voided` for its Purchases & stock page). The stock list is not an event: the sync agent sends the whole
+  list when it changed (`PUT /v1/pos/inventory`, at most every 5 minutes)
   is sent in `seq` order: `POST {hub}/v1/pos/sync/batches` `{streamId, fromSeq, events[{seq, kind, payload, createdAt}]}`,
   at most 200 rows / ~1 MB per batch, authenticated with the hub device key (Bearer). The licence key is public, so it
   is not used to authenticate. The hub answers `{ackSeq}` (the highest seq it holds); `RecordSyncAck` marks those rows

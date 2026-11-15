@@ -40,6 +40,7 @@ function fakeHub() {
     mode: 'ok' as 'ok' | 'down' | 'unpaired' | 'error',
     licence: null as string | null,
     batches: [] as Array<{ streamId: string; fromSeq: number; events: Array<{ seq: number; kind: string; payload: Record<string, unknown> }> }>,
+    stock: [] as Array<{ at: number; items: Array<Record<string, unknown>>; usage: Array<Record<string, unknown>> }>,
     streams,
     fetch: ((input: string | URL | Request, init?: RequestInit) => Promise.resolve().then(() => {
       const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
@@ -47,6 +48,10 @@ function fakeHub() {
       if (t.mode === 'unpaired') return json(401, { error: { code: 'UNAUTHENTICATED', message: 'Pair again.' } });
       if (t.mode === 'error') return json(503, { error: { code: 'INTERNAL', message: 'busy' } });
       if (url.pathname === '/v1/pos/licence') return json(200, { key: t.licence, updatedAt: t.licence ? 1 : null });
+      if (url.pathname === '/v1/pos/inventory') {
+        t.stock.push(JSON.parse(init?.body as string) as (typeof t.stock)[number]);
+        return json(200, { ok: true });
+      }
       const b = JSON.parse(init?.body as string) as (typeof t.batches)[number];
       t.batches.push(b);
       const s = streams.get(b.streamId) ?? new Map<number, string>();
@@ -90,6 +95,32 @@ describe('cloud sync (P4-05)', () => {
     const rows = h.db.prepare('SELECT kind, payload_json FROM outbox ORDER BY seq').all() as Array<{ kind: string; payload_json: string }>;
     expect(rows.map((r) => r.kind)).toEqual(['bill.printed', 'bill.settled']);
     for (const r of rows) expect(JSON.parse(r.payload_json)).toMatchObject({ billId, businessDate: currentBusinessDate(h.db) });
+  });
+
+  it('sends the stock list when it changed: kept back while the hub is down, once per change, never in the sales stream', async () => {
+    agent = new SyncAgent({ db: h.db, now: TEST_NOW, execute: (type, payload, actor) => h.run(type, payload, actor ? { actor } : {}), bus: new EventBus(), fetch: hub.fetch, stockEveryMs: 0 });
+    pair();
+    const item = newId();
+    h.db.prepare("INSERT INTO stock_item (id, name, unit, on_hand_milli, reorder_level_milli, last_unit_cost_paise, created_at, updated_at) VALUES (?, 'Saffron', 'g', 1500, 2000, 32000, '2026-11-02T08:00:00.000Z', '2026-11-02T08:00:00.000Z')").run(item);
+    const day = currentBusinessDate(h.db);
+    const move = h.db.prepare("INSERT INTO stock_movement (id, stock_item_id, delta_milli, kind, business_date, command_id, at) VALUES (?, ?, ?, ?, ?, ?, '2026-11-02T08:00:00.000Z')");
+    move.run(newId(), item, -500, 'sale', day, newId());
+    move.run(newId(), item, -100, 'wastage', day, newId());
+    hub.mode = 'down';
+    await agent.syncNow();
+    expect(hub.stock).toEqual([]);
+    hub.mode = 'ok';
+    await agent.syncNow();
+    expect(hub.stock).toHaveLength(1);
+    expect(hub.stock[0]!.at).toBe(TEST_NOW().getTime());
+    expect(hub.stock[0]!.items.find((i) => i.id === item)).toEqual({ id: item, name: 'Saffron', unit: 'g', onHandMilli: 1500, reorderMilli: 2000, unitCostPaise: 32000 });
+    expect(hub.stock[0]!.usage).toEqual([{ date: day, usedPaise: 16000, wastePaise: 3200 }]);
+    await agent.syncNow();
+    expect(hub.stock).toHaveLength(1); // unchanged: not sent again
+    h.db.prepare('UPDATE stock_item SET on_hand_milli = 900 WHERE id = ?').run(item);
+    await agent.syncNow();
+    expect(hub.stock).toHaveLength(2);
+    expect(hub.batches).toEqual([]); // the stock list never travels in the sales stream
   });
 
   it('sends the outbox in order, in batches, and marks what the hub acks as sent', async () => {

@@ -32,6 +32,16 @@ export const recordPurchase = defineCommand({
       postMovement(ctx, { stockItemId: l.stockItemId, deltaMilli: l.qtyMilli, kind: 'purchase', refType: 'purchase', refId: p.id, unitCostPaise: l.unitCostPaise });
     }
     ctx.audit({ entity: 'purchase', entityId: p.id, action: 'purchase.record', after: { supplierName: p.supplierName, invoiceNo: p.invoiceNo, totalPaise: total, lines } });
+    // up to the cloud for the owner's portal (Purchases & stock): hub/src/inventory.ts reads exactly these fields
+    const material = db.prepare('SELECT name, unit FROM stock_item WHERE id = ?');
+    ctx.outbox('purchase.recorded', {
+      purchaseId: p.id,
+      supplier: p.supplierName,
+      billNo: p.invoiceNo,
+      businessDate: ctx.businessDate,
+      totalPaise: total,
+      lines: lines.map((l) => ({ ...(material.get(l.stockItemId) as { name: string; unit: string }), qtyMilli: l.qtyMilli, amountPaise: l.amountPaise })),
+    });
     stockChanged(ctx, lines.map((l) => l.stockItemId));
     return { result: { purchaseId: p.id, totalPaise: total } };
   },
