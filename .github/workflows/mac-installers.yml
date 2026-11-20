@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   mac:
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 60
     env:
       CSC_LINK: ${{ secrets.CSC_LINK }}
