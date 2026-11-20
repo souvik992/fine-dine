@@ -10,7 +10,7 @@
 //     node_modules/better-sqlite3/       native SQLite binding (Node-API prebuild, any Node >= 18)
 //     package.json                       { "type": "module" }
 //
-// The installer adds node.exe (pinned Node runtime) and the service wrapper beside these.
+// The installer adds the pinned Node runtime beside these (node.exe on Windows, a universal `node` on a Mac).
 import { execSync } from 'node:child_process';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -22,7 +22,9 @@ const repo = fileURLToPath(new URL('../../..', import.meta.url));
 // posinext-cloud repository (checked out next to this one, or POSINEXT_CLOUD_DIR); commit it there.
 const cloud = process.argv.includes('--cloud');
 const out = cloud ? `${process.env.POSINEXT_CLOUD_DIR ?? `${repo}../posinext-cloud`}/outlet-server/` : `${root}dist-bundle/`;
-const platforms = cloud ? ['linux-x64', 'linux-arm64'] : ['win32-x64'];
+// The Mac installer (built on a Mac) carries both Mac builds: one universal app runs on Apple silicon and Intel Macs.
+const mac = process.argv.includes('--mac') || (!cloud && process.platform === 'darwin');
+const platforms = cloud ? ['linux-x64', 'linux-arm64'] : mac ? ['darwin-arm64', 'darwin-x64'] : ['win32-x64'];
 const pkg = JSON.parse(readFileSync(`${root}package.json`, 'utf8'));
 
 rmSync(out, { recursive: true, force: true });

@@ -25,6 +25,11 @@ describe('loadConfig', () => {
     expect(c.dbFile).toBe('dinepos.db');
   });
 
+  it('keeps production data in /Users/Shared/DinePOS on a Mac (writable by every user, like ProgramData)', () => {
+    expect(loadConfig({ NODE_ENV: 'production' }, '/Applications/DinePOS.app', 'darwin').dataDir).toBe('/Users/Shared/DinePOS');
+    expect(loadConfig({ NODE_ENV: 'production' }, '/opt/x', 'linux').dataDir).toBe('/var/lib/dinepos');
+  });
+
   it('honours DATA_DIR and port overrides', () => {
     const c = loadConfig({ DATA_DIR: './x', DINEPOS_PORT: '8000' }, '/work', 'linux');
     expect(c.dataDir).toBe(path.resolve('/work', 'x'));

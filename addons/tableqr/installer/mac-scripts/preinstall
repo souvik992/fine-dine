@@ -1,0 +1,10 @@
+#!/bin/sh
+# Table QR for DinePOS (macOS .pkg): runs before the files are copied, as root.
+# DinePOS must be on this Mac (the master that runs the DinePOS Server). The old signature goes first, so DinePOS never
+# sees a half-copied package as valid (the same order as the Windows installer).
+if [ ! -d "/Applications/DinePOS.app" ]; then
+  echo "Install DinePOS on this Mac first (the master that runs the DinePOS Server)." >&2
+  exit 1
+fi
+rm -f "/Users/Shared/DinePOS/addons/tableqr/manifest.json"
+exit 0

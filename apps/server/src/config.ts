@@ -4,6 +4,9 @@ import { z } from 'zod';
 import { StartupError } from './core/errors.js';
 import { IS_BUNDLED } from './version.js';
 
+/** Where a Mac master keeps the database, backups, logs and add-ons (the Mac app and add-on installers use it too). */
+export const MAC_DATA_DIR = '/Users/Shared/DinePOS';
+
 export interface ServerConfig {
   env: 'development' | 'production' | 'test';
   host: string;
@@ -62,6 +65,8 @@ function defaultDataDir(
 ): string {
   if (mode !== 'production') return path.resolve(cwd, 'data');
   if (platform === 'win32') return path.win32.join(env.ProgramData ?? 'C:\\ProgramData', 'DinePOS');
+  // macOS: the shared folder every user of the Mac can write (like ProgramData); /var/lib is not writable there
+  if (platform === 'darwin') return MAC_DATA_DIR;
   return '/var/lib/dinepos';
 }
 

@@ -253,7 +253,8 @@ app.on('second-instance', () => {
 });
 
 void app.whenReady().then(() => {
-  Menu.setApplicationMenu(null);
+  // macOS: no menu bar shows in the kiosk window, but Edit keeps Cmd+V working in the setup page and Cmd+Q quits
+  Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }]) : null);
   session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false)); // no camera, mic, location…
   protocol.handle(SCHEME, handle);
   powerSaveBlocker.start('prevent-display-sleep'); // a kitchen screen stays on

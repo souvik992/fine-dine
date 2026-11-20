@@ -7,20 +7,7 @@ import path from 'node:path';
 import { deflateSync } from 'node:zlib';
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray, type IpcMainInvokeEvent } from 'electron';
 import { ORIGIN } from './protocol.js';
-import { opensWindowAtStart, ServerSupervisor, type ServerCommand } from './server-supervisor.js';
-
-/** How to run the server: the installed bundle, or (development and tests) DINEPOS_SERVER_NODE / _ARGS / _CWD. */
-export function serverCommand(env: NodeJS.ProcessEnv = process.env, resources = process.resourcesPath): ServerCommand {
-  const port = Number(env.DINEPOS_PORT ?? 7420) || 7420;
-  const dataDir = env.DATA_DIR ?? path.join(env.ProgramData ?? 'C:\\ProgramData', 'DinePOS');
-  const clean: NodeJS.ProcessEnv = { ...env };
-  delete clean.ELECTRON_RUN_AS_NODE;
-  if (env.DINEPOS_SERVER_NODE) {
-    return { node: env.DINEPOS_SERVER_NODE, args: JSON.parse(env.DINEPOS_SERVER_ARGS ?? '[]') as string[], cwd: env.DINEPOS_SERVER_CWD ?? process.cwd(), env: clean, port, dataDir };
-  }
-  const dir = path.join(resources, 'server');
-  return { node: path.join(dir, 'node.exe'), args: [path.join(dir, 'server.mjs')], cwd: dir, env: { ...clean, NODE_ENV: 'production' }, port, dataDir };
-}
+import { opensWindowAtStart, serverCommand, ServerSupervisor } from './server-supervisor.js';
 
 /** A small round tray icon (green running, amber starting, red stopped), drawn here: no image file needed. */
 function dot(rgb: [number, number, number]): Electron.NativeImage {
@@ -56,7 +43,8 @@ function dot(rgb: [number, number, number]): Electron.NativeImage {
   ihdr.writeUInt32BE(size, 4);
   ihdr.set([8, 6, 0, 0, 0], 8);
   const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(Buffer.concat(rows))), chunk('IEND', Buffer.alloc(0))]);
-  return nativeImage.createFromBuffer(png);
+  // a Mac menu bar is 22 pt high: the 32 px dot is drawn at 2x (16 pt)
+  return nativeImage.createFromBuffer(png, { scaleFactor: process.platform === 'darwin' ? 2 : 1 });
 }
 
 /** Called once the app is ready (after the app:// pages are served). */
@@ -99,6 +87,7 @@ export function runServerMode(devUrl: string | undefined): void {
     }
     if (win.isMinimized()) win.restore();
     win.show();
+    if (process.platform === 'darwin') app.focus({ steal: true }); // no Dock icon: bring the window forward
     win.focus();
   };
 
@@ -149,7 +138,11 @@ export function runServerMode(devUrl: string | undefined): void {
   });
 
   void (async () => {
-    Menu.setApplicationMenu(null);
+    if (process.platform === 'darwin') {
+      // a menu-bar item only (no Dock icon), like the tray icon on Windows; Edit keeps copy and paste working
+      app.dock?.hide();
+      Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }]));
+    } else Menu.setApplicationMenu(null);
     tray = new Tray(icons.starting);
     tray.setToolTip('DinePOS Server');
     tray.setContextMenu(
@@ -163,7 +156,7 @@ export function runServerMode(devUrl: string | undefined): void {
     tray.on('click', show);
     // only the tray icon (after install, at Windows start, from the shortcut); --show opens the window too
     if (opensWindowAtStart()) show();
-    else tray.displayBalloon({ title: 'DinePOS Server is running', content: 'It runs in the background. Click the DinePOS icon by the clock to open it.', noSound: true });
+    else if (process.platform === 'win32') tray.displayBalloon({ title: 'DinePOS Server is running', content: 'It runs in the background. Click the DinePOS icon by the clock to open it.', noSound: true });
     await supervisor.start();
     setInterval(() => void supervisor.poll(), 3000).unref();
     void supervisor.poll();

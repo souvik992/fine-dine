@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, Menu, protocol, session, shell, type MenuItemConstructorOptions } from 'electron';
 import { CSP, isAppUrl, resolveAppFile, SCHEME, START_URL } from './protocol.js';
 import { ADDON_FILES, loadAddonFile, parseAddonUrl } from './addons.js';
+import { buildMacMenu, macFirstRun } from './mac-setup.js';
 import { runServerMode } from './server-mode.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -87,6 +88,7 @@ async function serveApp(request: Request): Promise<Response> {
 }
 
 function buildMenu(): void {
+  if (process.platform === 'darwin') return buildMacMenu(createWindow, app.isPackaged ? [] : [{ role: 'toggleDevTools' }]);
   const template: MenuItemConstructorOptions[] = [
     {
       label: 'File',
@@ -132,7 +134,9 @@ void app.whenReady().then(() => {
   protocol.handle(SCHEME, serveApp);
   if (SERVER_MODE) return runServerMode(DEV_URL);
   buildMenu();
-  createWindow();
+  const first = createWindow();
+  // macOS: the .dmg has no "Install as master" page; the app asks once (mac-setup.ts)
+  if (process.platform === 'darwin') first.once('ready-to-show', () => void macFirstRun(first, buildMenu));
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

@@ -98,6 +98,27 @@ archive holds node_modules or `resources/server` misses anything the server need
    keeps the server running (tray icon by the clock); Quit stops it after asking.
 6. Uninstall → shortcuts gone, `%ProgramData%\DinePOS\dinepos.db` still present.
 
+## Mac installer
+Built on a Mac only (a .dmg cannot be made on Windows): GitHub Actions › **Mac installers** › Run workflow
+(`.github/workflows/mac-installers.yml`), or on a Mac `npm run dist -w @dinepos/desktop`. Outputs (run Artifacts):
+`DinePOS-<v>-mac.dmg`, `DinePOS-Kitchen-<v>-mac.dmg`, `DinePOS-TableQR-<v>-mac.pkg`. One **universal** app runs on
+Apple silicon and Intel Macs (macOS 12+): the bundled Node 24.21.0 is the two verified nodejs.org builds joined with
+`lipo`, and the server bundle carries both better-sqlite3 Mac builds.
+
+- Install: open the .dmg, drag DinePOS to Applications. First start asks **"Is this Mac the master?"**
+  (`electron/mac-setup.ts`, the Mac's version of the NSIS master page). Master: data in `/Users/Shared/DinePOS`
+  (writable by every user), the DinePOS Server runs in the menu bar (no Dock icon) and starts at login
+  (`~/Library/LaunchAgents/com.dinepos.server.plist`). Change it later: DinePOS menu › "This Mac is the master";
+  DinePOS menu › Open DinePOS Server shows its window. If macOS asks whether "node" may accept incoming connections,
+  choose Allow (phones, kitchen screens and other terminals).
+- Licence: the Mac's hardware id comes from its IOPlatformUUID (not the hostname).
+- Table QR: run the .pkg on the master Mac; it installs to `/Users/Shared/DinePOS/addons/tableqr` (same signed package
+  as Windows), then quit and reopen the DinePOS Server.
+- Signing: with an Apple Developer ID certificate and notarization secrets (see the workflow) the apps open with no
+  warning. Without them they are ad-hoc signed and macOS blocks the first open: System Settings › Privacy & Security ›
+  **Open Anyway** (or `xattr -dr com.apple.quarantine /Applications/DinePOS.app`). Once per Mac.
+- Uninstall: quit the DinePOS Server, drag DinePOS to the Bin, delete the LaunchAgent plist; `/Users/Shared/DinePOS` (bills) stays.
+
 ## Conflict handling
 `VERSION_CONFLICT` → if command is "safe" (see `docs/05-sync-offline.md`) resend with the returned
 version; otherwise show `ConflictBanner` with what changed and who did it.

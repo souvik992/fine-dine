@@ -9,6 +9,8 @@ const stopScript = read('../build/server/stop-server.ps1');
 const config = createRequire(import.meta.url)('../electron-builder.config.cjs') as {
   nsis: Record<string, unknown>;
   extraResources: Array<{ from: string; to: string }>;
+  win: { extraResources: Array<{ from: string; to: string }> };
+  mac: { target: Array<{ target: string; arch: string[] }>; extraResources: Array<{ from: string; to: string }>; x64ArchFiles: string; hardenedRuntime: boolean; entitlements: string };
   files: string[];
 };
 
@@ -68,8 +70,16 @@ describe('electron-builder config', () => {
   });
 
   it('ships the server, its node_modules, node.exe and the stop script', () => {
-    const to = config.extraResources.map((r) => r.to);
+    const to = [...config.extraResources, ...config.win.extraResources].map((r) => r.to);
     expect(to).toEqual(expect.arrayContaining(['server', 'server/node_modules', 'server/node.exe', 'server/stop-server.ps1']));
+  });
+
+  it('Mac: one universal .dmg with the universal node beside the server, hardened runtime', () => {
+    expect(config.mac.target).toEqual([{ target: 'dmg', arch: ['universal'] }]);
+    expect(config.mac.extraResources).toEqual([{ from: 'build-cache/mac/node', to: 'server/node' }]);
+    expect(config.mac.x64ArchFiles).toBe('Contents/Resources/server/**');
+    expect(config.mac.hardenedRuntime).toBe(true);
+    expect(read('../build/entitlements.mac.plist')).toContain('com.apple.security.cs.disable-library-validation');
   });
 
   it('keeps node_modules out of the app archive (everything is bundled)', () => {

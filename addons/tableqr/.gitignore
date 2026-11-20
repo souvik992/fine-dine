@@ -1,2 +1,3 @@
 .build/
 .tsbuild/
+.mac-pkg/

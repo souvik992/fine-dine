@@ -1,0 +1,85 @@
+name: Mac installers
+
+# Builds the macOS installers on a Mac runner (a .dmg cannot be built on Windows):
+#   DinePOS-<v>-mac.dmg           billing app + DinePOS Server (universal: Apple silicon and Intel)
+#   DinePOS-Kitchen-<v>-mac.dmg   kitchen display
+#   DinePOS-TableQR-<v>-mac.pkg   Table QR add-on (only when the add-on signing key secret is set)
+# Download them from the run's "Artifacts". Run it from Actions > Mac installers > Run workflow, or push a tag mac-v*.
+#
+# Secrets (all optional):
+#   DINEPOS_ADDON_SIGNING_KEY_PEM   contents of %USERPROFILE%\.dinepos\addon-signing\private.pem (Table QR is signed
+#                                   with it; DinePOS refuses add-ons signed with any other key). Without it: no Table QR.
+#   CSC_LINK, CSC_KEY_PASSWORD      Apple "Developer ID Application" certificate (.p12, base64) and its password
+#   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID   notarization (with the certificate: opens on any Mac
+#                                   without a warning). Without them the apps are ad-hoc signed: see the README.
+#   APPLE_INSTALLER_P12, APPLE_INSTALLER_P12_PASSWORD      "Developer ID Installer" certificate for the Table QR .pkg
+on:
+  workflow_dispatch:
+  push:
+    tags: ['mac-v*']
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    runs-on: macos-14
+    timeout-minutes: 60
+    env:
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      # without a certificate electron-builder must not go looking in the keychain (identity '-' = ad-hoc)
+      CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test
+
+      - name: DinePOS (billing app + server)
+        run: npm run dist -w @dinepos/desktop
+
+      - name: DinePOS Kitchen
+        run: npm run dist -w @dinepos/kitchen
+
+      - name: Table QR add-on
+        env:
+          SIGNING_KEY: ${{ secrets.DINEPOS_ADDON_SIGNING_KEY_PEM }}
+          INSTALLER_P12: ${{ secrets.APPLE_INSTALLER_P12 }}
+          INSTALLER_P12_PASSWORD: ${{ secrets.APPLE_INSTALLER_P12_PASSWORD }}
+        run: |
+          if [ -z "$SIGNING_KEY" ]; then
+            echo "::warning::DINEPOS_ADDON_SIGNING_KEY_PEM is not set: Table QR is not built."
+            exit 0
+          fi
+          key="$RUNNER_TEMP/addon-signing.pem"
+          printf '%s\n' "$SIGNING_KEY" > "$key"
+          chmod 600 "$key"
+          if [ -n "$INSTALLER_P12" ]; then
+            kc="$RUNNER_TEMP/installer.keychain-db"
+            security create-keychain -p ci "$kc"
+            security set-keychain-settings "$kc"
+            security unlock-keychain -p ci "$kc"
+            echo "$INSTALLER_P12" | base64 --decode > "$RUNNER_TEMP/installer.p12"
+            security import "$RUNNER_TEMP/installer.p12" -k "$kc" -P "$INSTALLER_P12_PASSWORD" -T /usr/bin/productbuild
+            security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+            export APPLE_INSTALLER_IDENTITY="$(security find-identity -v "$kc" | grep -o '"Developer ID Installer: [^"]*"' | head -1 | tr -d '"')"
+          fi
+          DINEPOS_ADDON_SIGNING_KEY="$key" npm run installer:mac -w @dinepos/addon-tableqr
+          rm -f "$key"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dinepos-mac-installers
+          if-no-files-found: error
+          path: |
+            apps/desktop/release/*.dmg
+            apps/kitchen/release/*.dmg
+            addons/dist/installers/*.pkg

@@ -21,5 +21,7 @@ writeFileSync(
 
 const { build } = createRequire(import.meta.url)('electron-builder');
 const config = createRequire(import.meta.url)(`${here}electron-builder.config.cjs`);
-await build({ projectDir: here, config, win: ['nsis'], publish: 'never' });
+// on a Mac: release/DinePOS-Kitchen-<version>-mac.dmg (one app for Apple silicon and Intel)
+const mac = process.platform === 'darwin';
+await build({ projectDir: here, config, ...(mac ? { mac: ['dmg'], universal: true } : { win: ['nsis'] }), publish: 'never' });
 console.warn(`installer written to ${here}release`);

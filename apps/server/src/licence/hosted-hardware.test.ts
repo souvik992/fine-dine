@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatHardwareId, hostedHardwareId } from './hardware.js';
+import { formatHardwareId, hostedHardwareId, parseMacPlatformUuid } from './hardware.js';
 
 // P6-04: hosted outlets on one cloud machine each need their own licence key.
 describe('hosted outlet hardware id', () => {
@@ -11,5 +11,13 @@ describe('hosted outlet hardware id', () => {
     expect(hostedHardwareId('store-b', machine)).not.toBe(a);
     expect(formatHardwareId(machine)).not.toBe(a);
     expect(hostedHardwareId('store-a', ['another-machine'])).not.toBe(a);
+  });
+});
+
+describe('Mac hardware id', () => {
+  it('reads the IOPlatformUUID from ioreg (not the hostname, which changes with the network)', () => {
+    const ioreg = '+-o J314sAP  <class IOPlatformExpertDevice>\n    {\n      "IOPlatformSerialNumber" = "C02XYZ"\n      "IOPlatformUUID" = "1a2b3c4d-0000-1111-2222-333344445555"\n    }\n';
+    expect(parseMacPlatformUuid(ioreg)).toBe('1A2B3C4D-0000-1111-2222-333344445555');
+    expect(parseMacPlatformUuid('')).toBeNull();
   });
 });

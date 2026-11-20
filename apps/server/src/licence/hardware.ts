@@ -21,6 +21,11 @@ export function machineIdentifiers(): string[] {
     const serial = /([0-9A-F]{4}-[0-9A-F]{4})/i.exec(run('cmd', ['/c', 'vol', drive]))?.[1] ?? '';
     return [guid, serial];
   }
+  if (platform() === 'darwin') {
+    // the hostname changes with the network on a Mac; the hardware UUID survives reinstalls of DinePOS and macOS
+    const uuid = parseMacPlatformUuid(run('/usr/sbin/ioreg', ['-rd1', '-c', 'IOPlatformExpertDevice']));
+    if (uuid) return [`mac:${uuid}`];
+  }
   let machineId = '';
   try {
     machineId = readFileSync('/etc/machine-id', 'utf8').trim();
@@ -28,6 +33,11 @@ export function machineIdentifiers(): string[] {
     // not Linux
   }
   return [machineId || hostname()];
+}
+
+/** The Mac's IOPlatformUUID from `ioreg -rd1 -c IOPlatformExpertDevice`, or null. */
+export function parseMacPlatformUuid(ioreg: string): string | null {
+  return /"IOPlatformUUID"\s*=\s*"([0-9A-F-]{36})"/i.exec(ioreg)?.[1]?.toUpperCase() ?? null;
 }
 
 /** "AB12-CD34-EF56-7890-1A2B": 20 hex digits of SHA-256, easy to read out over the phone. */

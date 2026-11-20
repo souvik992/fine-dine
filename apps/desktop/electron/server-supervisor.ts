@@ -4,6 +4,8 @@
 // tested; server-mode.ts puts it in a window and the tray.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { networkInterfaces } from 'node:os';
+import path from 'node:path';
+import { MAC_DATA_DIR } from './mac-master.js';
 
 export interface ServerCommand {
   node: string;
@@ -252,4 +254,25 @@ export class ServerSupervisor {
 /** The DinePOS Server opens its window at start only with --show (tests, support); otherwise it sits in the tray. */
 export function opensWindowAtStart(argv: readonly string[] = process.argv): boolean {
   return argv.includes('--show');
+}
+
+/** How to run the server: the installed bundle, or (development and tests) DINEPOS_SERVER_NODE / _ARGS / _CWD. */
+export function serverCommand(env: NodeJS.ProcessEnv = process.env, resources = process.resourcesPath, platform: NodeJS.Platform = process.platform): ServerCommand {
+  const port = Number(env.DINEPOS_PORT ?? 7420) || 7420;
+  const dataDir = env.DATA_DIR ?? defaultServerDataDir(env, platform);
+  const clean: NodeJS.ProcessEnv = { ...env };
+  delete clean.ELECTRON_RUN_AS_NODE;
+  if (env.DINEPOS_SERVER_NODE) {
+    return { node: env.DINEPOS_SERVER_NODE, args: JSON.parse(env.DINEPOS_SERVER_ARGS ?? '[]') as string[], cwd: env.DINEPOS_SERVER_CWD ?? process.cwd(), env: clean, port, dataDir };
+  }
+  const p = platform === 'win32' ? path.win32 : path.posix;
+  const dir = p.join(resources, 'server');
+  return { node: p.join(dir, platform === 'win32' ? 'node.exe' : 'node'), args: [p.join(dir, 'server.mjs')], cwd: dir, env: { ...clean, NODE_ENV: 'production' }, port, dataDir };
+}
+
+/** The server's own default (apps/server/src/config.ts): %ProgramData%\DinePOS on Windows, /Users/Shared/DinePOS on a Mac. */
+export function defaultServerDataDir(env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string {
+  if (platform === 'win32') return path.win32.join(env.ProgramData ?? 'C:\\ProgramData', 'DinePOS');
+  if (platform === 'darwin') return MAC_DATA_DIR;
+  return '/var/lib/dinepos';
 }

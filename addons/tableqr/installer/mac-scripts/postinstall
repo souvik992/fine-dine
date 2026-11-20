@@ -1,0 +1,7 @@
+#!/bin/sh
+# Table QR for DinePOS (macOS .pkg): after the files are copied, as root.
+# The installer may have made /Users/Shared/DinePOS itself (DinePOS not started yet): the DinePOS Server runs as whoever
+# is signed in and must be able to write its database there, as on Windows (Users: modify on %ProgramData%\DinePOS).
+chmod 777 "/Users/Shared/DinePOS" 2>/dev/null
+chmod 755 "/Users/Shared/DinePOS/addons" "/Users/Shared/DinePOS/addons/tableqr" 2>/dev/null
+exit 0

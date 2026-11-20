@@ -1,5 +1,7 @@
-// Builds the Windows installer: server bundle → desktop build → verified runtime binaries → staged app →
-// electron-builder (NSIS). Output: apps/desktop/release/DinePOS-Setup-<version>.exe (+ win-unpacked/).
+// Builds the installer for the OS it runs on. Windows: NSIS .exe. macOS: universal .dmg (Apple silicon + Intel).
+// Steps: server bundle → desktop build → verified runtime binaries → staged app →
+// electron-builder. Output: apps/desktop/release/DinePOS-Setup-<version>.exe (+ win-unpacked/), or on a Mac
+// release/DinePOS-<version>-mac.dmg (+ mac-universal/DinePOS.app).
 import { execFileSync } from 'node:child_process';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -45,6 +47,8 @@ writeFileSync(
 
 const { build } = createRequire(import.meta.url)('electron-builder');
 const config = createRequire(import.meta.url)(`${here}electron-builder.config.cjs`);
-await build({ projectDir: here, config, win: ['nsis'], publish: 'never' });
+const mac = process.platform === 'darwin';
+if (!mac && process.platform !== 'win32') throw new Error('Build the installer on Windows (.exe) or on a Mac (.dmg).');
+await build({ projectDir: here, config, ...(mac ? { mac: ['dmg'], universal: true } : { win: ['nsis'] }), publish: 'never' });
 console.warn(`installer written to ${here}release`);
 execFileSync(process.execPath, [`${here}scripts/inspect-release.mjs`], { stdio: 'inherit' });
