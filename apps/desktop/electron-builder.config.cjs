@@ -12,7 +12,9 @@ module.exports = {
   copyright: 'Copyright © 2026 DinePOS',
   directories: { app: '.stage', output: 'release', buildResources: 'build' },
   electronVersion: require('electron/package.json').version,
-  electronDist: path.join(electronDir, 'dist'),
+  // Windows: the Electron already in node_modules. Mac: electron-builder downloads (checksum-verified) the arm64 and x64
+  // Electron for the two halves of the universal app; node_modules holds only the build machine's one.
+  electronDist: process.platform === 'darwin' ? undefined : path.join(electronDir, 'dist'),
   // Chromium's own text (context menus, file dialogs) in English only; DinePOS's screens carry their own text. Saves ~48 MB.
   electronLanguages: ['en-US'],
   npmRebuild: false,
