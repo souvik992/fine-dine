@@ -40,14 +40,13 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run test
+      # (typecheck and tests run on Windows and Linux in CI, and passed here too; the Mac build is what this job adds)
 
       - name: DinePOS (billing app + server)
-        run: npm run dist -w @dinepos/desktop
+        run: bash .github/scripts/run-annotated.sh "DinePOS build" npm run dist -w @dinepos/desktop
 
       - name: DinePOS Kitchen
-        run: npm run dist -w @dinepos/kitchen
+        run: bash .github/scripts/run-annotated.sh "Kitchen build" npm run dist -w @dinepos/kitchen
 
       - name: Table QR add-on
         env:
