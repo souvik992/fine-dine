@@ -75,6 +75,6 @@ npm run installer -w @dinepos/addon-tableqr # -> addons/dist/installers/DinePOS-
 npm run test:e2e -w @dinepos/desktop -- apps/desktop/e2e/tableqr.e2e.test.ts   # the real apps
 ```
 
-- **Installing:** run `DinePOS-TableQR-Setup-<version>.exe` on the main PC, then close and reopen DinePOS there. It needs administrator rights and an installed DinePOS. It copies the package into `C:\ProgramData\DinePOS\addons\tableqr`.
+- **Installing:** run `DinePOS-TableQR-Setup-<version>.exe` on the main PC. It needs administrator rights and an installed DinePOS. It copies the package into `C:\ProgramData\DinePOS\addons\tableqr`, then offers to restart the DinePOS server (Yes in a silent install). The server reads add-ons only when it starts and keeps running in the tray when the DinePOS windows close, so closing and reopening DinePOS is not enough: if you choose No, use the tray icon › **Restart the server** later.
 - **Uninstalling:** use Windows Settings › Apps. The add-on's settings, codes and history stay in the DinePOS data.
 - **Releasing:** raise `version` in `package.json` for every release. DinePOS refuses a version older than one it already ran.

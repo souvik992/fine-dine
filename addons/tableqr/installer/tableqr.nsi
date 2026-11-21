@@ -25,7 +25,7 @@ BrandingText "DinePOS"
 !define MUI_WELCOMEPAGE_TITLE "Table QR for DinePOS"
 !define MUI_WELCOMEPAGE_TEXT "This adds table QR ordering to DinePOS:$\r$\n$\r$\n- guests scan the code on their table to see the menu and order$\r$\n- call a waiter, ask for the bill, see the running bill$\r$\n- pay a printed bill by UPI (the cashier confirms)$\r$\n- Settings > Table QR: switch on, accepting, print the codes$\r$\n$\r$\nRun it on the main PC (where DinePOS runs the outlet server). Your bills and data are not changed."
 !define MUI_FINISHPAGE_TITLE "Table QR is installed"
-!define MUI_FINISHPAGE_TEXT "Close DinePOS on this PC and open it again. Then switch Table QR on in Settings > Table QR and print the codes."
+!define MUI_FINISHPAGE_TEXT "Then switch Table QR on in Settings > Table QR and print the codes.$\r$\n$\r$\nIf you did not restart the server just now, Table QR starts the next time the DinePOS server starts (tray icon by the clock > Restart the server)."
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
@@ -85,7 +85,21 @@ Section "Table QR"
   WriteRegStr HKLM "${REGKEY}" "QuietUninstallString" '"$INSTDIR\uninstall.exe" /S'
   WriteRegDWORD HKLM "${REGKEY}" "NoModify" 1
   WriteRegDWORD HKLM "${REGKEY}" "NoRepair" 1
+  Call RestartServer
 SectionEnd
+
+; The server reads add-ons only when it starts, and it runs on in the tray when the DinePOS windows close, so a fresh
+; install is invisible until the server restarts. Stop the bundled server node.exe (matched by its exact path, never
+; another node): the DinePOS Server tray restarts it within a second. SQLite runs in WAL with synchronous=FULL, so a
+; stop never loses a committed bill; a command cut off mid-way rolls back and the terminal retries it.
+Function RestartServer
+  StrCpy $0 "$PROGRAMFILES64\DinePOS\resources\server\node.exe"
+  MessageBox MB_ICONQUESTION|MB_YESNO "Restart the DinePOS server now so Table QR starts?$\r$\n$\r$\nTerminals pause for a few seconds. Choose No during service and restart it later from the DinePOS tray icon." /SD IDYES IDNO done
+  nsExec::ExecToLog `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -eq '$0' } | Stop-Process -Force"`
+  Pop $1
+  DetailPrint "DinePOS server restart requested."
+  done:
+FunctionEnd
 
 Section "Uninstall"
   ; signature first, so DinePOS stops loading it at the next start; its settings, codes and history stay in the DinePOS data
