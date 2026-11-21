@@ -117,13 +117,59 @@ describe('sign-in and sessions', () => {
     expect((await login(ids.cashier, '1111')).status).toBe(200);
   });
 
-  it('a session expires 12 hours after its last use', async () => {
+  it('a session never ends with time; Sign out ends it', async () => {
     await seeded();
     const { token } = (await login(ids.cashier, '1111')).body;
-    clock = new Date(clock.getTime() + 11 * 3_600_000);
-    expect((await app.inject({ method: 'GET', url: '/v1/session', headers: { 'x-user-session': token } })).statusCode).toBe(200); // slides
-    clock = new Date(clock.getTime() + 12 * 3_600_000 + 1_000);
-    expect((await app.inject({ method: 'GET', url: '/v1/session', headers: { 'x-user-session': token } })).statusCode).toBe(401);
+    const get = () => app.inject({ method: 'GET', url: '/v1/session', headers: { 'x-user-session': token } });
+    clock = new Date(clock.getTime() + 30 * 86_400_000);
+    expect((await get()).statusCode).toBe(200);
+    expect((await app.inject({ method: 'DELETE', url: '/v1/session', headers: { 'x-user-session': token } })).statusCode).toBeLessThan(300);
+    expect((await get()).statusCode).toBe(401);
+  });
+
+  type Body = { error?: { code: string; message: string; details?: unknown }; user?: { id: string } };
+  const body = (r: { json: () => unknown }) => r.json() as Body;
+
+  it('Lock keeps the sign-in but refuses everything until the same PIN; audited', async () => {
+    await seeded();
+    const { token } = (await login(ids.cashier, '1111')).body;
+    const h = { 'x-user-session': token };
+    const unlock = (pin: string) => app.inject({ method: 'POST', url: '/v1/session/unlock', headers: h, payload: { pin } });
+    expect((await app.inject({ method: 'POST', url: '/v1/session/lock', headers: h })).statusCode).toBe(204);
+    const locked = await app.inject({ method: 'GET', url: '/v1/session', headers: h });
+    expect(locked.statusCode).toBe(401);
+    expect(body(locked).error).toMatchObject({ code: 'UNAUTHENTICATED', details: { sessionLocked: true, userId: ids.cashier } });
+    expect((await send('SetConfig', { values: { 'outlet.name': 'x' } }, { token })).body.error?.details).toMatchObject({ sessionLocked: true });
+    // another person's PIN does not open it; a wrong PIN counts towards the 5-minute lockout
+    const wrong = await unlock('2345'); // the manager's PIN
+    expect(wrong.statusCode).toBe(401);
+    expect(body(wrong).error).toMatchObject({ message: 'Wrong PIN. Try again.', details: { attemptsLeft: 4 } });
+    const ok = await unlock('1111');
+    expect(ok.statusCode).toBe(200);
+    expect(body(ok).user?.id).toBe(ids.cashier);
+    expect((await app.inject({ method: 'GET', url: '/v1/session', headers: h })).statusCode).toBe(200);
+    const actions = db.prepare("SELECT action FROM audit_event WHERE action IN ('auth.session_lock', 'auth.unlock', 'auth.fail') ORDER BY rowid").pluck().all();
+    expect(actions).toEqual(['auth.session_lock', 'auth.fail', 'auth.unlock']);
+  });
+
+  it('a locked sign-in can still sign out; unlock after that says the session ended', async () => {
+    await seeded();
+    const { token } = (await login(ids.cashier, '1111')).body;
+    const h = { 'x-user-session': token };
+    await app.inject({ method: 'POST', url: '/v1/session/lock', headers: h });
+    expect((await app.inject({ method: 'DELETE', url: '/v1/session', headers: h })).statusCode).toBe(204);
+    const r = await app.inject({ method: 'POST', url: '/v1/session/unlock', headers: h, payload: { pin: '1111' } });
+    expect(body(r).error).toMatchObject({ code: 'UNAUTHENTICATED', details: { sessionEnded: true } });
+  });
+
+  it('a session from before sign-ins stopped expiring is kept from then on', async () => {
+    await seeded();
+    const { token } = (await login(ids.cashier, '1111')).body;
+    db.prepare('UPDATE user_session SET expires_at = ?').run(new Date(clock.getTime() + 3_600_000).toISOString());
+    const get = () => app.inject({ method: 'GET', url: '/v1/session', headers: { 'x-user-session': token } });
+    expect((await get()).statusCode).toBe(200);
+    clock = new Date(clock.getTime() + 2 * 3_600_000);
+    expect((await get()).statusCode).toBe(200);
   });
 });
 

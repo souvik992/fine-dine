@@ -1,6 +1,6 @@
 import { formatINR, type FloorSnapshot, type FloorTable } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
-import { BellRing, ChefHat, Clock, Lock, Minus, Plus, ReceiptText, TriangleAlert, Users, WifiOff } from 'lucide-react';
+import { BellRing, ChefHat, Clock, Lock, LogOut, Minus, Plus, ReceiptText, TriangleAlert, Users, WifiOff } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../app-context.js';
 import { Sheet } from '../components/Sheet.js';
@@ -17,7 +17,7 @@ import { OrderScreen } from './OrderScreen.js';
  * comes first and opens by default when there are any; tiles show the order's captain and "Bill asked".
  */
 export function TablesScreen() {
-  const { session, signOut, stream, can } = useApp();
+  const { session, signOut, lock, stream, can } = useApp();
   const sync = useSync();
   const floor = useQuery({ queryKey: ['floor'], queryFn: () => sync.cachedGet<FloorSnapshot>('/v1/floor'), refetchInterval: 60_000 });
   const [areaId, setAreaId] = useState<string | null>(null);
@@ -56,8 +56,11 @@ export function TablesScreen() {
             {session?.user.name}
             <span className="block text-xs text-muted-foreground">{session?.user.roleName}</span>
           </span>
-          <button className="btn h-10 w-10 px-0" onClick={signOut} aria-label="Lock">
+          <button className="btn h-10 w-10 px-0" onClick={() => void lock().catch(() => undefined)} aria-label="Lock">
             <Lock className="h-5 w-5" />
+          </button>
+          <button className="btn h-10 w-10 px-0" onClick={signOut} aria-label="Sign out">
+            <LogOut className="h-5 w-5" />
           </button>
         </div>
         <nav role="tablist" aria-label="Areas" className="no-scrollbar -mx-1 mt-2 flex gap-1 overflow-x-auto px-1">

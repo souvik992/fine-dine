@@ -7,12 +7,11 @@ import './styles.css';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true } } });
 
-/** A kitchen screen stays signed in (no idle lock) and listens to every station's tickets (topic `kds`). */
+/** A kitchen screen stays signed in and listens to every station's tickets (topic `kds`). */
 const KDS: ShellConfig = {
   kind: 'kds',
   storagePrefix: 'dinepos.kds',
   topicQueries: { kds: ['board'], menu: ['menu'], system: ['board', 'setup', 'menu'] },
-  idleLockMs: null,
 };
 
 createRoot(document.getElementById('root')!).render(

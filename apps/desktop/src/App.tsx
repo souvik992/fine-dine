@@ -4,6 +4,7 @@ import { RefreshCw, Settings } from 'lucide-react';
 import { useState } from 'react';
 import { ApiError } from './api/client.js';
 import { useApp } from './app-context.js';
+import { LockScreen } from './auth/LockScreen.js';
 import { LoginScreen } from './auth/LoginScreen.js';
 import { PairScreen } from './auth/PairScreen.js';
 import { ManagerPinDialog } from './auth/ManagerPinDialog.js';
@@ -37,6 +38,8 @@ export function App() {
   // Public: first-run setup or the staff list. Refetched whenever nobody is signed in.
   const setup = useQuery({ queryKey: ['setup-state'], queryFn: () => api.get<SetupState>('/v1/setup-state'), enabled: !session, retry: 1 });
 
+  // Locked (Lock button, another window, or before a restart): nothing else of the app is reachable, settings included.
+  if (session?.locked && !needsPairing) return <LockScreen />;
   if (screen.kind === 'settings') {
     // Settings has its own PIN actions (approving a device, staff changes): the PIN prompt must be shown here too.
     return (

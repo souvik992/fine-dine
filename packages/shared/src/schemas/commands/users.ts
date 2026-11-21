@@ -37,6 +37,8 @@ export const upsertRoleSchema = z
   .strict();
 
 export const loginSchema = z.object({ userId: ulidSchema, pin: pinSchema }).strict();
+/** POST /v1/session/unlock: the PIN of the person whose sign-in is locked. */
+export const unlockSchema = z.object({ pin: pinSchema }).strict();
 
 export type SetupOutletPayload = z.infer<typeof setupOutletSchema>;
 export type UpsertUserPayload = z.infer<typeof upsertUserSchema>;

@@ -40,6 +40,8 @@ export interface ApiClientOptions {
   getToken?: () => string | null;
   /** Called when the server says the session is missing or over (except while signing in). */
   onUnauthenticated?: () => void;
+  /** The sign-in is locked (Lock button, here or in another window): show the lock screen, keep the session. */
+  onSessionLocked?: () => void;
   /** P2-02: this terminal's device token (sent as `Authorization: Device <token>`). */
   getDeviceToken?: () => string | null;
   /** The server does not know this device (never paired, or revoked): the terminal must pair. */
@@ -165,7 +167,8 @@ export class ApiClient {
     if (res.ok) return json as T;
     const fail = json as Partial<CommandFailure>;
     if (fail.error?.code === 'UNAUTHENTICATED' && (fail.error.details as { reason?: string } | undefined)?.reason === 'device_not_paired') this.opts.onDeviceUnpaired?.();
-    else if (fail.error?.code === 'UNAUTHENTICATED' && path !== '/v1/sessions' && sessionToken === undefined) this.opts.onUnauthenticated?.();
+    else if (fail.error?.code === 'UNAUTHENTICATED' && (fail.error.details as { sessionLocked?: boolean } | undefined)?.sessionLocked && sessionToken === undefined) this.opts.onSessionLocked?.();
+    else if (fail.error?.code === 'UNAUTHENTICATED' && path !== '/v1/sessions' && path !== '/v1/session/unlock' && sessionToken === undefined) this.opts.onUnauthenticated?.();
     throw new ApiError(fail.error?.code ?? 'INTERNAL', fail.error?.message ?? `Request failed (HTTP ${res.status}).`, fail.error?.details, fail.order);
   }
 }

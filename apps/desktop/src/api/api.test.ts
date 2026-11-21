@@ -246,6 +246,21 @@ describe('ApiClient: sessions and manager approval', () => {
     expect(signedOut).toBe(1);
   });
 
+  it('a locked sign-in shows the lock screen (keeps the session); a wrong unlock PIN signs nobody out', async () => {
+    const locked = vi.fn();
+    const signedOut = vi.fn();
+    let n = 0;
+    const fetch: Fetch = () =>
+      ++n === 1
+        ? reply({ ok: false, error: { code: 'UNAUTHENTICATED', message: 'Locked.', details: { sessionLocked: true } } }, 401)
+        : reply({ ok: false, error: { code: 'UNAUTHENTICATED', message: 'Wrong PIN. Try again.' } }, 401);
+    const api = new ApiClient({ baseUrl: 'http://s', fetch, getToken: () => 't', onUnauthenticated: signedOut, onSessionLocked: locked });
+    await expect(api.get('/v1/floor')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    await expect(api.send('POST', '/v1/session/unlock', { pin: '0000' })).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    expect(locked).toHaveBeenCalledOnce();
+    expect(signedOut).not.toHaveBeenCalled();
+  });
+
   it('P3-03: a queued command goes out as the captain who made it, once; a refused old session signs nobody out', async () => {
     const tokens: Array<string | null> = [];
     let signedOut = 0;

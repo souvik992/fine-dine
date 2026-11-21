@@ -48,7 +48,8 @@ header: refuses while tables are open, then asks for counted cash and shows the 
 ## Sign-in and settings (P2-01)
 `src/auth/`: first-run setup, name tiles + PIN pad, manager PIN dialog (the command is resent with the same
 `commandId` and `X-Manager-Pin`). The session lives in localStorage `dinepos.session`, is checked against the
-server at start, shared by all windows, and locks after 10 idle minutes (or Lock / Ctrl+L).
+server at start, shared by all windows, and stays signed in (idle time and restarts included) until Sign out, the icon at the top right. Lock (next to it)
+shows `src/auth/LockScreen.tsx` until the same person's PIN; the lock is kept by the server (docs/07).
 `src/settings/`: one file per section (Outlet, Floor, Menu, Kitchen, Staff, Terminal) plus `common.tsx`;
 `layout-model.ts` holds the layout editor geometry (pure + tested). Sections follow `docs/09-ui-screens.md` §7.
 

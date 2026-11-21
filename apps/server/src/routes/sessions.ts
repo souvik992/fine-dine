@@ -1,9 +1,9 @@
 import { renderBill } from '@dinepos/printing';
-import { configSchemas, loginSchema, type OutletConfig, type RoleInfo, type StaffMember } from '@dinepos/shared';
+import { configSchemas, loginSchema, unlockSchema, type OutletConfig, type RoleInfo, type StaffMember } from '@dinepos/shared';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { requireRight as requireSessionRight, sessionToken as token } from '../auth/require-right.js';
-import { login, logout, resolveSession, roleRights, setupState } from '../auth/sessions.js';
+import { lockSession, login, logout, resolveSession, unlockSession, roleRights, setupState } from '../auth/sessions.js';
 import { billLogoBits, sampleBillDocument } from '../commands/bill-design.js';
 import { PosError } from '../core/errors.js';
 import { getConfig } from '../core/outlet-config.js';
@@ -28,6 +28,18 @@ export function sessionRoutes(app: FastifyInstance, deps: { db: Db; now: () => D
   });
 
   app.get('/v1/session', (req, reply) => reply.headers(noStore).send(resolveSession(db, token(req), now())));
+
+  /** The Lock button (as in Tiffin POS): the sign-in stays; only the same person's PIN continues. */
+  app.post('/v1/session/lock', (req, reply) => {
+    lockSession(db, token(req), now());
+    return reply.status(204).send();
+  });
+
+  app.post('/v1/session/unlock', (req, reply) => {
+    const body = unlockSchema.safeParse(req.body);
+    if (!body.success) throw new PosError('VALIDATION', 'Type your PIN (4 to 6 digits).');
+    return reply.headers(noStore).send(unlockSession(db, token(req), body.data.pin, now()));
+  });
 
   app.delete('/v1/session', (req, reply) => {
     logout(db, token(req), now());

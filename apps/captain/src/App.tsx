@@ -1,4 +1,4 @@
-import { LoginScreen, PairScreen } from '@dinepos/web-shell';
+import { LockScreen, LoginScreen, PairScreen } from '@dinepos/web-shell';
 import { useApp } from './app-context.js';
 import { TablesScreen } from './screens/TablesScreen.js';
 
@@ -7,5 +7,6 @@ export function App() {
   const { needsPairing, session } = useApp();
   if (needsPairing) return <PairScreen kind="captain" />;
   if (!session) return <LoginScreen question="Who is taking orders?" />;
+  if (session.locked) return <LockScreen />;
   return <TablesScreen />;
 }

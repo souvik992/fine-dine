@@ -39,7 +39,7 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 | Code | HTTP | When |
 | --- | --- | --- |
 | `VALIDATION` | 400 | zod failed |
-| `UNAUTHENTICATED` | 401 | bad device token / session |
+| `UNAUTHENTICATED` | 401 | bad device token / session; `details.sessionLocked` = the sign-in is locked (lock screen, docs/07) |
 | `PIN_REQUIRED` | 401 | right needs manager PIN; resend with `X-Manager-Pin` |
 | `FORBIDDEN` | 403 | user lacks right; `details.right` |
 | `NOT_FOUND` | 404 | order/table/item missing |

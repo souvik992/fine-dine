@@ -8,6 +8,8 @@ import { StreamClient, streamUrl, type StreamStatus } from './api/stream.js';
 /** The signed-in person on this terminal. */
 export interface Session extends SessionInfo {
   token: string;
+  /** Locked with the Lock button (here, in another window or before a restart): only this person's PIN continues. */
+  locked?: boolean;
 }
 
 /** A pending "manager PIN please" prompt (shown by ManagerPinDialog). */
@@ -25,6 +27,10 @@ interface AppContextValue {
   signIn: (result: LoginResult) => void;
   /** Ends the session on the server and shows the sign-in screen. */
   signOut: () => void;
+  /** The Lock button: keeps the sign-in and shows the lock screen until the same person's PIN. */
+  lock: () => Promise<void>;
+  /** Checks the signed-in person's PIN with the server and leaves the lock screen (throws ApiError). */
+  unlock: (pin: string) => Promise<void>;
   /** Whether the signed-in role has a right; `withPin` also accepts rights that need a manager PIN. */
   can: (right: Right, withPin?: boolean) => boolean;
   pinRequest: PinRequest | null;
@@ -40,8 +46,6 @@ const Ctx = createContext<AppContextValue | null>(null);
 const TOPIC_QUERIES: Record<string, string[]> = { floor: ['floor', 'catalog'], printers: ['printers', 'catalog', 'failed-prints'], menu: ['menu', 'catalog'], system: ['health', 'floor', 'config', 'staff', 'roles'], stock: ['stock', 'purchases', 'recipes', 'stock-usage', 'stock-moves'], reservations: ['reservations', 'waitlist'], online: ['online', 'online-orders'] };
 const TOPICS = [...Object.keys(TOPIC_QUERIES), 'order:*'];
 const SESSION_KEY = 'dinepos.session';
-/** docs/07: terminals sign out after 10 idle minutes. */
-export const IDLE_LOCK_MS = 10 * 60_000;
 
 /** Query keys a stream event should refresh. */
 export function queriesFor(topic: string): unknown[][] {
@@ -97,45 +101,64 @@ export function AppProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
   }, [queryClient]);
 
+  const saveSession = useCallback((s: Session | null) => {
+    if (s) storage()?.setItem(SESSION_KEY, JSON.stringify(s));
+    else storage()?.removeItem(SESSION_KEY);
+    setSession(s);
+  }, []);
+
+  /** Shows the lock screen (keeps the sign-in; pending manager-PIN prompts are cancelled). */
+  const markLocked = useCallback(() => {
+    const s = sessionRef.current;
+    if (!s || s.locked) return;
+    setPinRequest((p) => {
+      p?.resolve(null);
+      return null;
+    });
+    saveSession({ ...s, locked: true });
+  }, [saveSession]);
+
   const api = useMemo(
     () =>
       new ApiClient({
         baseUrl: serverUrl,
         getToken: () => sessionRef.current?.token ?? null,
         onUnauthenticated: dropSession,
+        onSessionLocked: markLocked,
         getDeviceToken: () => deviceRef.current,
         onDeviceUnpaired: () => setNeedsPairing(true),
         requestManagerPin: (err: ApiError) => new Promise((resolve) => setPinRequest({ message: err.message, resolve })),
       }),
-    [serverUrl, dropSession],
+    [serverUrl, dropSession, markLocked],
   );
 
-  const signIn = useCallback((r: LoginResult) => {
-    const s: Session = { ...r };
-    storage()?.setItem(SESSION_KEY, JSON.stringify(s));
-    setSession(s);
-  }, []);
+  const signIn = useCallback((r: LoginResult) => saveSession({ ...r }), [saveSession]);
 
   const signOut = useCallback(() => {
     void api.send('DELETE', '/v1/session').catch(() => undefined);
     dropSession();
   }, [api, dropSession]);
 
-  // Idle lock: any key or pointer activity keeps the terminal signed in.
-  useEffect(() => {
-    if (!session) return;
-    let timer = setTimeout(signOut, IDLE_LOCK_MS);
-    const bump = () => {
-      clearTimeout(timer);
-      timer = setTimeout(signOut, IDLE_LOCK_MS);
-    };
-    const events = ['keydown', 'pointerdown', 'wheel'] as const;
-    for (const e of events) window.addEventListener(e, bump, { passive: true });
-    return () => {
-      clearTimeout(timer);
-      for (const e of events) window.removeEventListener(e, bump);
-    };
-  }, [session, signOut]);
+  const lock = useCallback(async () => {
+    // Out of reach of the server, the terminal still locks; the unlock then checks the PIN once the server is back.
+    await api.send('POST', '/v1/session/lock').catch((e: ApiError) => {
+      if (e.code !== 'NETWORK') throw e;
+    });
+    markLocked();
+  }, [api, markLocked]);
+
+  const unlock = useCallback(
+    async (pin: string) => {
+      const token = sessionRef.current?.token;
+      if (!token) return;
+      const info = await api.send<SessionInfo>('POST', '/v1/session/unlock', { pin });
+      saveSession({ ...info, token });
+    },
+    [api, saveSession],
+  );
+
+  // Nothing signs the terminal out by itself (docs/07, as in Tiffin POS): the sign-in survives idle time, closing the
+  // app and a restart, until Sign out (or the server ends it: person deactivated, PIN or role changed).
 
   // A stored session is checked with the server at start (and its rights refreshed): a session from an
   // earlier run, another server or a deactivated person must not look signed in.
@@ -146,16 +169,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     api.get<SessionInfo>('/v1/session').then(
       (info) => {
         if (cancelled || sessionRef.current?.token !== sessionToken) return;
-        const s: Session = { ...info, token: sessionToken };
-        storage()?.setItem(SESSION_KEY, JSON.stringify(s));
-        setSession(s);
+        // A lock made while the server was out of reach stays until the PIN is typed.
+        saveSession({ ...info, token: sessionToken, locked: sessionRef.current.locked });
       },
       () => undefined, // UNAUTHENTICATED already dropped it; a network error keeps it until the server is back
     );
     return () => {
       cancelled = true;
     };
-  }, [api, sessionToken]);
+  }, [api, sessionToken, saveSession]);
 
   // Another window of this terminal signed in or out.
   useEffect(() => {
@@ -194,6 +216,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       session,
       signIn,
       signOut,
+      lock,
+      unlock,
       pinRequest: pinRequest && {
         message: pinRequest.message,
         resolve: (pin) => {
@@ -219,7 +243,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setNeedsPairing(false);
       },
     }),
-    [api, serverUrl, streamStatus, session, signIn, signOut, pinRequest, queryClient, dropSession, needsPairing],
+    [api, serverUrl, streamStatus, session, signIn, signOut, lock, unlock, pinRequest, queryClient, dropSession, needsPairing],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

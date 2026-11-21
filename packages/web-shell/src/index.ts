@@ -2,3 +2,4 @@
 export * from './shell-context.js';
 export * from './PairScreen.js';
 export * from './LoginScreen.js';
+export * from './LockScreen.js';

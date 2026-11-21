@@ -29,8 +29,8 @@ Built in P2-02 (`apps/server/src/auth/devices.ts`, migration 0007):
 ## Users and PINs
 - Staff log in with a 4–6 digit PIN (unique per outlet). Hash: Argon2id.
 - 5 wrong PINs → lock that user 5 min; audit it.
-- Session token per device+user; auto-logout after configurable idle time (default 10 min on terminals,
-  off on captain).
+- Session token per device+user. ~~Auto-logout after idle time~~ (changed 2026-11-21, owner's choice, as in Tiffin
+  POS: nothing signs a terminal or captain phone out, or locks it, by itself).
 
 Built in P2-01 (`apps/server/src/auth/`):
 - First run: `SetupOutlet` (outlet name + owner name + PIN) is the only command accepted without a session, and only
@@ -38,8 +38,16 @@ Built in P2-01 (`apps/server/src/auth/`):
 - Sign-in = tap your name, type your PIN (`POST /v1/sessions {userId, pin}`), as in Tiffin POS; PINs are still unique
   per outlet. Hash: **scrypt** (node:crypto, N=2^14, salted) instead of Argon2id, to avoid a native module on shop PCs.
 - 5 wrong PINs lock that person for 5 minutes (`auth.lock` audited); a new PIN set by a manager unlocks them.
-- Session token: 256-bit random, only its SHA-256 stored, expires 12 h after last use; terminals lock after 10 idle
-  minutes (client) and on Lock / Ctrl+L. `GET /v1/session`, `DELETE /v1/session`.
+- Session token: 256-bit random, only its SHA-256 stored. It never ends with time (`expires_at` = `9999-12-31…`;
+  sessions from before 2026-11-21 are moved to that on their next use): only **Sign out** (the icon at the top right
+  of every desktop screen and the captain's Tables header), deactivating the person or changing their PIN or role ends
+  it. Terminals and phones keep the sign-in through idle time, closing the app and restarts.
+- **Lock** (next to Sign out, as in Tiffin POS): `POST /v1/session/lock` sets `user_session.locked_at` (migration 0019,
+  audited `auth.session_lock`). A locked session answers `UNAUTHENTICATED` with `details.sessionLocked` (+ `userId`,
+  `name`) on every request, so every window and a restart show the lock screen. Only the same person's PIN opens it:
+  `POST /v1/session/unlock { pin }` (same 5-wrong-PINs lockout, `auth.fail` / `auth.unlock` audited; another
+  person's PIN is a wrong PIN). The lock screen also offers "Sign out and sign in as someone else". Offline, the
+  client still locks locally and the unlock waits for the server. `GET /v1/session`, `DELETE /v1/session`.
 - Manager approval: the client resends the same command with `X-Manager-Pin`; the PIN must belong to an active person
   whose role has the right without a PIN (and, for discounts, a high enough limit). 5 wrong manager PINs per session
   per minute are refused. The approver is stored in `audit_event.approved_by`.

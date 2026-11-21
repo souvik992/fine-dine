@@ -999,9 +999,23 @@ describe('desktop app', () => {
     await page!.getByRole('button', { name: 'Floor', exact: true }).click();
   });
 
-  it('Lock returns every window of the terminal to the sign-in screen', async () => {
+  it('Lock shows the lock screen in every window; only the same PIN opens it', async () => {
     const [page, other] = app.windows();
     await page!.getByRole('button', { name: 'Lock' }).click();
+    await page!.getByRole('heading', { name: 'Locked' }).waitFor();
+    await other!.reload();
+    await other!.getByRole('heading', { name: 'Locked' }).waitFor({ timeout: 5_000 });
+    await page!.keyboard.type('0000');
+    await page!.keyboard.press('Enter');
+    await page!.getByRole('alert').getByText('Wrong PIN').waitFor();
+    await page!.keyboard.type('1234'); // the owner, who signed in at the start
+    await page!.keyboard.press('Enter');
+    await page!.getByTestId('signed-in-user').waitFor();
+  });
+
+  it('Sign out returns every window of the terminal to the sign-in screen', async () => {
+    const [page, other] = app.windows();
+    await page!.getByRole('button', { name: 'Sign out' }).click();
     await page!.getByText('Who is signing in?').waitFor();
     await other!.getByText('Who is signing in?').waitFor({ timeout: 5_000 });
   });
