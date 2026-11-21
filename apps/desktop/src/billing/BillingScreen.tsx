@@ -387,7 +387,9 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
             <MenuViewSwitch view={menuView} onChange={setMenuView} />
           </form>
           <div
-            className={`grid min-h-0 flex-1 content-start gap-2 overflow-y-auto p-4 ${menuView === 'photos' ? '[grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]' : '[grid-template-columns:repeat(auto-fill,minmax(170px,1fr))]'}`}
+            // auto-rows-max: rows keep their tiles' full height and the list scrolls. Without it a photo tile
+            // (overflow-hidden, so its minimum height is 0) is squeezed to fit the screen and its name is cut off.
+            className={`grid min-h-0 flex-1 auto-rows-max content-start gap-2 overflow-y-auto p-4 ${menuView === 'photos' ? '[grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]' : '[grid-template-columns:repeat(auto-fill,minmax(170px,1fr))]'}`}
             aria-label="Items"
           >
             {items.map((it) => (

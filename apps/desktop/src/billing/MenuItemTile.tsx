@@ -67,7 +67,7 @@ export function MenuItemTile({ item: it, view, onChoose, onToggleSoldOut, canMar
   if (view === 'photos') {
     return (
       <button {...common} className={`flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left hover:border-ring ${it.available ? '' : 'opacity-50'}`}>
-        <span className="relative block aspect-[4/3] w-full">
+        <span className="relative block aspect-[4/3] w-full shrink-0">
           <DishPhoto name={it.image} label={it.name} className="absolute inset-0 h-full w-full text-4xl" />
           {!it.available ? <span className="absolute left-2 top-2 text-xs">{soldOut}</span> : null}
         </span>

@@ -582,7 +582,28 @@ describe('desktop app', () => {
     await page!.getByRole('radio', { name: 'List' }).click();
     await expect.poll(() => tile.locator('img').count()).toBe(0);
     await page!.getByLabel('Add item').fill('');
-    await page!.getByRole('button', { name: 'Floor', exact: true }).click();
+
+    // 4. More dishes than fit, in Photos view on a short window: the list scrolls; no tile is squeezed until its
+    //    name and price are cut off (a photo tile clips, so the grid used to shrink its rows to fit the screen)
+    const sizes = await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().map((w) => {
+        const [width, height] = w.getSize();
+        w.setSize(1100, 520);
+        return { id: w.id, width: width!, height: height! };
+      }),
+    );
+    try {
+      await page!.getByRole('radio', { name: 'Photos' }).click();
+      const grid = page!.getByLabel('Items', { exact: true });
+      await expect.poll(() => grid.locator(':scope > button').count()).toBeGreaterThan(4);
+      await expect.poll(() => grid.evaluate((g) => g.scrollHeight > g.clientHeight)).toBe(true);
+      const clipped = await grid.locator(':scope > button').evaluateAll((tiles) => tiles.filter((t) => t.scrollHeight > t.clientHeight + 1).map((t) => t.textContent));
+      expect(clipped).toEqual([]);
+    } finally {
+      await page!.getByRole('radio', { name: 'List' }).click();
+      await app.evaluate(({ BrowserWindow }, list) => list.forEach((s) => BrowserWindow.fromId(s.id)?.setSize(s.width, s.height)), sizes);
+      await page!.getByRole('button', { name: 'Floor', exact: true }).click();
+    }
   });
 
   it('Kitchen status on the floor: a ticket bumped ready shows Food ready (no longer KOT running), then Served · print bill, live in both windows', async () => {
