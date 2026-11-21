@@ -22,7 +22,7 @@ export function cashierRoutes(app: FastifyInstance, deps: { db: Db; now: () => D
     const date = dateOf(req.query);
     const rows = db
       .prepare(
-        `SELECT b.id, b.order_id, o.version, o.state AS order_state, COALESCE(t.label, 'Takeaway') AS tbl, b.split_of, b.total_paise, b.state, b.printed_at,
+        `SELECT b.id, b.order_id, o.version, o.state AS order_state, COALESCE(t.label, CASE o.type WHEN 'delivery' THEN 'Delivery' ELSE 'Takeaway' END || COALESCE(' #' || o.ticket_no, '')) AS tbl, b.split_of, b.total_paise, b.state, b.printed_at,
                 (SELECT d.bill_no_text FROM bill_document d WHERE d.bill_id = b.id ORDER BY d.revision DESC LIMIT 1) AS bill_no_text,
                 (SELECT count(*) FROM bill x WHERE x.order_id = b.order_id AND x.state <> 'superseded' AND (x.fy < b.fy OR (x.fy = b.fy AND x.bill_no <= b.bill_no))) AS part_no
          FROM bill b JOIN "order" o ON o.id = b.order_id LEFT JOIN dining_table t ON t.id = o.table_id

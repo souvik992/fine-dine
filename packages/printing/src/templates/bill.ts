@@ -41,7 +41,8 @@ export interface BillDocument {
   covers?: number | null;
   captainName?: string | null;
   cashierName?: string | null;
-  customer?: { name?: string | null; phone?: string | null; gstin?: string | null } | null;
+  /** `address`: where a delivery goes (prints under the guest). */
+  customer?: { name?: string | null; phone?: string | null; gstin?: string | null; address?: string | null } | null;
   lines: BillDocLine[];
   breakup: BillBreakup;
   discountReason?: string | null;
@@ -98,12 +99,13 @@ export function renderBill(doc: BillDocument, opts: { paper: PaperWidth; feed?: 
   if (doc.tableLabel && d.showTable) p.twoCol(`Table ${doc.tableLabel}${doc.areaName ? ` (${doc.areaName})` : ''}`, covers);
   else if (doc.tableLabel) {
     if (covers) p.line(covers);
-  } else if (doc.orderRef) p.wrapped(`Online order ${doc.orderRef}`);
+  } else if (doc.orderRef) p.wrapped(`${doc.orderType === 'takeaway' ? 'Takeaway' : doc.orderType === 'delivery' ? 'Delivery' : 'Online order'} ${doc.orderRef}`);
   else p.line(doc.orderType === 'takeaway' ? 'Takeaway' : doc.orderType === 'delivery' ? 'Delivery' : 'Online order');
   const captain = doc.captainName && d.showCaptain ? `Captain: ${doc.captainName}` : '';
   const cashier = doc.cashierName && d.showCashier ? `Cashier: ${doc.cashierName}` : '';
   if (captain || cashier) p.twoCol(captain, cashier);
   if (d.showGuest && (doc.customer?.name || doc.customer?.phone)) p.line(`Guest: ${[doc.customer.name, doc.customer.phone].filter(Boolean).join(', ')}`);
+  if (doc.customer?.address) p.wrapped(`Deliver to: ${doc.customer.address}`);
   if (doc.customer?.gstin) p.line(`Guest GSTIN: ${doc.customer.gstin}`);
   p.rule();
 

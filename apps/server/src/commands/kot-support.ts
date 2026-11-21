@@ -11,6 +11,11 @@ import { nextCounter } from './order-support.js';
 type TicketHeader = Omit<KotTicket, 'kotNo' | 'kind' | 'stationName' | 'lines'>;
 
 /** Table, covers, captain and the local time as printed on every ticket of this command. */
+/** "#12 - Ravi" on the kitchen ticket of a takeaway / delivery order (the ticket already says which). */
+function counterRef(order: OrderRow): string {
+  return [order.ticket_no ? `#${order.ticket_no}` : null, order.customer_name ?? null].filter(Boolean).join(' - ') || (order.type === 'delivery' ? 'Delivery' : 'Takeaway');
+}
+
 export function kotHeader(ctx: CommandContext, order: OrderRow): TicketHeader {
   const { db } = ctx;
   const table = order.table_id
@@ -24,6 +29,7 @@ export function kotHeader(ctx: CommandContext, order: OrderRow): TicketHeader {
     orderType: order.type,
     tableLabel: table?.label ?? null,
     ...(order.type === 'online' ? { orderRef: onlineRef(db, order.id), orderNote: onlineNote(db, order.id) } : {}),
+    ...(!order.table_id && (order.type === 'takeaway' || order.type === 'delivery') ? { orderRef: counterRef(order) } : {}),
     areaName: table?.area ?? null,
     covers: order.covers,
     captainName: captainName ?? null,

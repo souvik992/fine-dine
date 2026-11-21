@@ -38,6 +38,7 @@ import { mergeTables } from './merge-tables.js';
 import { modifyFiredItem } from './modify-fired-item.js';
 import { moveTable } from './move-table.js';
 import { openDrawer } from './open-drawer.js';
+import { openCounterOrder } from './open-counter-order.js';
 import { openTable } from './open-table.js';
 import { pairDevice } from './pair-device.js';
 import { payIn } from './pay-in.js';
@@ -116,6 +117,7 @@ export const coreHandlers: readonly CommandHandler<unknown, unknown>[] = [
   revokeDevice,
   // orders
   openTable,
+  openCounterOrder,
   addItems,
   updateHeldItem,
   removeHeldItem,

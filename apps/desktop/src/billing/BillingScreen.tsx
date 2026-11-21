@@ -1,12 +1,13 @@
 import { formatINR, newId, type MenuItem, type MenuSnapshot, type OrderItemSnapshot, type OrderSnapshot, type OutletConfig } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRightLeft, DoorOpen, Flame, Merge, MoveRight, Printer, ReceiptText, Search, Split, TriangleAlert, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, Ban, Bike, DoorOpen, Flame, Merge, MoveRight, Printer, ReceiptText, Search, Split, TriangleAlert, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { HealthDots } from '../components/HealthDots.js';
 import { UserBadge } from '../components/UserBadge.js';
 import { elapsedMinutes, formatElapsed } from '../floor/floor-model.js';
+import { isCounterOrder, orderTitle } from '../floor/counter-model.js';
 import { CaptainPicker } from './CaptainPicker.js';
 import { Cart } from './Cart.js';
 import { hasChoices, needsChoices, resolveQuickEntry, visibleItems } from './menu-model.js';
@@ -265,7 +266,8 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
   if (!order || !menu) return <p className="mt-24 text-center text-muted-foreground">Opening order…</p>;
 
   const elapsed = formatElapsed(elapsedMinutes(order.openedAt, new Date()));
-  const tableTitle = order.table ? `Table ${order.table.label}` : 'Takeaway';
+  const tableTitle = orderTitle(order);
+  const counter = isCounterOrder(order); // takeaway / delivery from the floor: no table, no covers, nothing to move
 
   return (
     <div className="flex h-full flex-col">
@@ -277,9 +279,15 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
           {tableTitle}
         </h1>
         <span className="text-sm text-muted-foreground">
-          {order.covers} covers{elapsed ? ` · ${elapsed}` : ''} · v{order.version}
+          {counter ? [order.customer?.name, order.customer?.phone].filter(Boolean).join(' · ') || 'Walk-in' : `${order.covers} covers`}
+          {elapsed ? ` · ${elapsed}` : ''} · v{order.version}
         </span>
-        {order.state === 'open' || order.state === 'billed' ? <CaptainPicker order={order} disabled={!can('order.edit')} run={run} /> : null}
+        {order.customer?.address ? (
+          <span className="flex max-w-xs items-center gap-1 truncate rounded-full bg-muted px-3 py-1 text-xs font-semibold" title={order.customer.address} data-testid="delivery-address">
+            <Bike className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{order.customer.address}</span>
+          </span>
+        ) : null}
+        {!counter && (order.state === 'open' || order.state === 'billed') ? <CaptainPicker order={order} disabled={!can('order.edit')} run={run} /> : null}
         {order.billRequest && order.state === 'open' ? (
           <span role="status" className="flex items-center gap-1 rounded-full bg-[var(--bill)] px-3 py-1 text-xs font-bold text-[var(--bill-ink)]" data-testid="bill-asked">
             <ReceiptText className="h-3.5 w-3.5" /> Bill asked{order.billRequest.byName ? ` by ${order.billRequest.byName}` : ''}
@@ -292,12 +300,12 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
         ) : null}
         {order.state === 'open' || order.state === 'billed' ? (
           <div className="ml-4 flex gap-1" aria-label="Table actions">
-            {can('table.move', true) ? (
+            {!counter && can('table.move', true) ? (
               <button className="btn h-9" onClick={() => setTableAction('move')}>
                 <MoveRight className="h-4 w-4" /> Move
               </button>
             ) : null}
-            {can('table.merge', true) ? (
+            {!counter && can('table.merge', true) ? (
               <button className="btn h-9" onClick={() => setTableAction('merge')}>
                 <Merge className="h-4 w-4" /> Merge
               </button>
@@ -307,14 +315,14 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
                 <Split className="h-4 w-4" /> Split bill
               </button>
             ) : null}
-            {can('item.transfer', true) ? (
+            {!counter && can('item.transfer', true) ? (
               <button className="btn h-9" onClick={() => setTableAction('items')} disabled={order.items.every((i) => i.status === 'cancelled')}>
                 <ArrowRightLeft className="h-4 w-4" /> Move items
               </button>
             ) : null}
-            {order.state === 'open' && order.table && order.bills.length === 0 && order.items.every((i) => i.status !== 'fired') && can('order.create', true) ? (
-              <button className="btn h-9" onClick={() => setReleasing(true)} title="Nothing to bill: free the table">
-                <DoorOpen className="h-4 w-4" /> Release
+            {order.state === 'open' && (order.table || counter) && order.bills.length === 0 && order.items.every((i) => i.status !== 'fired') && can('order.create', true) ? (
+              <button className="btn h-9" onClick={() => setReleasing(true)} title={counter ? 'Nothing to bill: cancel this order' : 'Nothing to bill: free the table'}>
+                {counter ? <Ban className="h-4 w-4" /> : <DoorOpen className="h-4 w-4" />} {counter ? 'Cancel order' : 'Release'}
               </button>
             ) : null}
           </div>
@@ -457,7 +465,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
                 <p className="my-2 text-4xl font-bold tabular-nums" data-testid="change-due">{formatINR(settledChange)}</p>
               </>
             ) : (
-              <p className="my-2 text-lg font-semibold">{unpaidParts > 0 ? 'Paid in full.' : 'Paid in full. The table is free.'}</p>
+              <p className="my-2 text-lg font-semibold">{unpaidParts > 0 ? 'Paid in full.' : counter ? `Paid in full. ${tableTitle} is closed.` : 'Paid in full. The table is free.'}</p>
             )}
             {unpaidParts > 0 ? (
               <>

@@ -1,4 +1,4 @@
-import { deriveTableState, isoInZone, type FloorSnapshot, type FloorTable, type TableBadge } from '@dinepos/shared';
+import { deriveTableState, isoInZone, type CounterOrder, type FloorSnapshot, type FloorTable, type TableBadge } from '@dinepos/shared';
 import type { Db } from '../db/connection.js';
 import { getConfig } from '../core/outlet-config.js';
 import { sectionCaptains } from '../commands/captain-support.js';
@@ -94,5 +94,50 @@ export function getFloor(db: Db, now: Date, timeZone: string, badges?: () => Map
   tables.sort(
     (a, b) => (areaOrder.get(a.areaId) ?? 0) - (areaOrder.get(b.areaId) ?? 0) || collator.compare(a.label, b.label),
   );
-  return { serverTime: isoInZone(now, timeZone), areas, tables };
+  return { serverTime: isoInZone(now, timeZone), areas, tables, counterOrders: counterOrders(db, now) };
+}
+
+interface CounterRow {
+  id: string;
+  version: number;
+  type: 'takeaway' | 'delivery';
+  ticket_no: number | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  delivery_address: string | null;
+  state: 'open' | 'billed';
+  opened_at: string;
+  sent: number;
+  item_count: number;
+}
+
+/** Open takeaway and delivery orders (no table), oldest first, for the strip above the tables. */
+export function counterOrders(db: Db, now: Date): CounterOrder[] {
+  const rows = db
+    .prepare(
+      `SELECT o.id, o.version, o.type, o.ticket_no, o.customer_name, o.customer_phone, o.delivery_address, o.state, o.opened_at,
+              EXISTS (SELECT 1 FROM order_item i WHERE i.order_id = o.id AND i.status = 'fired') AS sent,
+              (SELECT coalesce(sum(i.qty), 0) FROM order_item i WHERE i.order_id = o.id AND i.status <> 'cancelled') AS item_count
+       FROM "order" o
+       WHERE o.table_id IS NULL AND o.type IN ('takeaway', 'delivery') AND o.state IN ('open', 'billed')
+       ORDER BY o.opened_at, o.ticket_no`,
+    )
+    .all() as CounterRow[];
+  return rows.map((r) => {
+    const c: CounterOrder = {
+      orderId: r.id,
+      orderVersion: r.version,
+      type: r.type,
+      stage: r.state === 'billed' ? 'billed' : r.sent ? 'kitchen' : 'new',
+      since: r.opened_at,
+      elapsedMin: Math.max(0, Math.floor((now.getTime() - Date.parse(r.opened_at)) / 60_000)),
+      amountPaise: getOrderSnapshot(db, r.id)?.totals.totalPaise ?? 0,
+      itemCount: r.item_count,
+    };
+    if (r.ticket_no) c.ticketNo = r.ticket_no;
+    if (r.customer_name) c.customerName = r.customer_name;
+    if (r.customer_phone) c.customerPhone = r.customer_phone;
+    if (r.delivery_address) c.address = r.delivery_address;
+    return c;
+  });
 }

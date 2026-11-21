@@ -1,6 +1,6 @@
 import { renderBill, type BillDocument } from '@dinepos/printing';
 import { calculateBill, financialYearAt, formatBillNo, newId, printBillSchema, type BillDiscount } from '@dinepos/shared';
-import { defineCommand } from '../core/command-handler.js';
+import { defineCommand, type OrderRow } from '../core/command-handler.js';
 import { PosError } from '../core/errors.js';
 import { getConfig } from '../core/outlet-config.js';
 import { billLogoBits, billOutlet } from './bill-design.js';
@@ -21,6 +21,19 @@ interface ExistingBill {
  * (decided 2026-11-02), or reuses the number of a bill superseded by later items. Stores the printed document
  * (bill_document revision) and queues it on the bill printer. Always CGST + SGST for dine-in (decided 2026-11-02).
  */
+/**
+ * Who the bill names: what the cashier typed in the bill dialog, else (takeaway / delivery) who the order was opened
+ * for. A delivery always carries its address.
+ */
+function billCustomer(o: OrderRow, typed: { name: string | null; phone: string | null; gstin: string | null } | null | undefined): BillDocument['customer'] {
+  if (o.type !== 'takeaway' && o.type !== 'delivery') return typed ?? null;
+  const name = typed?.name ?? o.customer_name ?? null;
+  const phone = typed?.phone ?? o.customer_phone ?? null;
+  const address = o.type === 'delivery' ? (o.delivery_address ?? null) : null;
+  if (!name && !phone && !address && !typed?.gstin) return null;
+  return { name, phone, gstin: typed?.gstin ?? null, ...(address ? { address } : {}) };
+}
+
 export const printBill = defineCommand({
   type: 'PrintBill',
   schema: printBillSchema,
@@ -128,12 +141,12 @@ export const printBill = defineCommand({
       time: when.time,
       orderType: o.type,
       tableLabel: place.tableLabel,
-      ...(o.type === 'online' ? { orderRef: onlineRef(db, o.id) } : {}),
+      ...(o.type === 'online' ? { orderRef: onlineRef(db, o.id) } : o.ticket_no ? { orderRef: `#${o.ticket_no}` } : {}),
       areaName: place.areaName,
       covers: o.covers,
       captainName: userName(db, o.captain_id),
       cashierName: userName(db, ctx.actor.userId),
-      customer: p.customer,
+      customer: billCustomer(o, p.customer),
       lines: items.map((i) => ({
         name: i.name,
         qty: i.qty,

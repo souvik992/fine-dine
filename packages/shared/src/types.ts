@@ -96,6 +96,10 @@ export interface OrderSnapshot {
   type: OrderType;
   businessDate: string;
   table?: { id: string; label: string; areaId: string };
+  /** Takeaway and delivery orders from the floor: the day's ticket number (shown as "Takeaway #12"). */
+  ticketNo?: number;
+  /** Who the order is for (takeaway / delivery), when given. */
+  customer?: { name?: string; phone?: string; address?: string };
   covers: number;
   captainId?: string;
   openedAt: string;
@@ -188,10 +192,29 @@ export function kitchenLevel(waitingMin: number | null, limits: { amberMin: numb
   return waitingMin === null ? 'ok' : waitingMin >= limits.redMin ? 'red' : waitingMin >= limits.amberMin ? 'amber' : 'ok';
 }
 
+/** An open takeaway or delivery order, shown on the floor beside the tables. */
+export interface CounterOrder {
+  orderId: string;
+  orderVersion: number;
+  type: 'takeaway' | 'delivery';
+  ticketNo?: number;
+  customerName?: string;
+  customerPhone?: string;
+  address?: string;
+  /** new: nothing sent to the kitchen yet; kitchen: food sent; billed: bill printed, waiting for payment. */
+  stage: 'new' | 'kitchen' | 'billed';
+  since: string;
+  elapsedMin: number;
+  amountPaise: number;
+  itemCount: number;
+}
+
 export interface FloorSnapshot {
   serverTime: string;
   areas: FloorArea[];
   tables: FloorTable[];
+  /** Open takeaway and delivery orders, oldest first (absent from older servers). */
+  counterOrders?: CounterOrder[];
 }
 
 // ---------- menu (GET /v1/menu) ----------

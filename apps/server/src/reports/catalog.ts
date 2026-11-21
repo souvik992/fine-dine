@@ -27,7 +27,7 @@ const IN_RANGE = 'o.business_date BETWEEN @from AND @to';
 const params = (c: Ctx) => ({ from: c.from, to: c.to });
 /** Latest printed copy of a bill (number text, GST groups). */
 const BILL_NO = `(SELECT d.bill_no_text FROM bill_document d WHERE d.bill_id = b.id ORDER BY d.revision DESC LIMIT 1)`;
-const TABLE = `COALESCE((SELECT t.label FROM dining_table t WHERE t.id = o.table_id), 'Takeaway')`;
+const TABLE = `COALESCE((SELECT t.label FROM dining_table t WHERE t.id = o.table_id), CASE o.type WHEN 'delivery' THEN 'Delivery' ELSE 'Takeaway' END || COALESCE(' #' || o.ticket_no, ''))`;
 const rate = (bp: number) => `${Math.trunc(bp / 100)}${bp % 100 ? `.${String(bp % 100).padStart(2, '0').replace(/0$/, '')}` : ''}%`;
 const avg = (total: number, count: number) => (count > 0 ? roundHalfUp(total, count) : 0);
 const local = (c: Ctx, iso: string | null) => {

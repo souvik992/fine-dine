@@ -20,6 +20,24 @@ export const openTableSchema = z
   })
   .strict();
 
+/**
+ * A takeaway or delivery order from the floor: no table, a ticket number for the day. A delivery needs a phone number
+ * and an address (the rider and the bill carry them); a takeaway may name the guest.
+ */
+export const openCounterOrderSchema = z
+  .object({
+    type: z.enum(['takeaway', 'delivery']),
+    /** Client-made id; the server makes one when omitted. */
+    orderId: ulidSchema.optional(),
+    // the same limits as the guest on PrintBill, so the bill dialog can carry them over
+    customerName: z.string().trim().max(60).nullable().default(null),
+    customerPhone: z.string().trim().regex(/^(\+?[0-9 -]{6,16})?$/, 'not a phone number').nullable().default(null),
+    address: z.string().trim().max(300).nullable().default(null),
+  })
+  .strict()
+  .refine((p) => p.type !== 'delivery' || !!p.customerPhone, { message: 'a delivery needs a phone number', path: ['customerPhone'] })
+  .refine((p) => p.type !== 'delivery' || !!p.address, { message: 'a delivery needs an address', path: ['address'] });
+
 export const addItemsSchema = z
   .object({
     items: z
@@ -103,6 +121,7 @@ export const transferItemsSchema = z
   .refine((p) => new Set(p.itemIds).size === p.itemIds.length, { message: 'an item appears twice', path: ['itemIds'] });
 
 export type OpenTablePayload = z.infer<typeof openTableSchema>;
+export type OpenCounterOrderPayload = z.infer<typeof openCounterOrderSchema>;
 export type AddItemsPayload = z.infer<typeof addItemsSchema>;
 export type UpdateHeldItemPayload = z.infer<typeof updateHeldItemSchema>;
 export type RemoveHeldItemPayload = z.infer<typeof removeHeldItemSchema>;

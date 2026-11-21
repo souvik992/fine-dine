@@ -64,6 +64,20 @@ interface TableRow {
 
 const opt = <T>(v: T | null): T | undefined => (v === null ? undefined : v);
 
+/** Who a takeaway or delivery order is for (dine-in and online orders keep their guest elsewhere). */
+function counterCustomer(order: OrderRow): Pick<OrderSnapshot, 'customer'> {
+  if (order.type !== 'takeaway' && order.type !== 'delivery') return {};
+  const c = { name: opt(order.customer_name ?? null), phone: opt(order.customer_phone ?? null), address: opt(order.delivery_address ?? null) };
+  const customer = Object.fromEntries(Object.entries(c).filter(([, v]) => v !== undefined)) as NonNullable<OrderSnapshot['customer']>;
+  return Object.keys(customer).length ? { customer } : {};
+}
+
+/** "Takeaway #12" / "Delivery #5": how tickets, bills and lists name an order without a table. */
+export function counterLabel(order: Pick<OrderRow, 'type' | 'ticket_no'>): string {
+  const kind = order.type === 'delivery' ? 'Delivery' : order.type === 'online' ? 'Online' : 'Takeaway';
+  return order.ticket_no ? `${kind} #${order.ticket_no}` : kind;
+}
+
 export function loadOrderRow(db: Db, orderId: string): OrderRow | undefined {
   return db.prepare('SELECT * FROM "order" WHERE id = ?').get(orderId) as OrderRow | undefined;
 }
@@ -167,6 +181,8 @@ export function getOrderSnapshot(db: Db, orderId: string): OrderSnapshot | undef
     type: order.type,
     businessDate: order.business_date,
     table: table ? { id: table.id, label: table.label, areaId: table.area_id } : undefined,
+    ...(order.ticket_no ? { ticketNo: order.ticket_no } : {}),
+    ...counterCustomer(order),
     covers: order.covers ?? 0,
     captainId: opt(order.captain_id),
     openedAt: order.opened_at,

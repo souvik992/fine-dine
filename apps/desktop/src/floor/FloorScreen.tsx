@@ -12,6 +12,9 @@ import { BookingsButton } from '../bookings/BookingsButton.js';
 import { OnlineButton } from '../online/OnlineButton.js';
 import { StockButton } from '../stock/StockButton.js';
 import { BillsDialog } from './BillsDialog.js';
+import { CounterOrderDialog } from './CounterOrderDialog.js';
+import { CounterOrders } from './CounterOrders.js';
+import type { CounterType } from './counter-model.js';
 import { CashDialog } from './CashDialog.js';
 import { DayEndDialog } from './DayEndDialog.js';
 import { SeatDialog } from './SeatDialog.js';
@@ -63,6 +66,7 @@ export function FloorScreen({
   const [search, setSearch] = useState('');
   const [searchError, setSearchError] = useState<string | null>(null);
   const [seating, setSeating] = useState<FloorTable | null>(null);
+  const [starting, setStarting] = useState<CounterType | null>(null);
   const [closingDay, setClosingDay] = useState(false);
   const [panel, setPanel] = useState<'bills' | 'cash' | null>(null);
   const grid = useRef<HTMLDivElement>(null);
@@ -117,7 +121,7 @@ export function FloorScreen({
   // Typing a letter or digit anywhere on the floor jumps to the table search (docs/09: type "T7" + Enter).
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (seating || closingDay || panel || pinRequest || e.ctrlKey || e.altKey || e.metaKey) return;
+      if (seating || starting || closingDay || panel || pinRequest || e.ctrlKey || e.altKey || e.metaKey) return;
       if (document.activeElement === searchBox.current) return;
       if (/^[a-z0-9]$/i.test(e.key)) {
         searchBox.current?.focus();
@@ -125,7 +129,7 @@ export function FloorScreen({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [seating, closingDay, panel, pinRequest]);
+  }, [seating, starting, closingDay, panel, pinRequest]);
 
   const submitSearch = () => {
     if (!data) return;
@@ -250,9 +254,12 @@ export function FloorScreen({
           </div>
         ) : !data ? (
           <p className="mt-16 text-center text-muted-foreground">Loading floor…</p>
-        ) : tables.length === 0 ? (
-          <p className="mt-16 text-center text-muted-foreground">No tables in this area yet. Add them in Settings.</p>
         ) : (
+          <>
+            <CounterOrders orders={data.counterOrders} now={now} canCreate={can('order.create')} onNew={setStarting} onOpen={onOpenOrder} />
+            {tables.length === 0 ? (
+              <p className="mt-16 text-center text-muted-foreground">No tables in this area yet. Add them in Settings.</p>
+            ) : (
           <>
             <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-muted-foreground" aria-label="Table summary">
               {Object.entries(counts).map(([state, n]) => (
@@ -302,12 +309,15 @@ export function FloorScreen({
               </div>
             )}
           </>
+            )}
+          </>
         )}
       </main>
 
       {closingDay && data ? <DayEndDialog floor={data} onClose={() => setClosingDay(false)} /> : null}
       {panel === 'bills' ? <BillsDialog onClose={() => setPanel(null)} /> : null}
       {panel === 'cash' ? <CashDialog onClose={() => setPanel(null)} /> : null}
+      {starting ? <CounterOrderDialog initialType={starting} onClose={() => setStarting(null)} onOpened={onOpenOrder} /> : null}
       {seating ? <SeatDialog table={seating} onClose={() => setSeating(null)} onSeated={onOpenOrder} /> : null}
     </div>
   );

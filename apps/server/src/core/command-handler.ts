@@ -17,6 +17,11 @@ export interface OrderRow {
   last_kot_at: string | null;
   bill_printed_at: string | null;
   closed_at: string | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  /** Takeaway / delivery orders from the floor (migration 0018). */
+  ticket_no?: number | null;
+  delivery_address?: string | null;
 }
 
 export interface HandlerResult<R = unknown> {

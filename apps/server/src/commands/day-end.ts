@@ -104,7 +104,7 @@ export const dayEnd = defineCommand({
   apply(ctx, p) {
     const { db } = ctx;
     const open = db
-      .prepare(`SELECT o.id, COALESCE(t.label, 'Takeaway') AS label FROM "order" o LEFT JOIN dining_table t ON t.id = o.table_id WHERE o.state IN ('open', 'billed') ORDER BY 2`)
+      .prepare(`SELECT o.id, COALESCE(t.label, CASE o.type WHEN 'delivery' THEN 'Delivery' ELSE 'Takeaway' END || COALESCE(' #' || o.ticket_no, '')) AS label FROM "order" o LEFT JOIN dining_table t ON t.id = o.table_id WHERE o.state IN ('open', 'billed') ORDER BY 2`)
       .all() as Array<{ id: string; label: string }>;
     if (open.length > 0) {
       throw new PosError('INVALID_STATE', `${open.length} order${open.length > 1 ? 's are' : ' is'} still open (${open.map((o) => o.label).join(', ')}). Settle them first.`, {

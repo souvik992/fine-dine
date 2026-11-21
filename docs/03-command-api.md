@@ -55,7 +55,7 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 | Type | Payload | Right | PIN | Effects | Leakage |
 | --- | --- | --- | --- | --- | --- |
 | `OpenTable` | tableId, covers, captainId? | order.create | | new order, table → SEATED | |
-| `NewTakeaway` | customer? | order.create | | new takeaway order | |
+| `OpenCounterOrder` | type (takeaway \| delivery), orderId?, customerName?, customerPhone?, address? (delivery: phone + address required) | order.create | | new order without a table, ticket no. for the day ("Takeaway #12"); cancelled with `ReleaseTable` | |
 | `AddItems` | items[{id, itemId, variantId?, qty, addons[], note?, course}] | order.edit | | items `held` | |
 | `UpdateHeldItem` | orderItemId, qty?, note?, course?, addons? | order.edit | | | |
 | `RemoveHeldItem` | orderItemId | order.edit | | | |

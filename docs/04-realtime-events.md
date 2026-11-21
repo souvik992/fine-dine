@@ -14,6 +14,7 @@ Endpoint: `GET /v1/stream` (WebSocket). Auth: first message `{ "type": "hello", 
 | --- | --- | --- | --- |
 | `order.updated` | `order:<id>`, `floor` | orderId, version, tableId, state, totals | desktop, captain |
 | `table.state` | `floor` | tableId, state, since, amountPaise, captainId | desktop, captain |
+| `counter.changed` | `floor` | orderId (null: some order without a table) — a takeaway / delivery order opened, sent, billed, settled or cancelled; reload `GET /v1/floor` `counterOrders` | desktop |
 | `kot.created` | `station:<id>`, `kds` | kot (full ticket incl. items, notes, course) | KDS |
 | `kot.status` | `station:<id>`, `order:<id>`, `kds` | kotId, orderId, stationId, status (`new` \| `ready` \| `served`) | KDS, captain, desktop |
 | `print.status` | `printers` | printerId, status (`retrying` \| `offline` \| `ok`), queued, error | desktop |

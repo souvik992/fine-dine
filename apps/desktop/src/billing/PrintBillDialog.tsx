@@ -28,7 +28,8 @@ export function PrintBillDialog({
   const [value, setValue] = useState('');
   const [reason, setReason] = useState('');
   const [service, setService] = useState(false);
-  const [guest, setGuest] = useState({ name: '', phone: '', gstin: '' });
+  // a takeaway / delivery order already knows who it is for
+  const [guest, setGuest] = useState({ name: order.customer?.name ?? '', phone: order.customer?.phone ?? '', gstin: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

@@ -183,7 +183,7 @@ export function nextCounter(db: Db, name: string): number {
 
 /** Announces the derived state of a table (docs/04 `table.state`). */
 export function emitTableState(ctx: CommandContext, tableId: string | null): void {
-  if (!tableId) return;
+  if (!tableId) return emitCounterOrders(ctx, null);
   const t = ctx.db.prepare('SELECT status, open_order_id FROM dining_table WHERE id = ?').get(tableId) as
     | { status: 'active' | 'reserved' | 'blocked'; open_order_id: string | null }
     | undefined;
@@ -205,4 +205,12 @@ export function emitTableState(ctx: CommandContext, tableId: string | null): voi
     amountPaise: order ? (getOrderSnapshot(ctx.db, order.id)?.totals.totalPaise ?? 0) : 0,
     captainId: order?.captain_id ?? null,
   });
+}
+
+/**
+ * A takeaway or delivery order changed (opened, sent, billed, settled, cancelled): the floor's strip of counter orders
+ * reloads. `orderId` null: some table-less order changed (the floor reloads either way).
+ */
+export function emitCounterOrders(ctx: CommandContext, orderId: string | null): void {
+  ctx.emit('floor', 'counter.changed', { orderId });
 }
