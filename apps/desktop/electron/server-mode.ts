@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { deflateSync } from 'node:zlib';
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray, type IpcMainInvokeEvent } from 'electron';
+import { addonsDirOf, AddonWatcher } from './addon-watch.js';
 import { ORIGIN } from './protocol.js';
 import { opensWindowAtStart, ServerSupervisor, type ServerCommand } from './server-supervisor.js';
 
@@ -66,12 +67,38 @@ export function runServerMode(devUrl: string | undefined): void {
   let tray: Tray | null = null;
   let quitting = false;
   const icons = { running: dot([22, 163, 74]), starting: dot([217, 119, 6]), stopped: dot([185, 28, 28]) };
-  const supervisor = new ServerSupervisor({
+  let lastPhase: string | null = null;
+  const supervisor: ServerSupervisor = new ServerSupervisor({
     command,
     onChange: () => {
       const phase = supervisor.snapshot().phase;
+      // the server reads the add-ons folder as it starts
+      if (phase === 'starting' && lastPhase !== 'starting') addons.serverStarted();
+      lastPhase = phase;
       tray?.setImage(phase === 'running' || phase === 'external' ? icons.running : phase === 'starting' || phase === 'stopping' ? icons.starting : icons.stopped);
       tray?.setToolTip(`DinePOS Server: ${phase}`);
+    },
+  });
+
+  // an add-on installed, updated or removed while the server runs: offer a restart (never forced: a bill may be open)
+  const addons = new AddonWatcher({
+    dir: addonsDirOf(command),
+    onChanged: () => {
+      if (supervisor.snapshot().phase !== 'running') return; // not started from this window: it cannot restart it
+      void dialog
+        .showMessageBox({
+          type: 'info',
+          title: 'DinePOS Server',
+          message: 'An add-on was installed, updated or removed.',
+          detail: 'Restart the DinePOS server to use it. Terminals pause for a few seconds; bills already saved are safe. During service you can choose Later and restart from the DinePOS icon by the clock.',
+          buttons: ['Restart the server now', 'Later'],
+          defaultId: 0,
+          cancelId: 1,
+          noLink: true,
+        })
+        .then((r) => {
+          if (r.response === 0) void supervisor.restart();
+        });
     },
   });
 
@@ -165,6 +192,7 @@ export function runServerMode(devUrl: string | undefined): void {
     if (opensWindowAtStart()) show();
     else tray.displayBalloon({ title: 'DinePOS Server is running', content: 'It runs in the background. Click the DinePOS icon by the clock to open it.', noSound: true });
     await supervisor.start();
+    addons.start();
     setInterval(() => void supervisor.poll(), 3000).unref();
     void supervisor.poll();
   })();

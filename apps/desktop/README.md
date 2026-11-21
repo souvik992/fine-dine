@@ -79,6 +79,10 @@ archive holds node_modules or `resources/server` misses anything the server need
   or opening the shortcut again shows the DinePOS Server window; `--show` opens it at start). The desktop app defaults to
   `http://127.0.0.1:7420`, so it connects with no setup. Terminals: untick master, then enter the master's address
   (shown in the server window) in Settings.
+- Add-ons: the server reads `%ProgramData%\DinePOS\addons` only when it starts. When an add-on is installed, updated or
+  removed while it runs, the tray asks **Restart the server now / Later** (`electron/addon-watch.ts`; it checks every
+  5 s, only once the change has held on two checks in a row, and asks once per change; an installer that restarts the
+  server itself is not asked about).
 - Uninstall/upgrade: `resources\server\stop-server.ps1` stops only the server running from this folder (a forced
   stop is safe: WAL + synchronous=FULL, stale lock taken over); shortcuts and the firewall rule are removed; data kept.
 - Verified without installing: the bundled server on the shipped node.exe (production defaults with no env vars,
