@@ -127,11 +127,12 @@ describe('RecordPurchase / VoidPurchase', () => {
     const p = purchase();
     h.run('RecordPurchase', p);
     h.run('VoidPurchase', { purchaseId: p.id, reason: 'Wrong supplier' });
-    const sent = (h.db.prepare("SELECT kind, payload_json FROM outbox WHERE kind LIKE 'purchase.%' ORDER BY seq").all() as Array<{ kind: string; payload_json: string }>).map((r) => [r.kind, JSON.parse(r.payload_json)]);
+    const sent = (h.db.prepare("SELECT kind, payload_json FROM outbox WHERE kind LIKE 'purchase.%' ORDER BY seq").all() as Array<{ kind: string; payload_json: string }>).map((r) => [r.kind, JSON.parse(r.payload_json) as unknown]);
+    const ymd: unknown = expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/);
     expect(sent).toEqual([
-      ['purchase.recorded', { purchaseId: p.id, supplier: 'Fresh Dairy', billNo: 'FD-101', businessDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), totalPaise: 85_120,
+      ['purchase.recorded', { purchaseId: p.id, supplier: 'Fresh Dairy', billNo: 'FD-101', businessDate: ymd, totalPaise: 85_120,
         lines: [{ name: 'Paneer', unit: 'kg', qtyMilli: 2500, amountPaise: 80_125 }, { name: 'Oil', unit: 'l', qtyMilli: 333, amountPaise: 4995 }] }],
-      ['purchase.voided', { purchaseId: p.id, businessDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }],
+      ['purchase.voided', { purchaseId: p.id, businessDate: ymd }],
     ]);
   });
 
