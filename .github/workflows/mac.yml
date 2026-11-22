@@ -35,6 +35,10 @@ jobs:
         run: npm run dist:mac -w @dinepos/desktop
       - name: Check the built DinePOS.app (server, Node runtime and SQLite inside; the server starts)
         run: node apps/desktop/scripts/inspect-mac.mjs
+      - name: Check the Intel DinePOS.app (its server runs here through Rosetta)
+        run: |
+          softwareupdate --install-rosetta --agree-to-license || true
+          node apps/desktop/scripts/inspect-mac.mjs apps/desktop/release/mac/DinePOS.app
       - name: DinePOS Kitchen disk images
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

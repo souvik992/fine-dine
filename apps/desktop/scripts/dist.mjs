@@ -48,7 +48,7 @@ writeFileSync(
 const { build } = createRequire(import.meta.url)('electron-builder');
 const config = createRequire(import.meta.url)(`${here}electron-builder.config.cjs`);
 if (mac) {
-  await build({ projectDir: here, config, mac: ['dmg'], publish: 'never' });
+  await build({ projectDir: here, config, mac: ['dmg'], arm64: true, x64: true, publish: 'never' }); // both processors (the config's arch list is not used when targets are given here)
   console.warn(`Mac disk images written to ${here}release`);
 } else {
   await build({ projectDir: here, config, win: ['nsis'], publish: 'never' });

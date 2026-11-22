@@ -23,5 +23,5 @@ const { build } = createRequire(import.meta.url)('electron-builder');
 const config = createRequire(import.meta.url)(`${here}electron-builder.config.cjs`);
 // --mac (on a Mac): the Mac disk images, release/DinePOS-Kitchen-<version>-mac-<arch>.dmg
 const mac = process.argv.includes('--mac');
-await build({ projectDir: here, config, ...(mac ? { mac: ['dmg'] } : { win: ['nsis'] }), publish: 'never' });
+await build({ projectDir: here, config, ...(mac ? { mac: ['dmg'], arm64: true, x64: true } : { win: ['nsis'] }), publish: 'never' });
 console.warn(`installer written to ${here}release`);
