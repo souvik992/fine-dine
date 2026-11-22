@@ -35,22 +35,41 @@ export const upsertPrinterSchema = z
   .object({
     id: ulidSchema,
     name,
-    transport: z.enum(['tcp', 'usb', 'fake']),
+    /** tcp: network · usb: a Windows printer · usbdirect: USB with no driver · serial: Bluetooth / COM · fake: screen only. */
+    transport: z.enum(['tcp', 'usb', 'usbdirect', 'serial', 'fake']),
     host: z.string().trim().min(1).max(253).nullable().default(null),
     port: z.number().int().min(1).max(65_535).default(9100),
     windowsName: z.string().trim().min(1).max(200).nullable().default(null),
+    /** usbdirect: vendor:product[:serial] (as detected); serial: COM5 or COM5:115200. */
+    device: z.string().trim().min(1).max(80).nullable().default(null),
     widthMm: z.union([z.literal(58), z.literal(80)]).default(80),
     bitmapText: z.boolean().default(false),
     copies: z.number().int().min(1).max(5).default(1),
     cutter: z.boolean().default(true),
     backupPrinterId: ulidSchema.nullable().default(null),
     role: z.enum(['kot', 'bill', 'both']).default('kot'),
+    /** 'slow_buffer': smaller pieces, for cheap or Bluetooth printers that cut long tickets short. */
+    profile: z.enum(['generic', 'slow_buffer']).default('generic'),
+    /** Off: nothing new is sent to it (kept for its history). */
+    active: z.boolean().default(true),
+    /** Opens the cash drawer plugged into it when a bill is settled with cash (bill printers). */
+    drawer: z.boolean().default(false),
+    /** The stations whose KOTs it prints (replaces this printer's station list). Left out: unchanged. */
+    stationIds: z.array(ulidSchema).max(50).optional(),
   })
   .strict()
   .refine((p) => p.transport !== 'tcp' || p.host !== null, { message: 'a TCP printer needs host', path: ['host'] })
   .refine((p) => p.transport !== 'usb' || p.windowsName !== null, {
     message: 'a USB printer needs windowsName',
     path: ['windowsName'],
+  })
+  .refine((p) => p.transport !== 'usbdirect' || /^[0-9a-f]{4}:[0-9a-f]{4}(:[0-9a-z._-]{1,64})?$/i.test(p.device ?? ''), {
+    message: 'a USB printer with no driver needs its USB id (vendor:product)',
+    path: ['device'],
+  })
+  .refine((p) => p.transport !== 'serial' || /^COM[1-9]\d{0,2}(:(9600|19200|38400|57600|115200))?$/i.test(p.device ?? ''), {
+    message: 'a Bluetooth / COM printer needs its COM port, like COM5',
+    path: ['device'],
   })
   .refine((p) => p.backupPrinterId !== p.id, { message: 'a printer cannot back itself up', path: ['backupPrinterId'] });
 
@@ -123,6 +142,8 @@ export const createPrintAgentSchema = z
 export const revokePrintAgentSchema = z.object({ agentId: ulidSchema }).strict();
 /** Which agent prints this printer's tickets; null: the server prints them itself. */
 export const setPrinterAgentSchema = z.object({ printerId: ulidSchema, agentId: ulidSchema.nullable() }).strict();
+/** Settings › Printers › Remove: deleted when it never printed anything, else turned off (its history stays). */
+export const removePrinterSchema = z.object({ printerId: ulidSchema }).strict();
 
 export type UpsertPrinterPayload = z.infer<typeof upsertPrinterSchema>;
 export type UpsertStationPayload = z.infer<typeof upsertStationSchema>;

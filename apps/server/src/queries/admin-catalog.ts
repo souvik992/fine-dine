@@ -7,16 +7,21 @@ export interface AdminCatalog {
   printers: Array<{
     id: string;
     name: string;
-    transport: 'tcp' | 'usb' | 'fake';
+    transport: 'tcp' | 'usb' | 'usbdirect' | 'serial' | 'fake';
     host: string | null;
     port: number;
     windowsName: string | null;
+    /** usbdirect: vendor:product[:serial]; serial: COM5[:baud]. */
+    device: string | null;
     widthMm: 58 | 80;
     bitmapText: boolean;
     copies: number;
     cutter: boolean;
     backupPrinterId: string | null;
     role: 'kot' | 'bill' | 'both';
+    profile: 'generic' | 'slow_buffer';
+    active: boolean;
+    drawer: boolean;
   }>;
   stations: Array<{ id: string; name: string; hasKds: boolean; printerIds: string[] }>;
   categories: Array<{ id: string; name: string; parentId: string | null; stationId: string | null; sort: number }>;
@@ -79,16 +84,20 @@ export function getAdminCatalog(db: Db): AdminCatalog {
       db.prepare('SELECT * FROM printer ORDER BY name COLLATE NOCASE').all() as Array<{
         id: string;
         name: string;
-        transport: 'tcp' | 'usb' | 'fake';
+        transport: 'tcp' | 'usb' | 'usbdirect' | 'serial' | 'fake';
         host: string | null;
         port: number | null;
         windows_name: string | null;
+        device: string | null;
         width_mm: number;
         bitmap_text: number;
         copies: number;
         cutter: number;
         backup_printer_id: string | null;
         role: 'kot' | 'bill' | 'both';
+        profile: 'generic' | 'slow_buffer';
+        active: number;
+        drawer: number;
       }>
     ).map((p) => ({
       id: p.id,
@@ -97,12 +106,16 @@ export function getAdminCatalog(db: Db): AdminCatalog {
       host: p.host,
       port: p.port ?? 9100,
       windowsName: p.windows_name,
+      device: p.device,
       widthMm: p.width_mm === 58 ? 58 : 80,
       bitmapText: p.bitmap_text === 1,
       copies: p.copies,
       cutter: p.cutter === 1,
       backupPrinterId: p.backup_printer_id,
       role: p.role,
+      profile: p.profile,
+      active: p.active === 1,
+      drawer: p.drawer === 1,
     })),
     stations: (db.prepare('SELECT id, name, has_kds FROM station ORDER BY name COLLATE NOCASE').all() as Array<{ id: string; name: string; has_kds: number }>).map((s) => ({
       id: s.id,

@@ -1,6 +1,7 @@
 // Online orders through the order hub (P4-06). The hub's contract v1 lives in pos-backend/contract; these are the
 // parts DinePOS uses, copied as they are there (field names, states, paise, ms since epoch). Never rename: v1 only adds.
 import { z } from 'zod';
+import { mulDivRound } from './money.js';
 import { tendersSchema } from './schemas/commands/tenders.js';
 
 export const HUB_ORDER_STATES = [
@@ -132,6 +133,48 @@ export const DEFAULT_SERVICEABILITY: Serviceability = {
   roadFactor: 1.3,
 };
 
+// ---------------------------------------------------------------- menu sync per channel (quickPOS ODS)
+
+export const SALES_CHANNELS = ['app', 'website', 'swiggy', 'zomato'] as const;
+export type SalesChannel = (typeof SALES_CHANNELS)[number];
+
+/**
+ * One channel's menu: which dishes it lists (all / all except / only; menu item ids, every size of a dish together)
+ * and its prices — the POS price, or the POS price changed by a percentage (to the nearest rupee) with prices set per
+ * dish or size (online item ids, "<itemId>" or "<itemId>:<variantId>"). An online bill for that channel uses these prices.
+ */
+export const channelSyncSchema = z
+  .object({
+    mode: z.enum(['all', 'exclude', 'include']),
+    items: z.array(z.string().min(1).max(60)).max(2000),
+    pricing: z.enum(['same', 'custom']),
+    /** -50% … +100%, in basis points (1500 = +15%). */
+    markupBp: z.number().int().min(-5000).max(10_000),
+    prices: z.record(z.string().min(1).max(120), z.number().int().min(0).max(10_000_00)),
+  })
+  .strict();
+export type ChannelSync = z.infer<typeof channelSyncSchema>;
+export const menuSyncSchema = z.object({ app: channelSyncSchema, website: channelSyncSchema, swiggy: channelSyncSchema, zomato: channelSyncSchema }).strict();
+export type MenuSync = z.infer<typeof menuSyncSchema>;
+const everything: ChannelSync = { mode: 'all', items: [], pricing: 'same', markupBp: 0, prices: {} };
+export const DEFAULT_MENU_SYNC: MenuSync = { app: everything, website: everything, swiggy: everything, zomato: everything };
+
+/** Does this channel list the dish? */
+export const channelLists = (s: ChannelSync, menuItemId: string): boolean => s.mode === 'all' || (s.mode === 'include' ? s.items.includes(menuItemId) : !s.items.includes(menuItemId));
+
+/**
+ * A dish's price on a channel (paise): exactly the hub's rule (contract `channelPrice`), so the customer's total and
+ * the DinePOS bill agree. Own price first, else the POS price changed by the percentage and rounded to the rupee.
+ */
+export function channelPrice(onlineItemId: string, posPricePaise: number, s: Pick<ChannelSync, 'pricing' | 'markupBp' | 'prices'>): number {
+  if (s.pricing !== 'custom') return posPricePaise;
+  const own = s.prices[onlineItemId];
+  if (own !== undefined && Number.isSafeInteger(own) && own >= 0) return own;
+  if (!s.markupBp) return posPricePaise;
+  const raised = mulDivRound(posPricePaise, 10_000 + s.markupBp, 10_000);
+  return Math.max(0, raised + 50 - ((raised + 50) % 100)); // to the nearest rupee
+}
+
 /** Online-order settings (Settings › Online orders); stored in `config` like the other outlet settings. */
 export const onlineSettingsSchema = z
   .object({
@@ -146,6 +189,8 @@ export const onlineSettingsSchema = z
     feeTaxBp: z.number().int().min(0).max(2800).nullable(),
     /** Kitchen time used when accepting without changing it. */
     prepMinutes: z.number().int().min(1).max(180),
+    /** What prints when an order is accepted (by staff or automatically); the rest can be printed from the order card. */
+    printOnAccept: z.object({ bill: z.boolean(), kot: z.boolean() }).strict().default({ bill: true, kot: true }),
     serviceability: serviceabilitySchema,
   })
   .strict();
@@ -160,6 +205,7 @@ export const DEFAULT_ONLINE_SETTINGS: OnlineSettings = {
   payments: { online: true, cod: true },
   feeTaxBp: 0,
   prepMinutes: 20,
+  printOnAccept: { bill: true, kot: true },
   serviceability: DEFAULT_SERVICEABILITY,
 };
 
@@ -190,12 +236,18 @@ export interface OnlineOrderView {
   posTotalPaise: number | null;
   prepMinutes: number | null;
   alert: string | null;
+  /** Has the bill / every KOT of the accepted order printed (else the card offers Print bill / Print KOT)? */
+  billPrinted: boolean;
+  kotPrinted: boolean;
 }
 
 // ---------------------------------------------------------------- commands
 
 const onlineOrderId = z.string().min(1).max(100);
 const reasonText = z.string().trim().min(1).max(200);
+
+/** Order card: print the bill or the KOTs of an accepted order that did not print yet (Print on accept off, or turned off since). */
+export const printOnlineOrderSchema = z.object({ onlineOrderId, what: z.enum(['bill', 'kot']) }).strict();
 
 /** Staff: accept = KOT + GST bill now (settled as Online when paid online), then the hub is told. */
 export const acceptOnlineOrderSchema = z

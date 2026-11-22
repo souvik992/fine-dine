@@ -118,7 +118,7 @@ describe('kitchen display', () => {
     // the floor shows what the kitchen screen says about T2's food
     const t2Kitchen = async () => (await get<{ tables: Array<{ label: string; kitchen?: { cooking: number; ready: number } }> }>('/v1/floor')).tables.find((t) => t.label === 'T2')!.kitchen;
     expect(await t2Kitchen()).toBeUndefined(); // Kitchen is not marked for a screen and nothing was bumped there yet
-    // the owner marks Kitchen as a screen station (Settings › Kitchen & printers): its tickets count from now on
+    // the owner marks Kitchen as a screen station (Settings › Kitchen): its tickets count from now on
     const kitchen = (await get<{ stations: Array<{ id: string; name: string; printerIds: string[] }> }>('/v1/admin/catalog')).stations.find((x) => x.id === kitchenId)!;
     expect((await send('UpsertStation', { id: kitchen.id, name: kitchen.name, hasKds: true, printerIds: kitchen.printerIds })).ok).toBe(true);
     expect(await t2Kitchen()).toMatchObject({ cooking: 1, ready: 0 });

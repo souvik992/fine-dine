@@ -161,7 +161,7 @@ async function handle(request: Request): Promise<Response> {
     if (!server) {
       setTimeout(() => {
         config = { ...config, autoStart };
-        void showSetup('That is not a server address. Type it like 192.168.1.4 (shown on the main PC in Settings › Kitchen & printers).');
+        void showSetup('That is not a server address. Type it like 192.168.1.4 (shown on the main PC in Settings › Kitchen).');
       }, 0);
       return html('Checking…');
     }

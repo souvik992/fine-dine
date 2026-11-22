@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { directionsUrl, mapView, parsePlaces, placeReverseUrl, placeSearchUrl, pointAt, project, pxPerKm, TILE, unproject, viewAt } from './map-view.js';
+import { directionsUrl, mapView, parsePlaces, pastedPoint, placeReverseUrl, placeSearchUrl, pointAt, project, pxPerKm, TILE, unproject, viewAt } from './map-view.js';
 
 const store = { lat: 22.5726, lng: 88.3639 };
 const customer = { lat: 22.5535, lng: 88.3517 };
@@ -33,7 +33,7 @@ describe('delivery map', () => {
     expect(Math.min(...v.tiles.map((t) => t.top))).toBeLessThanOrEqual(0);
     expect(Math.max(...v.tiles.map((t) => t.left + TILE))).toBeGreaterThanOrEqual(600);
     expect(Math.max(...v.tiles.map((t) => t.top + TILE))).toBeGreaterThanOrEqual(400);
-    expect(v.tiles.every((t) => t.src.startsWith(`https://tile.openstreetmap.org/${v.zoom}/`))).toBe(true);
+    expect(v.tiles.every((t) => t.src.startsWith(`/v1/maps/tiles/${v.zoom}/`))).toBe(true);
   });
 
   it('gives directions from the store when its location is set', () => {
@@ -71,5 +71,17 @@ describe('delivery map', () => {
     };
     expect(parsePlaces(body)).toEqual([{ name: 'Marathahalli, Bangalore East, Karnataka', lat: 12.955257, lng: 77.698416 }]);
     expect(parsePlaces({ message: 'busy' })).toEqual([]);
+  });
+});
+
+describe('pasted points', () => {
+  it('reads coordinates and map links, in India only', () => {
+    expect(pastedPoint('22.5726, 88.3639')).toEqual({ lat: 22.5726, lng: 88.3639 });
+    expect(pastedPoint(' 12.955257 77.698416 ')).toEqual({ lat: 12.955257, lng: 77.698416 });
+    expect(pastedPoint('https://www.google.com/maps/place/Shop/@22.5535123,88.3517456,17z/data=x')).toEqual({ lat: 22.553512, lng: 88.351746 });
+    expect(pastedPoint('https://maps.google.com/?q=22.57,88.36')).toEqual({ lat: 22.57, lng: 88.36 });
+    expect(pastedPoint('https://www.openstreetmap.org/?mlat=1&ll=19.076%2C72.877')).toEqual({ lat: 19.076, lng: 72.877 });
+    expect(pastedPoint('51.5072, -0.1276')).toBeNull(); // London
+    expect(pastedPoint('Park Street 22')).toBeNull();
   });
 });

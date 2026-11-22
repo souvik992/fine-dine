@@ -1,6 +1,6 @@
 import { formatINR, REJECT_REASONS, type OnlineOrderView, type OnlineStatus, type OutletConfig, type RejectReason } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Bike, Check, Clock, Map as MapIcon, MapPin, Phone, ReceiptText, ShoppingBag, TriangleAlert, X } from 'lucide-react';
+import { ArrowLeft, Bike, Check, Clock, Map as MapIcon, MapPin, Phone, Printer, ReceiptText, ShoppingBag, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
@@ -156,7 +156,7 @@ export function OnlineScreen({ onBack, onOpenOrder }: { onBack: () => void; onOp
                     <Check className="h-4 w-4" /> Accept at {formatINR(priceOk[o.id]!)}
                   </button>
                 ) : (
-                  <button className="btn btn-primary h-10" disabled={busy === o.id} onClick={() => void run(o.id, 'AcceptOnlineOrder', { onlineOrderId: o.id }, `${o.number} accepted: KOT sent, bill printed.`)}>
+                  <button className="btn btn-primary h-10" disabled={busy === o.id} onClick={() => void run(o.id, 'AcceptOnlineOrder', { onlineOrderId: o.id }, `${o.number} accepted.`)}>
                     <Check className="h-4 w-4" /> Accept
                   </button>
                 )}
@@ -184,6 +184,17 @@ export function OnlineScreen({ onBack, onOpenOrder }: { onBack: () => void; onOp
             {o.localOrderId ? (
               <button className="btn h-10" onClick={() => onOpenOrder(o.localOrderId!)}>
                 <ReceiptText className="h-4 w-4" /> Bill
+              </button>
+            ) : null}
+            {/* Settings › Online orders › When an order is accepted, print: what did not print, prints from here */}
+            {o.localOrderId && !o.kotPrinted && o.state !== 'CANCELLED' ? (
+              <button className="btn h-10" disabled={busy === o.id} onClick={() => void run(o.id, 'PrintOnlineOrder', { onlineOrderId: o.id, what: 'kot' }, `${o.number}: KOT printed.`)}>
+                <Printer className="h-4 w-4" /> Print KOT
+              </button>
+            ) : null}
+            {o.billId && !o.billPrinted && o.state !== 'CANCELLED' ? (
+              <button className="btn h-10" disabled={busy === o.id} onClick={() => void run(o.id, 'PrintOnlineOrder', { onlineOrderId: o.id, what: 'bill' }, `${o.number}: bill printed.`)}>
+                <Printer className="h-4 w-4" /> Print bill
               </button>
             ) : null}
             {o.billId && !['DELIVERED', 'PICKED_UP'].includes(o.state) && (o.state !== 'CANCELLED' || o.alert) ? (

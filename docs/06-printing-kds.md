@@ -19,12 +19,22 @@ commit, retry until confirmed.
 | Field | Example |
 | --- | --- |
 | id, name | `p_tandoor`, Tandoor |
-| transport | `tcp` (host, port 9100) \| `usb` (Windows printer name, RAW) \| `fake` (dev) |
+| transport | `tcp` (host, port 9100) \| `usb` (Windows printer name, RAW) \| `usbdirect` (USB, no driver; device `vendor:product[:serial]`) \| `serial` (Bluetooth / COM; device `COM5[:baud]`) \| `fake` (screen only) |
 | width | 58 (32 cols) \| 80 (48 cols) |
 | codepage / bitmapText | bitmapText=true for Hindi/Bengali lines |
 | backupPrinterId | optional |
 | copies | 1..3 |
-| cutter, drawerKick | booleans |
+| cutter | boolean |
+| drawer | opens the cash drawer on it when a bill is settled with cash (bill printers; off by default) |
+| profile | `generic` \| `slow_buffer` (smaller pieces, for cheap or Bluetooth printers) |
+| active | off: nothing new is sent to it; its waiting jobs move to failed (print alarm) |
+
+Settings › Printers (migration 0020, ported from quickPOS): USB printers plugged into the main PC are listed by
+themselves (`GET /v1/printers/usb-devices`, with or without a Windows driver) with **Use for bills** / **Set up with
+options**; **Add printer** in steps (connection → which printer, from `GET /v1/printers/windows`, `/serial-ports` or
+`/network-scan` → name and paper → bills, cash drawer, KOT stations → copies, backup, cutter, slow speed, on).
+`RemovePrinter` deletes a printer that never printed, else turns it off. A turned-off printer is skipped for KOTs,
+bills and as a backup. Driverless USB and Bluetooth printing run through Windows PowerShell (no native module).
 
 ## Templates (`packages/printing/src/templates`)
 ### KOT (no prices)
@@ -116,6 +126,10 @@ showed as "N printers down" in the top bar.
 assert on the text preview, not raw bytes.
 
 ## KDS
+- Settings › Kitchen › **Use kitchen screens (KDS)** (`kds.enabled`, off by default): the order screen's F8 button
+  says **Send to KDS** instead of **Print KOT**. **Also print paper KOTs at stations with a screen**
+  (`kds.printPaper`, on by default): off, a new ticket at a station with a screen is not printed (Reprint KOT still
+  prints it); stations without a screen always print.
 - PWA at `/kds?station=<id>`; subscribes to `station:<id>`.
 - Columns: New → Ready. Ticket shows KOT no., table, age timer (amber ≥ 10 min, red ≥ 20 min; configurable),
   items with notes, course.

@@ -6,6 +6,7 @@ import { isoInZone, newId } from '@dinepos/shared';
 import type { OrderRow } from '../core/command-handler.js';
 import type { CommandContext } from '../core/context.js';
 import { PosError } from '../core/errors.js';
+import { getConfig } from '../core/outlet-config.js';
 import { nextCounter } from './order-support.js';
 
 type TicketHeader = Omit<KotTicket, 'kotNo' | 'kind' | 'stationName' | 'lines'>;
@@ -38,9 +39,9 @@ export function kotHeader(ctx: CommandContext, order: OrderRow): TicketHeader {
   };
 }
 
-/** Prints a ticket on every printer of the station. */
+/** Prints a ticket on every printer of the station that is on (Settings › Printers). */
 function printTicket(ctx: CommandContext, stationId: string, kotId: string, ticket: KotTicket): void {
-  const printers = ctx.db.prepare('SELECT p.id, p.width_mm FROM station_printer sp JOIN printer p ON p.id = sp.printer_id WHERE sp.station_id = ? ORDER BY p.name').all(stationId) as Array<{
+  const printers = ctx.db.prepare('SELECT p.id, p.width_mm FROM station_printer sp JOIN printer p ON p.id = sp.printer_id WHERE sp.station_id = ? AND p.active = 1 ORDER BY p.name').all(stationId) as Array<{
     id: string;
     width_mm: number;
   }>;
@@ -51,8 +52,18 @@ function printTicket(ctx: CommandContext, stationId: string, kotId: string, tick
 }
 
 /**
+ * Does a new ticket at this station print on paper? Always, unless the outlet uses kitchen screens with paper switched
+ * off (Settings › Kitchen) and this station has a screen. A reprint asked for by hand always prints.
+ */
+export function printsPaper(ctx: CommandContext, stationId: string): boolean {
+  const cfg = getConfig(ctx.db);
+  if (!cfg['kds.enabled'] || cfg['kds.printPaper']) return true;
+  return ctx.db.prepare('SELECT has_kds FROM station WHERE id = ?').pluck().get(stationId) !== 1;
+}
+
+/**
  * Creates a KOT (new, modify or cancel slip): next number of the business day, stored ticket, printed on the
- * station's printers, announced on `station:<id>` and `kds`.
+ * station's printers (see printsPaper), announced on `station:<id>` and `kds`.
  */
 export function issueKot(
   ctx: CommandContext,
@@ -70,9 +81,21 @@ export function issueKot(
     .run(kotId, order.id, station.id, ctx.businessDate, kotNo, kind, ctx.nowIso, ctx.actor.userId);
   const ticket: KotTicket = { kotNo, kind, stationName: station.name, ...header, lines, ...(change ? { forKotNo: change.forKotNo, reason: change.reason } : {}) };
   ctx.db.prepare('INSERT INTO kot_document (kot_id, ticket_json, created_at, command_id) VALUES (?, ?, ?, ?)').run(kotId, JSON.stringify(ticket), ctx.nowIso, ctx.commandId);
-  printTicket(ctx, station.id, kotId, ticket);
+  if (printsPaper(ctx, station.id)) printTicket(ctx, station.id, kotId, ticket);
   ctx.emit([`station:${station.id}`, 'kds'], 'kot.created', { kotId, orderId: order.id, ...ticket });
   return { id: kotId, kotNo, ticket };
+}
+
+/**
+ * The stored ticket as an original (not DUPLICATE), for a ticket that never printed: an online order accepted with
+ * "print KOT" off (Settings › Online orders) and printed later from its card.
+ */
+export function printStoredKot(ctx: CommandContext, kotId: string): void {
+  const row = ctx.db.prepare('SELECT k.station_id, d.ticket_json FROM kot k JOIN kot_document d ON d.kot_id = k.id WHERE k.id = ?').get(kotId) as
+    | { station_id: string; ticket_json: string }
+    | undefined;
+  if (!row) throw new PosError('NOT_FOUND', 'That KOT does not exist.', { kotId });
+  printTicket(ctx, row.station_id, kotId, JSON.parse(row.ticket_json) as KotTicket);
 }
 
 /** The stored ticket, marked DUPLICATE, on the station's printers. Tickets from before migration 0006 are rebuilt. */

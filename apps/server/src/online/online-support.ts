@@ -87,7 +87,22 @@ export function onlineView(db: Db, o: OnlineOrderRow): OnlineOrderView {
     posTotalPaise: o.pos_total_paise,
     prepMinutes: o.prep_minutes,
     alert: o.alert,
+    billPrinted: o.bill_id ? !!db.prepare("SELECT 1 FROM print_job WHERE doc_kind = 'bill' AND ref_id = ?").get(o.bill_id) : false,
+    kotPrinted: o.local_order_id ? unprintedKots(db, o.local_order_id).length === 0 : false,
   };
+}
+
+/** The order's new KOTs that never printed, at stations that have a printer that is on (others cannot print anyway). */
+export function unprintedKots(db: Db, localOrderId: string): string[] {
+  return db
+    .prepare(
+      `SELECT k.id FROM kot k WHERE k.order_id = ? AND k.kind = 'new'
+         AND NOT EXISTS (SELECT 1 FROM print_job j WHERE j.doc_kind = 'kot' AND j.ref_id = k.id)
+         AND EXISTS (SELECT 1 FROM station_printer sp JOIN printer p ON p.id = sp.printer_id WHERE sp.station_id = k.station_id AND p.active = 1)
+       ORDER BY k.kot_no`,
+    )
+    .pluck()
+    .all(localOrderId) as string[];
 }
 
 /** "W-1042 · PICKUP" for the KOT and the bill of an online order's DinePOS order. */

@@ -31,7 +31,7 @@ async function makeKey(): Promise<{ key: string; hash: string }> {
 const seen = (iso: string | null) => (iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'never');
 
 /**
- * Settings › Kitchen & printers › Print agents (P6-03): a small program on a PC on the printers' network prints the
+ * Settings › Printers › Print agents (P6-03): a small program on a PC on the printers' network prints the
  * tickets of the printers assigned to it, when this outlet's server cannot reach them (DinePOS Cloud, another network).
  */
 export function PrintAgents() {

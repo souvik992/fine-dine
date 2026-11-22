@@ -1,3 +1,4 @@
+import { PosError } from '../core/errors.js';
 import { EscPos } from '@dinepos/printing';
 import { ulidSchema } from '@dinepos/shared';
 import { z } from 'zod';
@@ -8,7 +9,7 @@ import { printedDateTime } from './billing-support.js';
 
 export const printTestPageSchema = z.object({ printerId: ulidSchema }).strict();
 
-/** Prints a short test page through the normal print queue (Settings › Kitchen & printers › Test print). */
+/** Prints a short test page through the normal print queue (Settings › Printers › Test print). */
 export const printTestPage = defineCommand({
   type: 'PrintTestPage',
   schema: printTestPageSchema,
@@ -17,16 +18,28 @@ export const printTestPage = defineCommand({
   allowWhenDayClosed: true,
   apply(ctx, p) {
     requireRef(ctx.db, 'printer', p.printerId, 'printerId');
-    const printer = ctx.db.prepare('SELECT name, width_mm, transport, host, port, windows_name FROM printer WHERE id = ?').get(p.printerId) as {
+    const printer = ctx.db.prepare('SELECT name, width_mm, transport, host, port, windows_name, device, active FROM printer WHERE id = ?').get(p.printerId) as {
       name: string;
       width_mm: number;
       transport: string;
       host: string | null;
       port: number | null;
       windows_name: string | null;
+      device: string | null;
+      active: number;
     };
+    if (printer.active !== 1) throw new PosError('INVALID_STATE', `${printer.name} is turned off. Turn it on in Settings › Printers first.`);
     const when = printedDateTime(ctx.now, ctx.timeZone);
-    const where = printer.transport === 'tcp' ? `${printer.host}:${printer.port ?? 9100}` : printer.transport === 'usb' ? `Windows printer "${printer.windows_name}"` : 'preview file';
+    const where =
+      printer.transport === 'tcp'
+        ? `${printer.host}:${printer.port ?? 9100}`
+        : printer.transport === 'usb'
+          ? `Windows printer "${printer.windows_name}"`
+          : printer.transport === 'usbdirect'
+            ? `USB, no driver (${printer.device})`
+            : printer.transport === 'serial'
+              ? `Bluetooth / ${printer.device}`
+              : 'screen only';
     const page = new EscPos(printer.width_mm === 58 ? 58 : 80).init();
     page.bold(true).size(1, 2).center('DinePOS test page').size(1, 1).bold(false);
     page.center(getConfig(ctx.db)['outlet.name']).rule();

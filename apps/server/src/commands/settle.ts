@@ -3,12 +3,26 @@ import type { OrderRow } from '../core/command-handler.js';
 import { defineCommand } from '../core/command-handler.js';
 import type { CommandContext } from '../core/context.js';
 import { PosError } from '../core/errors.js';
+import { EscPos } from '@dinepos/printing';
+import { getConfig } from '../core/outlet-config.js';
+import { billPrinter } from './billing-support.js';
 import { emitTableState } from './order-support.js';
 
 export interface Tender {
   mode: PaymentMode;
   amountPaise: number;
   ref: string | null;
+}
+
+/**
+ * Cash taken: opens the drawer plugged into the bill printer, when that printer has "Open the cash drawer on cash
+ * bills" ticked (Settings › Printers). A pulse only, no paper. No such printer: nothing happens.
+ */
+function openDrawerForCash(ctx: CommandContext, billId: string): void {
+  const printer = billPrinter(ctx.db, getConfig(ctx.db));
+  if (!printer || ctx.db.prepare('SELECT drawer FROM printer WHERE id = ?').pluck().get(printer.id) !== 1) return;
+  const bytes = new EscPos(printer.paper).init().drawerKick().bytes();
+  ctx.print({ printerId: printer.id, docKind: 'drawer', refId: billId, bytes, previewText: '[cash drawer opened]' });
 }
 
 /**
@@ -48,6 +62,8 @@ export function settleBill(ctx: CommandContext, o: OrderRow, billId: string, ten
   const insert = db.prepare('INSERT INTO payment (id, bill_id, mode, amount_paise, ref, received_by, received_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
   for (const t of nonCash) insert.run(newId(), bill.id, t.mode, t.amountPaise, t.ref, ctx.actor.userId, ctx.nowIso);
   if (cash - change > 0) insert.run(newId(), bill.id, 'cash', cash - change, null, ctx.actor.userId, ctx.nowIso);
+
+  if (cash > 0) openDrawerForCash(ctx, bill.id);
 
   db.prepare(`UPDATE bill SET state = 'settled' WHERE id = ?`).run(bill.id);
   // A split bill (P2-05): the order closes and the table frees when the last part is paid.

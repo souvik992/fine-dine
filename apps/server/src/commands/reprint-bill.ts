@@ -29,7 +29,7 @@ export const reprintBill = defineCommand({
     if (!doc) throw new PosError('INVALID_STATE', 'This bill has no stored copy to reprint.', { billId: bill.id });
     const cfg = getConfig(db);
     const printer = billPrinter(db, cfg);
-    if (!printer) throw new PosError('INVALID_STATE', 'No bill printer is set up. Add one in Settings, Kitchen & printers.');
+    if (!printer) throw new PosError('INVALID_STATE', 'No bill printer is set up. Add one in Settings › Printers.');
     const { bytes, preview } = renderBill({ ...(JSON.parse(doc.doc_json) as BillDocument), duplicate: true }, { paper: printer.paper, logo: billLogoBits(cfg) });
     ctx.print({ printerId: printer.id, docKind: 'bill', refId: bill.id, bytes, previewText: preview });
     const reprint = (db.prepare("SELECT count(*) FROM audit_event WHERE entity_id = ? AND action = 'bill.reprint'").pluck().get(bill.id) as number) + 1;

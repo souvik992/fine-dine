@@ -25,14 +25,14 @@ describe('captain basket', () => {
     expect(heldSummary(items)).toEqual({ qty: 4, amountPaise: 40_000 });
   });
 
-  it('offers Fire all, plus one button per course when more than one course is waiting', () => {
+  it('offers Send all, plus one button per course when more than one course is waiting', () => {
     expect(fireChoices([line('a', 1, 'fired')])).toEqual([]);
-    expect(fireChoices([line('a', 1), line('b', 1)]).map((c) => c.label)).toEqual(['Fire all']);
+    expect(fireChoices([line('a', 1), line('b', 1)]).map((c) => c.label)).toEqual(['Send all']);
     const choices = fireChoices([line('a', 3), line('b', 1, 'held', 2)]);
     expect(choices.map((c) => [c.label, c.payload, c.qty])).toEqual([
-      ['Fire all', { all: true }, 3],
-      ['Fire course 1', { course: 1 }, 2],
-      ['Fire course 3', { course: 3 }, 1],
+      ['Send all', { all: true }, 3],
+      ['Send course 1', { course: 1 }, 2],
+      ['Send course 3', { course: 3 }, 1],
     ]);
   });
 

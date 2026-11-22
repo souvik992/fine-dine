@@ -1,9 +1,10 @@
-import { DEFAULT_ONLINE_SETTINGS, newId, type HubOrder, type OnlineSettings } from '@dinepos/shared';
+import { DEFAULT_ONLINE_SETTINGS, newId, type ChannelSync, type HubOrder, type OnlineSettings } from '@dinepos/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
 import { getConfig } from '../core/outlet-config.js';
 import { roleRights } from '../core/rights.js';
 import { onlineItemId, priceOnlineOrder, publishedMenu } from '../online/menu.js';
+import { onlineView } from '../online/online-support.js';
 import { seedId } from '../seed/dev-seed.js';
 import { denyAll, TEST_NOW, useHarness } from '../testing/command-harness.js';
 import { S, seedOutlet } from '../testing/order-fixture.js';
@@ -70,6 +71,66 @@ describe('online orders', () => {
   it('an outlet that never chose a GST rate for delivery and packaging charges gets 0% (exempt)', () => {
     h.db.prepare("DELETE FROM config WHERE key = 'online.settings'").run();
     expect(getConfig(h.db)['online.settings'].feeTaxBp).toBe(0);
+  });
+
+  // ---- menu sync per channel (quickPOS ODS)
+  const sync = (over: Partial<Record<'app' | 'website' | 'swiggy' | 'zomato', Partial<ChannelSync>>>) => {
+    const base: ChannelSync = { mode: 'all', items: [], pricing: 'same', markupBp: 0, prices: {} };
+    h.run('SetConfig', { values: { 'online.menuSync': { app: { ...base, ...over.app }, website: { ...base, ...over.website }, swiggy: { ...base, ...over.swiggy }, zomato: { ...base, ...over.zomato } } } });
+  };
+
+  it('menu sync: each channel lists its own dishes (all / all except / only) and sells at its own price; the POS price stays out of it', () => {
+    h.run('SetConfig', { values: { 'online.settings': { ...settings, channels: { app: true, website: true, swiggy: true, zomato: false } } } });
+    sync({ app: { mode: 'include', items: [S.dalMakhani] }, website: { mode: 'exclude', items: [S.dalMakhani], pricing: 'custom', markupBp: 1000, prices: { [onlineItemId(BC, BC_FULL)]: 49_900 } } });
+    const items = publishedMenu(h.db, getConfig(h.db)['online.settings'], getConfig(h.db)).body.items;
+    const dal = items.find((i) => i.id === S.dalMakhani)!;
+    const bcFull = items.find((i) => i.id === onlineItemId(BC, BC_FULL))!;
+    const bcHalf = items.find((i) => i.id.startsWith(`${BC}:`) && i.id !== bcFull.id)!;
+    expect(dal.channels).toEqual(['app', 'swiggy']); // not on the website; zomato is off
+    expect(dal.prices).toBeUndefined();
+    expect(bcFull.channels).toEqual(['website', 'swiggy']); // the app lists only the dal
+    expect(bcFull.prices).toEqual({ website: 49_900 }); // its own price
+    expect(bcFull.price).toBe(52_000); // the POS price is still the item price
+    expect(bcHalf.prices?.website).toBe(Math.round((bcHalf.price * 1.1) / 100) * 100); // +10%, to the rupee
+  });
+
+  it('an order from a channel with its own prices is billed at those prices, so the bill is what the customer paid', () => {
+    sync({ website: { pricing: 'custom', markupBp: 1500 } });
+    const o = receive(hubOrder()); // priced the way the hub prices it: +15%
+    const res = h.run('AcceptOnlineOrder', { onlineOrderId: o.id });
+    const r = row(o.id);
+    expect(r).toMatchObject({ state: 'ACCEPTED', alert: null, pos_total_paise: o.total });
+    expect(h.db.prepare("SELECT name_snapshot, unit_price_paise FROM order_item WHERE order_id = ? AND item_id NOT LIKE 'fee:%' ORDER BY name_snapshot").all(r.local_order_id)).toEqual([
+      { name_snapshot: 'Butter Chicken (Full)', unit_price_paise: 59_800 }, // 520 × 1.15 = 598
+      { name_snapshot: 'Dal Makhani', unit_price_paise: 32_200 }, // 280 × 1.15 = 322
+    ]);
+    expect((res.result as { totalPaise: number }).totalPaise).toBe(o.total);
+  });
+
+  it('print on accept off: the KOT and bill are made but not printed; the order card prints them later, once', () => {
+    h.run('SetConfig', { values: { 'online.settings': { ...settings, printOnAccept: { bill: false, kot: false } } } });
+    const o = receive(hubOrder());
+    h.run('AcceptOnlineOrder', { onlineOrderId: o.id });
+    const r = row(o.id);
+    expect(h.count('kot', `order_id = '${r.local_order_id}'`)).toBe(1);
+    expect(h.count('print_job', "doc_kind IN ('kot', 'bill')")).toBe(0);
+    const view = () => onlineView(h.db, h.db.prepare('SELECT * FROM online_order WHERE id = ?').get(o.id) as Parameters<typeof onlineView>[1]);
+    expect(view()).toMatchObject({ billPrinted: false, kotPrinted: false });
+    h.run('PrintOnlineOrder', { onlineOrderId: o.id, what: 'kot' });
+    h.run('PrintOnlineOrder', { onlineOrderId: o.id, what: 'bill' });
+    expect(view()).toMatchObject({ billPrinted: true, kotPrinted: true });
+    const bill = h.db.prepare("SELECT preview_text FROM print_job WHERE doc_kind = 'bill'").pluck().get() as string;
+    expect(bill).not.toContain('DUPLICATE'); // its first print
+    h.fail('PrintOnlineOrder', { onlineOrderId: o.id, what: 'bill' }, 'INVALID_STATE'); // printed: Reprint does it now
+    h.fail('PrintOnlineOrder', { onlineOrderId: o.id, what: 'kot' }, 'INVALID_STATE');
+  });
+
+  it('print on accept is on by default (bill and KOT, as before)', () => {
+    const o = receive(hubOrder());
+    h.run('AcceptOnlineOrder', { onlineOrderId: o.id });
+    expect(h.db.prepare("SELECT doc_kind FROM print_job WHERE doc_kind IN ('kot', 'bill') ORDER BY doc_kind").pluck().all()).toEqual(['bill', 'kot']);
+    h.fail('PrintOnlineOrder', { onlineOrderId: newId(), what: 'bill' }, 'NOT_FOUND');
+    h.fail('PrintOnlineOrder', { onlineOrderId: o.id, what: 'bill' }, 'FORBIDDEN', { rights: denyAll });
   });
 
   it('an order from the hub is stored once and confirmed (received); a replayed event is ignored', () => {

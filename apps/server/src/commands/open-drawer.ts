@@ -11,7 +11,7 @@ export const openDrawer = defineCommand({
   needsOrder: false,
   apply(ctx, p) {
     const printerId = printCashSlip(ctx, 'drawer', p.reason, null);
-    if (!printerId) throw new PosError('INVALID_STATE', 'No bill printer is set up; the cash drawer is opened through it. Add one in Settings, Kitchen & printers.');
+    if (!printerId) throw new PosError('INVALID_STATE', 'No bill printer is set up; the cash drawer is opened through it. Add one in Settings › Printers.');
     ctx.audit({ entity: 'drawer', entityId: printerId, action: 'drawer.open', reason: p.reason, leakage: true });
     return { result: { printerId } };
   },

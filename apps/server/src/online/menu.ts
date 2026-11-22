@@ -1,7 +1,7 @@
 // What DinePOS publishes to the order hub (PUT /v1/pos/menu, contract `PublishedMenu`) and how it prices an online
 // order itself before accepting (P4-06). Pure apart from reading the menu and settings.
 import { createHash } from 'node:crypto';
-import { calculateBill, isPlatformOrder, type HubOrder, type MenuSnapshot, type OnlineSettings, type OutletConfig, type Serviceability } from '@dinepos/shared';
+import { calculateBill, channelLists, channelPrice, isPlatformOrder, SALES_CHANNELS, type HubOrder, type MenuSnapshot, type MenuSync, type OnlineSettings, type OutletConfig, type SalesChannel, type Serviceability } from '@dinepos/shared';
 import { PosError } from '../core/errors.js';
 import type { Db } from '../db/connection.js';
 import { getMenu } from '../queries/menu.js';
@@ -31,6 +31,8 @@ export interface PublishedMenuBody {
     channels: Array<'app' | 'website' | 'swiggy' | 'zomato'>;
     /** The dish's photo ("<sha256>.webp"), served by the hub once the connector uploaded it. */
     image: string | null;
+    /** Menu sync: a channel's own price for it when that channel does not sell at the POS price (contract `MenuItem.prices`). */
+    prices?: Partial<Record<SalesChannel, number>>;
   }>;
   modifierGroups: Array<{ id: string; name: string; minSelect: number; maxSelect: number; modifiers: Array<{ id: string; name: string; price: number }> }>;
   roundToRupee: boolean;
@@ -48,14 +50,19 @@ export interface PublishedMenuBody {
 /** The base menu (no area price list: online orders have no table) as the hub wants it, and its hash. */
 export function publishedMenu(db: Db, settings: OnlineSettings, cfg: OutletConfig): { body: PublishedMenuBody; hash: string } {
   const menu = getMenu(db) as MenuSnapshot;
-  // every dish is sold on every channel switched on (Swiggy / Zomato too, P6-06: the hub sends this menu to UrbanPiper,
-  // so platform orders come back with these ids)
-  const channels = (['app', 'website', 'swiggy', 'zomato'] as const).filter((c) => settings.channels[c]);
+  const sync = cfg['online.menuSync'];
+  // each dish is sold on the channels switched on that list it (menu sync; Swiggy / Zomato too, P6-06: the hub sends this
+  // menu to UrbanPiper, so platform orders come back with these ids), at each channel's own price
+  const on = SALES_CHANNELS.filter((c) => settings.channels[c]);
   const items: PublishedMenuBody['items'] = [];
   for (const i of menu.items) {
-    const base = { categoryId: i.categoryId, unit: 'nos', isVeg: i.veg, rateBp: i.taxRateBp, cessBp: 0, priceIncludesTax: false, modifierGroupIds: i.addonGroupIds, available: i.available, channels: [...channels], image: i.image ?? null };
-    if (i.variants.length === 0) items.push({ ...base, id: i.id, name: i.name, price: i.pricePaise });
-    else for (const v of i.variants) items.push({ ...base, id: onlineItemId(i.id, v.id), name: `${i.name} (${v.name})`, price: v.pricePaise });
+    const channels = on.filter((c) => channelLists(sync[c], i.id));
+    const base = { categoryId: i.categoryId, unit: 'nos', isVeg: i.veg, rateBp: i.taxRateBp, cessBp: 0, priceIncludesTax: false, modifierGroupIds: i.addonGroupIds, available: i.available, channels, image: i.image ?? null };
+    const sized = i.variants.length === 0 ? [{ id: i.id, name: i.name, price: i.pricePaise }] : i.variants.map((v) => ({ id: onlineItemId(i.id, v.id), name: `${i.name} (${v.name})`, price: v.pricePaise }));
+    for (const s of sized) {
+      const prices = channelPrices(sync, channels, s.id, s.price);
+      items.push({ ...base, ...s, ...(prices ? { prices } : {}) });
+    }
   }
   const body: PublishedMenuBody = {
     storeName: cfg['outlet.name'],
@@ -74,6 +81,16 @@ export function publishedMenu(db: Db, settings: OnlineSettings, cfg: OutletConfi
     serviceability: { ...settings.serviceability, hours: Object.fromEntries(Object.entries(settings.serviceability.hours).map(([d, s]) => [d, s])) as PublishedMenuBody['serviceability']['hours'] },
   };
   return { body, hash: createHash('sha256').update(JSON.stringify(body)).digest('hex') };
+}
+
+/** The channels that sell this dish (or size) at their own price, and that price; undefined when all use the POS price. */
+function channelPrices(sync: MenuSync, channels: readonly SalesChannel[], id: string, posPrice: number): Partial<Record<SalesChannel, number>> | undefined {
+  const out: Partial<Record<SalesChannel, number>> = {};
+  for (const c of channels) {
+    const p = channelPrice(id, posPrice, sync[c]);
+    if (p !== posPrice) out[c] = p;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /**
@@ -122,7 +139,9 @@ export function priceOnlineOrder(db: Db, order: HubOrder, settings: OnlineSettin
       if (!a) throw new PosError('INVALID_STATE', `The option ${m.name} for ${l.name} is no longer on the menu.`, { addonId: m.id });
       return { addonId: a.id, name: a.name, qty: 1, pricePaise: a.pricePaise };
     });
-    lines.push({ itemId, variantId, name: variant ? `${item.name} (${variant.name})` : item.name, qty: l.qtyMilli / 1000, unitPricePaise: variant?.pricePaise ?? item.pricePaise, taxRateBp: item.taxRateBp, addons, note: l.note });
+    // the channel's price (menu sync), as the customer was charged: the bill matches what they pay
+    const unitPricePaise = channelPrice(l.itemId, variant?.pricePaise ?? item.pricePaise, cfg['online.menuSync'][order.channel]);
+    lines.push({ itemId, variantId, name: variant ? `${item.name} (${variant.name})` : item.name, qty: l.qtyMilli / 1000, unitPricePaise, taxRateBp: item.taxRateBp, addons, note: l.note });
   }
   const itemsCalc = calculateBill(
     lines.map((l, i) => ({ id: String(i), qty: l.qty, unitPricePaise: l.unitPricePaise, taxRateBp: l.taxRateBp, addons: l.addons })),

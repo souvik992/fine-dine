@@ -19,7 +19,7 @@ Every state also has a text label and icon — colour is never the only signal.
 
 ## Desktop app (Electron)
 ### 1. Floor (built in P1-08: area tabs, table search, health dots, clock, tiles, seat dialog, arrow keys)
-- Top bar: area tabs, search table (type `T7` + Enter), **+ Takeaway** and **+ Delivery** (start a counter order; the strip of open ones shows above the tables only while any is open), clock, sync/print health dots.
+- Top bar: area tabs, search table (type `T7` + Enter), **+ Takeaway** and **+ Delivery** (at the right end of the top bar, on the same line as the modules; start a counter order; the strip of open ones shows above the tables only while any is open), clock, sync/print health dots.
 - Layout / Grid switch (remembered per terminal): Layout shows tables where they were placed in Settings ›
   Floor & tables; areas without a saved layout fall back to the grid.
 - Tile: label, covers, elapsed min, amount, captain initials, state label.
@@ -42,7 +42,7 @@ Every state also has a text label and icon — colour is never the only signal.
 Keyboard map: type a code + Enter (`pt2`, `pt 2`, `2*pt`; an exact code wins, so `C65` works), Shift+Enter
 opens options for an item that has optional ones; in the sheet 1–9/0 toggle options, + / − quantity,
 [ / ] course, Enter adds, Esc cancels; Alt+↑/↓ pick a held line, + / − its quantity, Delete removes it;
-F8 fires all held items; Esc clears the search, then returns to the floor. Seating a table opens its order.
+F8 sends all held items to the kitchen (the KOT button, or Send to KDS when the outlet uses kitchen screens); Esc clears the search, then returns to the floor. Seating a table opens its order.
 Addon options follow the order they were entered in (menu admin), so hotkeys stay stable.
 Adding an item already waiting in the cart with the same size, add-ons, note and course raises that line's
 quantity instead of adding a second line (lines already sent to the kitchen are never changed). Cart changes and
@@ -55,7 +55,7 @@ quantity instead of adding a second line (lines already sent to the kitchen are 
 - Cart sections: Held (editable) and Fired (grouped by KOT, read-only; actions via context menu).
 - Item tap → modifier sheet: required variation, add-on groups with min/max, quick-note chips, free note,
   course selector.
-- Footer buttons: Fire (F8), Fire course… , Print bill (F9), Settle (F10), More (discount, covers, captain,
+- Footer buttons: KOT / Send to KDS (F8), Bill (F9; prints or reprints the bill), Settle (F10), More (discount, covers, captain,
   customer, transfer items).
 - Conflict banner when the order changed elsewhere. Built in P2-07: a refused decision (print, settle, split, move,
   merge, move items, change a sent item) shows what was not done and who changed the table, how and when.
@@ -111,9 +111,13 @@ Sections are shown by right; every save is a command, so it is audited and other
   groups, active), categories (station, sort), add-on groups (min/max, options), **Bulk upload** (CSV template,
   row-by-row check against the file and the menu, then `ImportMenu`, all or nothing). Saved variants and options can
   be deactivated but not removed, so old orders keep their meaning.
-- **Kitchen & printers** (admin): printers (network IP/port, Windows USB name, or preview-only; paper width;
-  KOT/bill role; copies; cutter; backup printer) with live status and **Test print** (`PrintTestPage`);
-  stations with their printers.
+- **Kitchen** (admin): stations with their printers and kitchen screen; **Use kitchen screens (KDS)** and **Also print
+  paper KOTs**; where to open the kitchen screens and their amber / red times.
+- **Printers** (admin, quickPOS printer setup): USB printers plugged into the main PC (Use for bills / Set up with
+  options); every printer with its connection, paper, what it prints and live status, **Test print**, **Retry failed**,
+  **Turn off / on**, **Edit**, **Remove**; **Add printer** in steps (USB, Wi-Fi with Find printers, Bluetooth COM port,
+  Screen only → name and paper → bills and cash drawer, KOT stations → copies, backup printer, cutter, slow speed, on);
+  print agents.
 - **Backups** (admin, P2-08): last backup and its health, "Back up now", the copy folder, the list of backups
   (time, kind, size) and, for staff managers, **Restore** (type RESTORE + Owner PIN; the app reconnects when the server
   is back). The top bar shows "Backup late" when there was no backup for an hour.
@@ -152,9 +156,16 @@ The button shows how many materials are low or need a count. Tabs:
   Silence, and a falling alarm when an order goes late and every minute after, until it is marked Ready.
 - The customer's note for the whole order prints on the KOT ("NOTE: ..." after the dishes).
 - Settings › Online orders: the hub link (paste the connection link / Disconnect, live status), take online orders,
-  accepting by hand or automatically, the hub's reject-after minutes, kitchen time, website/app/Swiggy/Zomato (P6-06), pickup/delivery, pay
-  online / cash, GST on charges, pickup minimum and time, packaging charge, store location and address, up to six
-  delivery bands (km, charge, minimum, free above, time) and opening hours per day (up to two times).
+  accepting by hand or automatically, the hub's reject-after minutes, kitchen time, website/app/Swiggy/Zomato (P6-06),
+  each with **Menu sync** (as quickPOS: all dishes / all except / only; prices same as the POS, or a percentage with
+  prices per dish or size; Save, and Save and sync now), pickup/delivery, pay online / cash, and **When an order is
+  accepted, print** the bill and / or the KOT (what is not printed shows **Print bill** / **Print KOT** on the order
+  card, `PrintOnlineOrder`).
+- Settings › Serviceability (as quickPOS): GST on charges, pickup minimum and time, packaging charge, the store's
+  location (search as you type, Enter for a wider search, paste coordinates or a map link → Use this point, click the
+  map or drag the pin; the address is filled in), up to six delivery bands (km, charge, minimum, free above, time),
+  the road factor and opening hours per day (up to two times; **Copy Monday to all days** fills the week). Map pictures come from the outlet server, which saves
+  OpenStreetMap tiles in `<data>\tiles`, so the maps work offline once seen.
 
 ## Licence (built in P2-09: Settings › Licence; `apps/desktop/src/settings/LicenceSettings.tsx`)
 - Status (Licensed / Ending soon / Ended: grace period / Ended / Not licensed / Key not valid here) with the message,
@@ -176,7 +187,7 @@ The button shows how many materials are low or need a count. Tabs:
 ## Captain PWA (phone/tablet)
 - Login with PIN → My tables (assigned areas first) → table → order screen.
 - Order screen: category chips, item list with + buttons, held basket at bottom with course tags.
-- Actions: Fire all / Fire course N, Request bill (notifies desk), Add note, Covers.
+- Actions: Send all / Send course N, Request bill (notifies desk), Add note, Covers.
 - Offline banner and pending-command counter.
 - Built in P3-01 (`apps/captain`, served by the outlet server at `http://<master>:7420/captain`): **Pair this phone**
   (name + 6-digit code; not shown on the master PC itself) → **Who is taking orders?** (name tiles, big PIN pad) →
@@ -187,9 +198,9 @@ The button shows how many materials are low or need a count. Tabs:
   locked once the bill is printed), running total, search, category chips and a **Course 1–5** picker for quick adds.
   Each dish row has a **+** (adds one to the chosen course; the same dish/options/note/course raises the waiting line,
   as on the terminal); tapping the row, or **+** on a dish with a required choice, opens the **options sheet** (size,
-  add-ons within min/max, quick notes and a note, course, quantity). The bottom bar shows what is waiting and **Fire
+  add-ons within min/max, quick notes and a note, course, quantity). The bottom bar shows what is waiting and **Send
   all**; the **basket** groups waiting lines by course (−/+/remove, move to another course), shows what was sent by
-  KOT, and offers **Fire all** plus **Fire course N** when more than one course waits. Changes from other devices
+  KOT, and offers **Send all** plus **Send course N** when more than one course waits. Changes from other devices
   arrive live; a refused change says who changed the table.
 - Captains (P3-04): **My tables** (the captain's section and the orders they look after) is the first tab and opens by
   default when there are any; tiles show another captain's initials and "Bill asked". Tables seated on the phone are

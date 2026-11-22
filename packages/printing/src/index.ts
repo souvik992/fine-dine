@@ -9,3 +9,7 @@ export * from './transports/fake.js';
 export * from './transports/tcp.js';
 export * from './transports/types.js';
 export * from './transports/usb-windows.js';
+export * from './detect.js';
+export * from './transports/powershell.js';
+export * from './transports/serial.js';
+export * from './transports/usb-direct.js';

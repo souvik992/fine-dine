@@ -467,11 +467,12 @@ describe('desktop app', () => {
     await page.keyboard.press('Escape');
   });
 
-  it('Kitchen & printers: a test print reaches the printer', async () => {
-    const page = await openSettings('Kitchen & printers');
-    const row = page.getByRole('list', { name: 'Printers' }).getByRole('listitem').filter({ hasText: 'Bill printer' });
+  it('Printers: a test print reaches the printer; a printer added in steps, turned off and removed', async () => {
+    const page = await openSettings('Printers');
+    const list = page.getByRole('list', { name: 'Printers' });
+    const row = list.getByRole('listitem').filter({ hasText: 'Bill printer' });
     await row.getByRole('button', { name: 'Test print' }).click();
-    await row.getByText('Test page sent').waitFor();
+    await page.getByText('Test page sent to Bill printer.').waitFor();
     await expect
       .poll(() => {
         const dir = path.join(dataDir, 'prints');
@@ -479,6 +480,24 @@ describe('desktop app', () => {
         return files.some((f) => readFileSync(path.join(dir, f), 'utf8').includes('DinePOS test page'));
       }, { timeout: 5_000 })
       .toBe(true);
+
+    // Add printer in steps (quickPOS): screen only, KOTs for the Bar
+    await page.getByRole('button', { name: 'Add printer' }).click();
+    const dlg = page.getByRole('dialog', { name: 'Add printer' });
+    await dlg.getByRole('radio', { name: 'Screen only' }).click();
+    await dlg.getByLabel('Printer name').fill('Bar screen');
+    await dlg.getByLabel('Stations').getByRole('button', { name: 'Bar', exact: true }).click();
+    await dlg.getByRole('button', { name: 'Add printer' }).click();
+    await page.getByText('Printer added. Press Test print to check it.').waitFor();
+    const bar = list.getByRole('listitem').filter({ hasText: 'Bar screen' });
+    await bar.getByText(/Screen only \(no paper\) · 80 mm · KOTs for Bar/).waitFor();
+    // off, then removed (never printed: really removed)
+    await bar.getByRole('button', { name: 'Turn off Bar screen' }).click();
+    await bar.getByText('Off', { exact: true }).waitFor();
+    await bar.getByRole('button', { name: 'Remove Bar screen' }).click();
+    await page.getByRole('dialog', { name: 'Remove Bar screen?' }).getByRole('button', { name: 'Remove' }).click();
+    await page.getByText('Bar screen removed.').waitFor();
+    expect(await list.getByRole('listitem').filter({ hasText: 'Bar screen' }).count()).toBe(0);
     await page.getByRole('button', { name: 'Floor', exact: true }).click();
   });
 

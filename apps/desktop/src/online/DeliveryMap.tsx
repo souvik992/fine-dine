@@ -2,6 +2,7 @@ import type { OnlineOrderView } from '@dinepos/shared';
 import { ExternalLink, Navigation } from 'lucide-react';
 import { useState } from 'react';
 import { Modal } from '../components/Modal.js';
+import { MapTileImg } from './MapTileImg.js';
 import { directionsUrl, mapView, openStreetMapUrl, type LatLng } from './map-view.js';
 
 const W = 640;
@@ -21,12 +22,12 @@ export function DeliveryMap({ order, store, onClose }: { order: OnlineOrderView;
       {a ? <p className="mb-2 text-sm">{[a.line1, a.line2, a.landmark, `${a.city} ${a.pincode}`].filter(Boolean).join(', ')}{order.order.distanceKm !== null ? ` · about ${order.order.distanceKm} km by road` : ''}</p> : null}
       <div className="relative mx-auto overflow-hidden rounded-lg border border-border bg-secondary" style={{ width: W, height: H, maxWidth: '100%' }} data-testid="delivery-map">
         {view.tiles.map((t) => (
-          <img key={t.key} src={t.src} alt="" draggable={false} className="absolute select-none" style={{ left: t.left, top: t.top, width: 256, height: 256 }} onError={() => setFailed(true)} />
+          <MapTileImg key={t.key} path={t.src} className="absolute select-none" style={{ left: t.left, top: t.top }} onError={() => setFailed(true)} />
         ))}
         {store ? <Pin x={view.pins[1]!.x} y={view.pins[1]!.y} label="Store" color="#1f6feb" /> : null}
         <Pin x={view.pins[0]!.x} y={view.pins[0]!.y} label="Customer" color="#d1242f" />
         <span className="absolute bottom-0 right-0 bg-white/80 px-1 text-[10px] text-black">© OpenStreetMap contributors</span>
-        {failed ? <p className="absolute inset-x-0 top-0 bg-warn px-2 py-1 text-sm font-semibold text-black">Map tiles did not load (no internet?). The links below still work on a phone.</p> : null}
+        {failed ? <p className="absolute inset-x-0 top-0 bg-warn px-2 py-1 text-sm font-semibold text-black">Part of the map is not saved yet (no internet?). The links below still work on a phone.</p> : null}
       </div>
       <p className="mt-2 text-xs text-muted-foreground tabular-nums">
         Customer pin {to.lat}, {to.lng}

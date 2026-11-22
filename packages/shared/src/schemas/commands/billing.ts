@@ -1,5 +1,5 @@
 // Payload schemas for PrintBill, Settle, DayEnd and SetConfig (docs/03-command-api.md).
-import { onlineSettingsSchema } from '../../online.js';
+import { menuSyncSchema, onlineSettingsSchema } from '../../online.js';
 import { z } from 'zod';
 import { gstinProblem } from '../../gstin.js';
 import { BILL_PREFIX_RE } from '../../numbering.js';
@@ -108,12 +108,18 @@ export const configSchemas = {
   /** P4-02: a kitchen ticket turns amber, then red, after this many minutes without being bumped. */
   'kds.amberMin': z.number().int().min(1).max(120),
   'kds.redMin': z.number().int().min(2).max(240),
+  /** The outlet uses kitchen screens: the order screen says "Send to KDS" (else "Print KOT"). Stations still say which have a screen. */
+  'kds.enabled': z.boolean(),
+  /** With kitchen screens on: also print paper KOTs at stations that have a screen (stations without one always print). */
+  'kds.printPaper': z.boolean(),
   /** P4-04: a booking holds its tables from this many minutes before its time… */
   'reservation.holdMin': z.number().int().min(0).max(240),
   /** …until this many minutes after it (a no-show then stops blocking the table). */
   'reservation.graceMin': z.number().int().min(0).max(120),
   /** P4-06: online orders through the order hub (the hub link and its device key are not here). */
   'online.settings': onlineSettingsSchema,
+  /** Menu sync per channel (Settings › Online orders › a channel's Menu sync): which dishes each lists, at what price. */
+  'online.menuSync': menuSyncSchema,
   /** P2-08: a second folder for backup copies (USB drive, another disk), an absolute path; null = none. */
   'backup.copyDir': z
     .string()

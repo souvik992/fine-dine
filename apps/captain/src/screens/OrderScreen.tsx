@@ -14,7 +14,7 @@ type FireChoice = { all: true } | { course: number };
 
 /**
  * Taking an order on the phone (docs/09 Captain): category chips and an item list with + buttons; a held basket
- * with course tags; Fire all / Fire course N; guests. Every change goes through the outbox (P3-03): shown at once,
+ * with course tags; Send all / Send course N; guests. Every change goes through the outbox (P3-03): shown at once,
  * sent now when the outlet server is reachable, or when it is back.
  */
 export function OrderScreen({ orderId, areaId, onBack, onAttention }: { orderId: string; areaId: string | null; onBack: () => void; onAttention: () => void }) {
@@ -215,7 +215,7 @@ export function OrderScreen({ orderId, areaId, onBack, onAttention }: { orderId:
         </button>
         {choices[0] ? (
           <button className="btn btn-primary" onClick={() => fire(choices[0]!.payload)}>
-            <Send className="h-5 w-5" /> Fire all
+            <Send className="h-5 w-5" /> Send all
           </button>
         ) : canAskBill ? (
           <button className="btn btn-primary" onClick={askBill}>

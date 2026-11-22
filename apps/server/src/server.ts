@@ -1,6 +1,6 @@
 import { createWriteStream, mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { FakeTransport, TcpTransport, WindowsSpoolerTransport } from '@dinepos/printing';
+import { FakeTransport, SerialTransport, TcpTransport, UsbDirectTransport, WindowsSpoolerTransport } from '@dinepos/printing';
 import type { FastifyInstance, FastifyServerOptions } from 'fastify';
 import { localDate } from '@dinepos/shared';
 import { buildApp, LOG_REDACT } from './app.js';
@@ -110,6 +110,8 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
         fake: new FakeTransport(path.join(config.dataDir, 'prints')),
         tcp: new TcpTransport(),
         usb: new WindowsSpoolerTransport(),
+        usbdirect: new UsbDirectTransport(), // quickPOS: a USB printer with no Windows driver
+        serial: new SerialTransport(), // a Bluetooth or COM port printer
       },
       log: (level, msg, data) => logSink.log?.(level, msg, data),
     });
@@ -150,6 +152,7 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
       trustLoopback: config.trustLoopback ?? true,
       ...(config.hostKey ? { hostKey: config.hostKey } : {}),
       backups: { scheduler: backups, dataDir: config.dataDir, requestRestart: opts.requestRestart ?? (() => undefined) },
+      maps: { dir: path.join(config.dataDir, 'tiles') },
       licence,
     });
     logSink.log = (level, msg, data) => app.log[level](data ?? {}, msg);

@@ -1,6 +1,9 @@
 import { Minus, Plus, Search } from 'lucide-react';
 import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from 'react';
-import { parsePlaces, placeReverseUrl, placeSearchUrl, pointAt, project, pxPerKm, unproject, viewAt, type LatLng, type Place } from '../online/map-view.js';
+import { parsePlaces, pastedPoint, placeReverseUrl, placeSearchUrl, pointAt, project, pxPerKm, unproject, viewAt, type LatLng, type Place } from '../online/map-view.js';
+import { ApiError } from '../api/client.js';
+import { useApp } from '../app-context.js';
+import { MapTileImg } from '../online/MapTileImg.js';
 
 const H = 360;
 const INDIA: LatLng = { lat: 22.35, lng: 78.67 };
@@ -13,6 +16,7 @@ const INDIA: LatLng = { lat: 22.35, lng: 78.67 };
  * that point (first '' while it is looked up, then the address; '' when none is found).
  */
 export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { location: LatLng | null; bandsKm: number[]; roadFactor: number; onPick: (p: LatLng, address: string) => void }) {
+  const { api } = useApp();
   const box = useRef<HTMLDivElement>(null);
   // the latest onPick: an address found after a click must not undo edits made while it was looked up
   const pickRef = useRef(onPick);
@@ -42,7 +46,10 @@ export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { lo
   const [places, setPlaces] = useState<Place[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const drag = useRef<{ x: number; y: number; c: { x: number; y: number }; moved: boolean } | null>(null);
+  const drag = useRef<{ x: number; y: number; c: { x: number; y: number }; moved: boolean; pin: boolean } | null>(null);
+  /** Where the pin is while it is being dragged (map pixels). */
+  const [dragPin, setDragPin] = useState<{ x: number; y: number } | null>(null);
+  const point = pastedPoint(query);
 
   useEffect(() => {
     const el = box.current;
@@ -61,14 +68,18 @@ export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { lo
 
   const valid = location && Number.isFinite(location.lat) && Number.isFinite(location.lng) && location.lat !== 0 ? location : null;
   const view = viewAt(centre, zoom, width, H, valid ? [valid] : []);
-  const pin = view.pins[0];
+  const pin = dragPin ?? view.pins[0];
   const ppk = pxPerKm(valid?.lat ?? centre.lat, zoom);
   const zoomBy = (d: number) => setZoom((z) => Math.min(18, Math.max(4, z + d)));
 
   const down = (e: PointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('button')) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { x: e.clientX, y: e.clientY, c: project(centre, zoom), moved: false };
+    // on the pin (its head is above the point): drag the pin to the exact door; elsewhere: move the map
+    const r = e.currentTarget.getBoundingClientRect();
+    const at = { x: e.clientX - r.left, y: e.clientY - r.top };
+    const onPin = !!pin && Math.abs(at.x - pin.x) <= 16 && at.y <= pin.y + 4 && at.y >= pin.y - 38;
+    drag.current = { x: e.clientX, y: e.clientY, c: project(centre, zoom), moved: false, pin: onPin };
   };
   const move = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
@@ -76,14 +87,19 @@ export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { lo
     const dx = e.clientX - d.x;
     const dy = e.clientY - d.y;
     if (Math.abs(dx) + Math.abs(dy) > 4) d.moved = true;
-    if (d.moved) setCentre(unproject(d.c.x - dx, d.c.y - dy, zoom));
+    if (!d.moved) return;
+    if (d.pin) {
+      const r = e.currentTarget.getBoundingClientRect();
+      setDragPin({ x: e.clientX - r.left, y: e.clientY - r.top });
+    } else setCentre(unproject(d.c.x - dx, d.c.y - dy, zoom));
   };
   const up = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     drag.current = null;
-    if (!d || d.moved) return;
+    setDragPin(null);
+    if (!d || (d.moved && !d.pin)) return;
     const r = e.currentTarget.getBoundingClientRect();
-    pickPoint(pointAt(centre, zoom, width, H, e.clientX - r.left, e.clientY - r.top));
+    pickPoint(pointAt(centre, zoom, width, H, e.clientX - r.left, e.clientY - r.top)); // a click, or where the pin was dropped
   };
   // search as you type: 400 ms after the last key, the newest search wins
   const skip = useRef(false);
@@ -94,7 +110,7 @@ export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { lo
     }
     const q = query.trim();
     setSearchError(null);
-    if (q.length < 3) {
+    if (q.length < 3 || pastedPoint(q)) {
       setPlaces(null);
       setSearching(false);
       return;
@@ -123,6 +139,29 @@ export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { lo
       ctl.abort();
     };
   }, [query]);
+  const usePoint = (p: LatLng) => {
+    setCentre(p);
+    setZoom(17);
+    setPlaces(null);
+    pickPoint(p); // its address is looked up
+  };
+  // Enter when typing found nothing: the wider search (the outlet server asks Nominatim, near the store)
+  const wider = async () => {
+    const q = query.trim();
+    if (q.length < 3) return;
+    setSearching(true);
+    setSearchError(null);
+    try {
+      const near = valid ? `&near=${valid.lat},${valid.lng}` : '';
+      const r = await api.get<{ places: Place[] }>(`/v1/maps/places?q=${encodeURIComponent(q)}${near}`);
+      setPlaces(r.places);
+      if (!r.places.length) setSearchError('No match. Try the area or road name, or paste the coordinates from a map (right-click your shop in any online map and copy the numbers).');
+    } catch (e) {
+      setSearchError(e instanceof ApiError ? e.message : 'Could not search.');
+    } finally {
+      setSearching(false);
+    }
+  };
   const choose = (p: Place) => {
     skip.current = true; // showing the chosen name in the box is not a new search
     setQuery(p.name);
@@ -142,13 +181,15 @@ export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { lo
         <input
           className="input w-full pl-9"
           maxLength={120}
-          placeholder="Type an area name, like Marathahalli, Bengaluru"
+          placeholder="Shop name, area or road (like Marathahalli, Bengaluru), or paste map coordinates"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              e.preventDefault(); // Enter takes the first match
-              if (places?.[0]) choose(places[0]);
+              e.preventDefault(); // Enter takes the pasted point, else the first match, else searches wider
+              if (point) usePoint(point);
+              else if (places?.[0]) choose(places[0]);
+              else void wider();
             } else if (e.key === 'Escape' && places?.length) {
               e.stopPropagation();
               setPlaces(null);
@@ -159,6 +200,11 @@ export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { lo
         />
         {searching ? <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">Searching…</span> : null}
       </div>
+      {point ? (
+        <button type="button" className="mb-2 w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-sm hover:bg-secondary" onClick={() => usePoint(point)}>
+          <b>Use this point</b> <span className="text-muted-foreground">{point.lat}, {point.lng}</span>
+        </button>
+      ) : null}
       {searchError ? <p className="mb-2 text-sm text-danger">{searchError}</p> : null}
       {places?.length ? (
         <ul className="mb-2 overflow-hidden rounded-lg border border-border bg-card text-sm" aria-label="Places found">
@@ -183,7 +229,7 @@ export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { lo
         aria-label="Store location map: click to set the store location"
       >
         {view.tiles.map((t) => (
-          <img key={t.key} src={t.src} alt="" draggable={false} className="pointer-events-none absolute" style={{ left: t.left, top: t.top, width: 256, height: 256 }} onError={() => setFailed(true)} />
+          <MapTileImg key={t.key} path={t.src} className="pointer-events-none absolute" style={{ left: t.left, top: t.top }} onError={() => setFailed(true)} />
         ))}
         {pin ? (
           <>
@@ -217,10 +263,10 @@ export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { lo
           </button>
         </div>
         <span className="absolute bottom-0 right-0 bg-white/80 px-1 text-[10px] text-black">© OpenStreetMap contributors</span>
-        {failed ? <p className="absolute inset-x-0 top-0 bg-warn px-2 py-1 text-sm font-semibold text-black">Map tiles did not load (no internet?). You can still type the latitude and longitude.</p> : null}
+        {failed ? <p className="absolute inset-x-0 top-0 bg-warn px-2 py-1 text-sm font-semibold text-black">Part of the map is not saved yet (no internet?). You can still paste or type the latitude and longitude.</p> : null}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        {valid ? 'Click the map to move the store to its exact spot (a searched area puts it at the area’s centre). ' : 'Search the area or drag and zoom, then click the store to set the location. '}
+        {valid ? 'Drag the pin to the exact door, or click the map (a searched area puts it at the area’s centre). ' : 'Search the area or drag and zoom, then click the store to set the location. '}
         Rings show roughly how far each band reaches in a straight line (km ÷ road factor {roadFactor}).
       </p>
     </div>

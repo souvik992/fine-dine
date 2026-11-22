@@ -16,6 +16,8 @@ import { addonRoutes, RELAY_HEADER, relayedAddress } from './routes/addons.js';
 import { CloudTunnel, type TunnelAnswer, type TunnelRequest } from './cloud/tunnel.js';
 import { AgentBroker } from './print/agent-broker.js';
 import { printAgentRoutes } from './routes/print-agent.js';
+import { printerSetupRoutes, type PrinterSetupDeps } from './routes/printer-setup.js';
+import { mapRoutes } from './routes/maps.js';
 import type { WebSocket as WsSocket } from 'ws';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { GuestAnswer, GuestRequest } from './online/connector.js';
@@ -87,6 +89,10 @@ export interface AppDeps {
   licence?: LicenceGate;
   /** P4-06 / P4-05: how the connector and the sync agent reach the order hub (tests pass a fake). */
   onlineFetch?: typeof fetch;
+  /** Tests: what Settings › Printers finds plugged into the PC (default: the real scan on Windows). */
+  printerScan?: PrinterSetupDeps['scan'];
+  /** Where map pictures are saved for offline use (<data dir>/tiles); tests pass a fake fetch. */
+  maps?: { dir?: string; fetch?: typeof fetch };
   /** P5-01: the signed add-ons loaded at start (server.ts); absent when none. */
   addons?: AddonSet;
   /** P6-04: a hosted outlet's host key (DinePOS Cloud on the same machine acts as the master device with it). */
@@ -309,6 +315,8 @@ export function buildApp(deps: AppDeps): DinePosApp {
   app.get('/v1/cloud', (_req, reply) => reply.header('cache-control', 'no-store').send(cloud.status()));
   const agents = deps.agents ?? new AgentBroker();
   printAgentRoutes(app, { db, agents, now });
+  printerSetupRoutes(app, { db, now, ...(deps.printerScan ? { scan: deps.printerScan } : {}) });
+  mapRoutes(app, { now, ...deps.maps });
   app.addHook('onClose', async () => {
     await online.stop();
     await sync.stop();

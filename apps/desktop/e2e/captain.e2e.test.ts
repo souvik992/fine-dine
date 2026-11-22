@@ -145,7 +145,7 @@ describe('captain app on a phone', () => {
   });
 
   // P3-02: order taking and course-wise firing on the phone.
-  it('takes an order by course on the phone: options, merge, Fire course 1, guests, then Fire all', async () => {
+  it('takes an order by course on the phone: options, merge, Send course 1, guests, then Send all', async () => {
     const page = await phone.firstWindow();
     await page.locator('[data-table="T5"]').click();
     await page.getByRole('dialog', { name: 'Seat T5' }).getByRole('button', { name: 'Seat 2 guests' }).click();
@@ -171,7 +171,7 @@ describe('captain app on a phone', () => {
     await page.getByRole('button', { name: 'Basket', exact: true }).click();
     const basket = page.getByRole('dialog', { name: 'Table T5 order' });
     await basket.getByRole('region', { name: 'Course 2' }).getByText('Chana Masala').waitFor();
-    await basket.getByRole('button', { name: 'Fire course 1 (3)' }).click();
+    await basket.getByRole('button', { name: 'Send course 1 (3)' }).click();
     await page.getByText(/KOT \d{4}.* sent to the kitchen/).waitFor({ timeout: 5_000 });
 
     const t5 = (await get<{ tables: Array<{ label: string; orderId?: string; state: string }> }>('/v1/floor')).tables.find((t) => t.label === 'T5')!;
@@ -187,7 +187,7 @@ describe('captain app on a phone', () => {
       ]),
     );
     expect(order.items.find((i) => i.name === 'Paneer Tikka')!.addons.map((a) => a.name)).toEqual(['Medium']);
-    await basket.getByRole('button', { name: 'Fire all (1)' }).waitFor();
+    await basket.getByRole('button', { name: 'Send all (1)' }).waitFor();
     await basket.getByRole('region', { name: 'Sent to the kitchen' }).getByText('2 × Hara Bhara Kebab').waitFor();
     await basket.getByRole('button', { name: 'Close' }).click();
     await basket.waitFor({ state: 'detached' });
@@ -197,7 +197,7 @@ describe('captain app on a phone', () => {
     await page.getByRole('button', { name: 'Save 3 guests' }).click();
     await page.getByRole('button', { name: 'Guests: 3' }).waitFor({ timeout: 5_000 });
 
-    await page.getByRole('button', { name: 'Fire all' }).click();
+    await page.getByRole('button', { name: 'Send all' }).click();
     await page.getByRole('button', { name: 'Basket', exact: true }).getByText('Order').waitFor({ timeout: 5_000 });
     order = await lines();
     expect(order.covers).toBe(3);
@@ -220,7 +220,7 @@ describe('captain app on a phone', () => {
     await page.getByRole('button', { name: 'Add Jeera Rice' }).click();
     await page.getByRole('button', { name: 'Add Jeera Rice' }).click();
     await page.getByRole('button', { name: 'Basket', exact: true }).getByText('2 to send').waitFor({ timeout: 5_000 });
-    await page.getByRole('button', { name: 'Fire all' }).click();
+    await page.getByRole('button', { name: 'Send all' }).click();
     await page.getByText(/Queued: it goes to the kitchen/).waitFor();
     await page.getByTestId('order-waiting').getByText('4 changes waiting to send').waitFor();
     await page.getByRole('button', { name: 'Basket', exact: true }).click();

@@ -1,5 +1,6 @@
 import { acceptOnlineOrderSchema, cashAtDoor, fireKotSchema, formatINR, isPlatformOrder, newId, printBillSchema } from '@dinepos/shared';
 import { defineCommand, type OrderRow } from '../core/command-handler.js';
+import type { CommandContext } from '../core/context.js';
 import { PosError } from '../core/errors.js';
 import { getConfig } from '../core/outlet-config.js';
 import { loadOrderRow } from '../queries/order-snapshot.js';
@@ -18,6 +19,12 @@ interface AcceptResult {
 }
 
 const reload = (db: Parameters<typeof loadOrderRow>[0], id: string): OrderRow => loadOrderRow(db, id)!;
+
+/** The same context, but a document of this kind is not printed (it is still created and stored). */
+function withoutPrint(ctx: CommandContext, kind: 'kot' | 'bill' | null): CommandContext {
+  if (!kind) return ctx;
+  return Object.create(ctx, { print: { value: (job: Parameters<CommandContext['print']>[0]) => (job.docKind === kind ? (job.id ?? newId()) : ctx.print(job)) } }) as CommandContext;
+}
 
 /**
  * Accepts an online order (P4-06): in one transaction, an order with no table is opened, its dishes go to the kitchen
@@ -64,7 +71,7 @@ export const acceptOnlineOrder = defineCommand({
     db.prepare('UPDATE online_order SET local_order_id = ? WHERE id = ?').run(orderId, oo.id);
     ctx.audit({ entity: 'order', entityId: orderId, action: 'order.open', after: { type: 'online', onlineOrderId: oo.id, number: oo.number } });
 
-    // 2. Dishes at DinePOS prices, then the KOT.
+    // 2. Dishes at the channel price (the DinePOS price unless menu sync says otherwise), then the KOT.
     const ictx = orderItemContext(db, reload(db, orderId));
     const insert = db.prepare(
       `INSERT INTO order_item (id, order_id, item_id, variant_id, name_snapshot, qty, unit_price_paise, tax_rate_bp, note, course, status, added_by, added_at)
@@ -73,16 +80,17 @@ export const acceptOnlineOrder = defineCommand({
     for (const l of priced.lines) {
       const id = newId();
       const item = priceItem(db, ictx, l.itemId, l.variantId);
-      insert.run(id, orderId, item.itemId, item.variantId, item.nameSnapshot, l.qty, item.unitPricePaise, item.taxRateBp, l.note, 1, 'held', ctx.actor.userId, ctx.nowIso);
+      insert.run(id, orderId, item.itemId, item.variantId, item.nameSnapshot, l.qty, l.unitPricePaise, item.taxRateBp, l.note, 1, 'held', ctx.actor.userId, ctx.nowIso);
       writeAddons(db, id, priceAddons(db, l.itemId, l.addons.map((a) => ({ addonId: a.addonId, qty: a.qty }))));
     }
-    fireKot.apply(ctx, fireKotSchema.parse({ all: true }), reload(db, orderId));
+    // Settings › Online orders › When an order is accepted, print: what is not printed now prints from the order card
+    fireKot.apply(withoutPrint(ctx, settings.printOnAccept.kot ? null : 'kot'), fireKotSchema.parse({ all: true }), reload(db, orderId));
 
     // 3. Charges: on the bill, never on a KOT.
     for (const f of priced.fees) insert.run(newId(), orderId, `fee:${f.kind}`, null, f.name, 1, f.pricePaise, f.taxRateBp, null, 1, 'fired', ctx.actor.userId, ctx.nowIso);
 
     // 4. The GST bill, then payment when it was paid online, or by Swiggy / Zomato.
-    const billed = printBill.apply(ctx, printBillSchema.parse({ customer: { name: order.customer.name?.slice(0, 60) ?? null, phone: order.customer.mobile } }), reload(db, orderId)) as { result: { billId: string; billNo: string; totalPaise: number } };
+    const billed = printBill.apply(withoutPrint(ctx, settings.printOnAccept.bill ? null : 'bill'), printBillSchema.parse({ customer: { name: order.customer.name?.slice(0, 60) ?? null, phone: order.customer.mobile } }), reload(db, orderId)) as { result: { billId: string; billNo: string; totalPaise: number } };
     const { billId, billNo, totalPaise } = billed.result;
     if (isPlatformOrder(order) && !cashAtDoor(order)) {
       // P6-06: the platform pays the outlet later (payment mode `other`, reference = the platform's order number);

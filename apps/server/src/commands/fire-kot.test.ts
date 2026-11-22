@@ -65,6 +65,41 @@ describe('FireKOT', () => {
     expect(job.preview_text).not.toMatch(/\d{3,}\.\d\d|Rs/); // no prices on a KOT
   });
 
+  it('kitchen screens with paper off: a station with a screen gets no paper KOT, one without still prints; a reprint prints', () => {
+    const cfg = (k: string, v: unknown) => h.db.prepare('INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(k, JSON.stringify(v));
+    h.db.prepare('UPDATE station SET has_kds = CASE id WHEN ? THEN 1 ELSE 0 END').run(S.kitchen); // the Tandoor is paper only
+    o.run('AddItems', orderId, { items: [line(S.dalMakhani), line(S.butterNaan)] });
+    cfg('kds.enabled', true);
+    cfg('kds.printPaper', false);
+    const kots = kotResult(o.run('FireKOT', orderId, { all: true }));
+    expect(h.db.prepare('SELECT printer_id FROM print_job').pluck().all()).toEqual([S.tandoorPrinter]);
+    expect(h.count('kot')).toBe(2); // both tickets exist (the kitchen's is on its screen)
+    h.run('ReprintKOT', { kotId: kots.find((k) => k.stationId === S.kitchen)!.id });
+    expect(h.count('print_job')).toBe(2);
+  });
+
+  it('a printer turned off in Settings › Printers gets no new KOT', () => {
+    h.db.prepare('UPDATE printer SET active = 0 WHERE id = ?').run(S.tandoorPrinter);
+    o.run('AddItems', orderId, { items: [line(S.butterNaan)] });
+    o.run('FireKOT', orderId, { all: true });
+    expect(h.count('kot')).toBe(1); // the ticket exists (on screens, and for Reprint KOT once the printer is back)
+    expect(h.count('print_job')).toBe(0);
+  });
+
+  it('kitchen screens with paper on (the default), or screens off: every station prints as before', () => {
+    const cfg = (k: string, v: unknown) => h.db.prepare('INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(k, JSON.stringify(v));
+    h.db.prepare('UPDATE station SET has_kds = 1').run();
+    o.run('AddItems', orderId, { items: [line(S.dalMakhani)] });
+    cfg('kds.enabled', true);
+    o.run('FireKOT', orderId, { all: true });
+    expect(h.count('print_job')).toBe(1);
+    cfg('kds.enabled', false);
+    cfg('kds.printPaper', false);
+    o.run('AddItems', orderId, { items: [line(S.dalMakhani)] });
+    o.run('FireKOT', orderId, { all: true });
+    expect(h.count('print_job')).toBe(2);
+  });
+
   it('emits kot.created to the station and kds topics', () => {
     o.run('AddItems', orderId, { items: [line(S.dalMakhani)] });
     o.run('FireKOT', orderId, { all: true });

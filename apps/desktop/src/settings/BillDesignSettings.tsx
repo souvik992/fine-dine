@@ -313,7 +313,7 @@ function SamplePrint({ dirty }: { dirty: boolean }) {
       <h3 className="font-semibold">Print a sample bill</h3>
       <p className="mb-2 text-xs text-muted-foreground">Checks paper width, logo and cutter. Marked “SAMPLE - NOT A BILL”; it takes no bill number.{dirty ? ' Save first: it prints the saved design.' : ''}</p>
       {printers.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Add a bill printer first (Kitchen & printers).</p>
+        <p className="text-sm text-muted-foreground">Add a bill printer first (Settings › Printers).</p>
       ) : (
         <div className="flex gap-2">
           <select className="input" value={target} onChange={(e) => setPrinterId(e.target.value)} aria-label="Printer for the sample">

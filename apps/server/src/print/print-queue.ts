@@ -39,6 +39,9 @@ interface PrinterRow {
   host: string | null;
   port: number | null;
   windows_name: string | null;
+  device: string | null;
+  profile: string;
+  active: number;
   width_mm: number;
   copies: number;
   backup_printer_id: string | null;
@@ -295,7 +298,8 @@ export class PrintQueue implements PrintWaker {
       db.prepare(`UPDATE print_job SET state = 'failed', attempts = attempts + 1, last_error = ?, done_at = ? WHERE id = ?`).run(error, at.toISOString(), job.id);
       const out = [this.statusEvent(job.printer_id, 'offline', error, at)];
       const backup = printer?.backup_printer_id ? this.printer(printer.backup_printer_id) : undefined;
-      if (printer && backup && !(job.preview_text ?? '').trimStart().startsWith(REROUTE_MARK)) {
+      const backupOn = backup?.active === 1; // a backup that was turned off takes nothing
+      if (printer && backup && backupOn && !(job.preview_text ?? '').trimStart().startsWith(REROUTE_MARK)) {
         const header = new EscPos(paper(backup.width_mm)).init().bold(true).center(`${REROUTE_MARK} ${printer.name} **`).bold(false);
         const copyId = newId();
         db.prepare(
@@ -338,7 +342,7 @@ export class PrintQueue implements PrintWaker {
 }
 
 function target(p: PrinterRow): PrinterTarget {
-  return { id: p.id, name: p.name, transport: p.transport, host: p.host, port: p.port, windowsName: p.windows_name };
+  return { id: p.id, name: p.name, transport: p.transport, host: p.host, port: p.port, windowsName: p.windows_name, device: p.device, profile: p.profile };
 }
 
 const paper = (mm: number): PaperWidth => (mm === 58 ? 58 : 80);

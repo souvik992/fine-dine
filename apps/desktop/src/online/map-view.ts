@@ -6,7 +6,8 @@ export interface LatLng {
 }
 
 export const TILE = 256;
-export const TILE_HOST = 'https://tile.openstreetmap.org';
+/** Map pictures come from the outlet server, which fetches OpenStreetMap tiles and keeps them for offline use. */
+export const TILE_PATH = '/v1/maps/tiles';
 const MIN_ZOOM = 11;
 const MAX_ZOOM = 17;
 
@@ -73,7 +74,7 @@ export function viewAt(centre: LatLng, zoom: number, width: number, height: numb
     if (ty < 0 || ty >= n) continue;
     for (let tx = Math.floor(ox / TILE); tx * TILE < ox + width; tx++) {
       const wx = ((tx % n) + n) % n;
-      tiles.push({ key: `${zoom}/${tx}/${ty}`, src: `${TILE_HOST}/${zoom}/${wx}/${ty}.png`, left: Math.round(tx * TILE - ox), top: Math.round(ty * TILE - oy) });
+      tiles.push({ key: `${zoom}/${tx}/${ty}`, src: `${TILE_PATH}/${zoom}/${wx}/${ty}.png`, left: Math.round(tx * TILE - ox), top: Math.round(ty * TILE - oy) });
     }
   }
   return { zoom, tiles, pins: points.map((p) => project(p, zoom)).map((p) => ({ x: Math.round(p.x - ox), y: Math.round(p.y - oy) })) };
@@ -129,4 +130,21 @@ export function parsePlaces(body: unknown): Place[] {
     out.push({ name, lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 });
   }
   return out;
+}
+
+/**
+ * A point pasted into the search box (quickPOS ODS): "22.5726, 88.3639", "22.5726 88.3639", or a map link with the
+ * numbers in it (…/@22.5726,88.3639,17z, ?q=22.5726,88.3639, ll=…). In India only; null for anything else.
+ */
+export function pastedPoint(text: string): LatLng | null {
+  const t = text.trim();
+  const m =
+    /@(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/.exec(t) ??
+    /[?&](?:q|ll|query|destination)=(-?\d{1,2}\.\d+)(?:,|%2C)\s*(-?\d{1,3}\.\d+)/i.exec(t) ??
+    /^(-?\d{1,2}\.\d+)\s*[,\s]\s*(-?\d{1,3}\.\d+)$/.exec(t);
+  if (!m) return null;
+  const lat = Number(m[1]);
+  const lng = Number(m[2]);
+  if (!(lat >= 6 && lat <= 38 && lng >= 68 && lng <= 98)) return null;
+  return { lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 };
 }

@@ -72,7 +72,7 @@ describe('PrintQueue', () => {
       bus,
       timeZone: 'Asia/Kolkata',
       backoffMs,
-      transports: { fake: new FakeTransport(dir), tcp: new TcpTransport({ timeoutMs: 2_000, settleMs: 50 }), usb: new FlakyTransport(0), ...transports },
+      transports: { fake: new FakeTransport(dir), tcp: new TcpTransport({ timeoutMs: 2_000, settleMs: 50 }), usb: new FlakyTransport(0), usbdirect: new FlakyTransport(0), serial: new FlakyTransport(0), ...transports },
     }));
 
   function fireOrder(): void {

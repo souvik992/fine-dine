@@ -63,7 +63,7 @@ describe('print agent (P6-03)', () => {
     broker = new AgentBroker({ offlineAfterMs: 1500, jobTimeoutMs: 5000 });
     // the server's own transports must never be used for an agent's printer
     const never: Transport = { send: () => Promise.reject(new Error('the server tried to print an agent printer itself')) };
-    queue = new PrintQueue({ db: h.db, bus, timeZone: 'Asia/Kolkata', transports: { fake: new FakeTransport(dir), tcp: never, usb: never }, agents: broker, backoffMs: [50, 50] });
+    queue = new PrintQueue({ db: h.db, bus, timeZone: 'Asia/Kolkata', transports: { fake: new FakeTransport(dir), tcp: never, usb: never, usbdirect: never, serial: never }, agents: broker, backoffMs: [50, 50] });
     app = buildApp({ db: h.db, timeZone: 'Asia/Kolkata', now: TEST_NOW, bus, printWaker: queue, printQueue: queue, agents: broker, devices: 'off' });
     await app.listen({ host: '127.0.0.1', port: 0 });
     base = `http://127.0.0.1:${(app.server.address() as net.AddressInfo).port}`;

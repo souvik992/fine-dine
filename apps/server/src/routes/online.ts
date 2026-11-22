@@ -42,6 +42,21 @@ export function onlineRoutes(app: FastifyInstance, deps: { db: Db; now: () => Da
     return reply;
   });
 
+  /**
+   * Menu sync's "Save and sync now" (admin): send the menu (with each channel's items and prices) to the hub now and
+   * say how it went. Saving already sends it within moments; this waits for the answer. Changes nothing here.
+   */
+  app.post('/v1/online/menu/publish', async (req) => {
+    requireRight(db, req, 'admin', now());
+    const before = deps.connector.status();
+    if (!before.paired) throw new PosError('INVALID_STATE', 'Connect to the order hub first (Settings › Online orders › Order hub).');
+    if (before.connection !== 'connected') throw new PosError('INVALID_STATE', 'The order hub is not connected right now. The menu goes to it as soon as it is.');
+    await deps.connector.publish(true);
+    const after = deps.connector.status();
+    if (after.lastError) throw new PosError('INVALID_STATE', `The order hub did not take the menu: ${after.lastError}`);
+    return { menuVersion: after.menuVersion };
+  });
+
   /** Pair with the hub (admin): the server asks the hub, then stores the link by command (the key never leaves it). */
   app.post<{ Body: { link?: unknown } }>('/v1/online/pair', async (req) => {
     requireRight(db, req, 'admin', now());

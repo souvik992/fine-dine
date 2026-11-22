@@ -75,6 +75,36 @@ describe('migrate', () => {
     expect(schemaVersion(db)).toBe(next.version);
   });
 
+  it('0020 rebuilds the printer table keeping every printer and everything that points at one; foreign keys stay on', () => {
+    db = openDatabase(':memory:');
+    const all = loadMigrations();
+    migrate(db, all.filter((m) => m.version < 20), fixed);
+    db.exec(`INSERT INTO printer (id, name, transport, host, port, role) VALUES ('P1', 'Kitchen', 'tcp', '192.168.1.50', 9100, 'kot');
+      INSERT INTO printer (id, name, transport, windows_name, role, backup_printer_id, copies) VALUES ('P2', 'Counter', 'usb', 'POS-80', 'bill', 'P1', 2);
+      INSERT INTO station (id, name) VALUES ('S1', 'Kitchen');
+      INSERT INTO station_printer (station_id, printer_id) VALUES ('S1', 'P1');
+      INSERT INTO print_job (id, printer_id, doc_kind, bytes, created_at) VALUES ('J1', 'P2', 'test', x'00', '2026-11-02T10:00:00Z');`);
+    expect(migrate(db, all, fixed).applied).toContain(20);
+    expect(db.prepare('SELECT id, name, transport, host, windows_name, copies, backup_printer_id, role, profile, active, drawer, device FROM printer ORDER BY id').all()).toEqual([
+      { id: 'P1', name: 'Kitchen', transport: 'tcp', host: '192.168.1.50', windows_name: null, copies: 1, backup_printer_id: null, role: 'kot', profile: 'generic', active: 1, drawer: 0, device: null },
+      { id: 'P2', name: 'Counter', transport: 'usb', host: null, windows_name: 'POS-80', copies: 2, backup_printer_id: 'P1', role: 'bill', profile: 'generic', active: 1, drawer: 0, device: null },
+    ]);
+    expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
+    db.prepare("INSERT INTO printer (id, name, transport, device) VALUES ('P3', 'Bluetooth', 'serial', 'COM5')").run(); // the new connections
+    expect(() => db!.prepare("DELETE FROM printer WHERE id = 'P1'").run()).toThrow(/FOREIGN KEY/); // the station still protects it
+  });
+
+  it('a foreign-keys-off migration that would leave a broken reference changes nothing', () => {
+    db = openDatabase(':memory:');
+    const base = loadMigrations();
+    migrate(db, base, fixed);
+    const bad = mig(base.length + 1, 'dangling', "-- dinepos: foreign-keys-off\nINSERT INTO station_printer (station_id, printer_id) VALUES ('nope', 'nope');");
+    expect(() => migrate(db!, [...base, bad], fixed)).toThrow(expect.objectContaining({ code: 'MIGRATION_FK' }));
+    expect(schemaVersion(db)).toBe(base.length);
+    expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
+  });
+
   it('refuses a database newer than the build', () => {
     db = openDatabase(':memory:');
     const base = loadMigrations();

@@ -23,6 +23,26 @@ describe('Settle', () => {
   const settle = (tenders: unknown[], opts: { commandId?: string; expectedVersion?: number } = {}) => o.run('Settle', orderId, { billId, tenders }, opts);
   const payments = () => h.db.prepare('SELECT mode, amount_paise AS amount, ref FROM payment ORDER BY rowid').all();
 
+  const billPrinterId = () => h.db.prepare("SELECT id FROM printer WHERE role = 'bill'").pluck().get() as string;
+  const drawerJobs = () => h.db.prepare("SELECT printer_id, ref_id, preview_text FROM print_job WHERE doc_kind = 'drawer'").all();
+
+  it('cash opens the drawer on the bill printer when it has one ticked (Settings › Printers); otherwise nothing', () => {
+    h.db.prepare('UPDATE printer SET drawer = 1 WHERE id = ?').run(billPrinterId());
+    settle([{ mode: 'cash', amountPaise: 100_000 }]);
+    expect(drawerJobs()).toEqual([{ printer_id: billPrinterId(), ref_id: billId, preview_text: '[cash drawer opened]' }]);
+  });
+
+  it('no drawer opens for a bill paid without cash, or when no printer has the drawer ticked', () => {
+    h.db.prepare('UPDATE printer SET drawer = 1 WHERE id = ?').run(billPrinterId());
+    settle([{ mode: 'upi', amountPaise: total, ref: 'U1' }]);
+    expect(drawerJobs()).toEqual([]);
+  });
+
+  it('the drawer is not ticked by default, so cash bills print nothing extra', () => {
+    settle([{ mode: 'cash', amountPaise: total }]);
+    expect(drawerJobs()).toEqual([]);
+  });
+
   // Acceptance: table returns FREE after settle
   it('settles bill and order, frees the table', () => {
     expect(total).toBe(88_200);

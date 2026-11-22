@@ -1,6 +1,7 @@
 // type → handler. One handler per file in this folder; add each new command here (see /add-command).
 import { createRegistry, type CommandHandler, type CommandRegistry } from '../core/command-handler.js';
 import { acceptOnlineOrder } from './accept-online-order.js';
+import { printOnlineOrder } from './print-online-order.js';
 import { advanceOnlineOrder } from './advance-online-order.js';
 import { applyHubEvent } from './apply-hub-event.js';
 import { cancelOnlineOrder } from './cancel-online-order.js';
@@ -14,6 +15,7 @@ import { addItems } from './add-items.js';
 import { createPrintAgent } from './create-print-agent.js';
 import { revokePrintAgent } from './revoke-print-agent.js';
 import { setPrinterAgent } from './set-printer-agent.js';
+import { removePrinter } from './remove-printer.js';
 import { addToWaitlist } from './add-to-waitlist.js';
 import { assignCaptain } from './assign-captain.js';
 import { adjustStock } from './adjust-stock.js';
@@ -85,6 +87,7 @@ export const coreHandlers: readonly CommandHandler<unknown, unknown>[] = [
   createPrintAgent,
   revokePrintAgent,
   setPrinterAgent,
+  removePrinter,
   // admin
   upsertArea,
   upsertTable,
@@ -150,6 +153,7 @@ export const coreHandlers: readonly CommandHandler<unknown, unknown>[] = [
   leaveWaitlist,
   // online orders through the hub (P4-06)
   acceptOnlineOrder,
+  printOnlineOrder,
   rejectOnlineOrder,
   advanceOnlineOrder,
   cancelOnlineOrder,

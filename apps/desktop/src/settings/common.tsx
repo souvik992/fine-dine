@@ -11,16 +11,20 @@ export interface AdminCatalog {
   printers: Array<{
     id: string;
     name: string;
-    transport: 'tcp' | 'usb' | 'fake';
+    transport: 'tcp' | 'usb' | 'usbdirect' | 'serial' | 'fake';
     host: string | null;
     port: number;
     windowsName: string | null;
+    device: string | null;
     widthMm: 58 | 80;
     bitmapText: boolean;
     copies: number;
     cutter: boolean;
     backupPrinterId: string | null;
     role: 'kot' | 'bill' | 'both';
+    profile: 'generic' | 'slow_buffer';
+    active: boolean;
+    drawer: boolean;
   }>;
   stations: Array<{ id: string; name: string; hasKds: boolean; printerIds: string[] }>;
   categories: Array<{ id: string; name: string; parentId: string | null; stationId: string | null; sort: number }>;

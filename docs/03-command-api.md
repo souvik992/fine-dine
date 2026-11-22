@@ -70,6 +70,7 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 | `RequestBill` | — | order.edit | | bill_request row, `bill.requested` on `floor` | |
 | `SetCaptainSection` | userId, areaIds[], tableIds[] | staff.sections | | replaces the captain's section, `floor.changed` | |
 | `AcceptOnlineOrder` | onlineOrderId, prepMinutes?, acceptPriceChange? | online.orders | | order (type online, no table), KOT, bill, Online payment when paid online; outbox `accept` | |
+| `PrintOnlineOrder` | onlineOrderId, what: bill \| kot | online.orders | | prints an accepted order's bill or KOTs that never printed (When an order is accepted, print: off), as originals; printed ones are reprinted with ReprintBill / ReprintKOT | |
 | `RejectOnlineOrder` | onlineOrderId, reason (contract REJECT_REASONS), reasonText? | online.orders | | state REJECTED; outbox `reject` | |
 | `AdvanceOnlineOrder` | onlineOrderId, to: PREPARING \| READY \| OUT_FOR_DELIVERY (rider) \| DELIVERED \| PICKED_UP, tenders? (COD only, with DELIVERED / PICKED_UP: cash, card, UPI, other; split; as Settle checks them) | online.orders | | state; a COD bill is settled on delivered/picked up with the tenders given (none: all cash), `changePaise` in the result; due / complimentary refused; outbox `state` | |
 | `CancelOnlineOrder` | onlineOrderId, reason | bill.void | per role | voids the bill; outbox `state` CANCELLED | |
@@ -265,7 +266,9 @@ Stock queries (need a session with `stock.manage`): `GET /v1/stock` → `{ items
 
 ## Admin endpoints (also commands, admin right)
 `UpsertArea`, `UpsertTable`, `UpsertCategory`, `UpsertMenuItem`, `UpsertAddonGroup`, `UpsertStation`,
-`UpsertPrinter`, `UpsertUser`, `UpsertRole`, `PairDevice`, `RevokeDevice`, `SetConfig`.
+`UpsertPrinter`, `RemovePrinter`, `UpsertUser`, `UpsertRole`, `PairDevice`, `RevokeDevice`, `SetConfig`.
+`UpsertPrinter` also takes `device`, `profile`, `active`, `drawer` and `stationIds` (the stations whose KOTs it prints,
+set from the printer); `RemovePrinter { printerId }` deletes a printer that never printed, else turns it off.
 
 Built in P1-05 (payload schemas in `packages/shared/src/schemas/commands/admin.ts`): every `Upsert*` takes the
 record `id` (ULID) and inserts or updates it; result `{ id, created }`. Right `admin`; allowed while the day is

@@ -2,10 +2,18 @@
 export interface PrinterTarget {
   id: string;
   name: string;
-  transport: 'tcp' | 'usb' | 'fake';
+  /**
+   * tcp: network / Wi-Fi (host:port) · usb: a Windows printer (driver installed; windowsName) · usbdirect: a USB
+   * printer with no driver (device = vendor:product[:serial]) · serial: Bluetooth or COM port (device = COM5[:baud]) ·
+   * fake: screen only (text files, no paper).
+   */
+  transport: 'tcp' | 'usb' | 'usbdirect' | 'serial' | 'fake';
   host?: string | null;
   port?: number | null;
   windowsName?: string | null;
+  device?: string | null;
+  /** 'slow_buffer' sends smaller pieces (cheap or Bluetooth printers that cut long tickets short). */
+  profile?: string | null;
 }
 
 export interface PrintRequest {

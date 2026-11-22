@@ -1,6 +1,6 @@
 import { formatINR, newId, type MenuItem, type MenuSnapshot, type OrderItemSnapshot, type OrderSnapshot, type OutletConfig } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRightLeft, Ban, Bike, DoorOpen, Flame, Merge, MoveRight, Printer, ReceiptText, Search, Split, TriangleAlert, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, Ban, Bike, DoorOpen, Flame, Merge, MonitorUp, MoveRight, Printer, ReceiptText, Search, Split, TriangleAlert, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
@@ -43,7 +43,7 @@ interface Toast {
 }
 
 /**
- * Order / billing screen (docs/09 §2). Keyboard: type a code + Enter (Shift+Enter for options), F8 fire,
+ * Order / billing screen (docs/09 §2). Keyboard: type a code + Enter (Shift+Enter for options), F8 Print KOT / Send to KDS,
  * Alt+↑/↓ pick a held line, + / − its quantity, Delete removes it, Esc clears the search or goes back.
  */
 export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: () => void }) {
@@ -411,11 +411,26 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
             onReprintKot={reprintKot}
           />
           <div className="grid w-[380px] grid-cols-3 gap-2 border-l border-t border-border bg-card p-3">
-            <button className="btn btn-primary h-12" onClick={fire} disabled={held.length === 0}>
-              <Flame className="h-4 w-4" /> Fire <kbd className="text-xs opacity-80">F8</kbd>
+            {/* Settings › Kitchen › "Use kitchen screens": new items go to the screens, else a paper KOT */}
+            <button className="btn btn-primary h-12 whitespace-normal px-2 leading-tight" onClick={fire} disabled={held.length === 0} data-testid="send-kitchen">
+              {configQuery.data?.['kds.enabled'] ? (
+                <>
+                  <MonitorUp className="h-4 w-4" /> Send to KDS
+                </>
+              ) : (
+                <>
+                  <Flame className="h-4 w-4" /> KOT
+                </>
+              )}{' '}
+              <kbd className="text-xs opacity-80">F8</kbd>
             </button>
-            <button className="btn h-12" onClick={openBill} disabled={!canPrint && !printedBill}>
-              <Printer className="h-4 w-4" /> {printedBill ? 'Reprint' : 'Bill'} <kbd className="text-xs">F9</kbd>
+            <button
+              className="btn h-12 px-2"
+              onClick={openBill}
+              disabled={!canPrint && !printedBill}
+              title={printedBill ? 'Print the bill again' : 'Print the bill'}
+            >
+              <Printer className="h-4 w-4" /> Bill <kbd className="text-xs">F9</kbd>
             </button>
             <button className="btn h-12" onClick={openSettle} disabled={!printedBill}>
               <Wallet className="h-4 w-4" /> Settle <kbd className="text-xs">F10</kbd>

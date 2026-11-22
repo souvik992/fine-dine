@@ -1,5 +1,5 @@
 import type { Right } from '@dinepos/shared';
-import { ArrowLeft, ChefHat, CloudUpload, DatabaseBackup, KeyRound, LayoutGrid, MapPinned, MonitorSmartphone, Puzzle, ShoppingBag, ReceiptText, Store, Users, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, ChefHat, CloudUpload, DatabaseBackup, KeyRound, LayoutGrid, MapPin, MapPinned, MonitorSmartphone, Printer, Puzzle, ShoppingBag, ReceiptText, Store, Users, UtensilsCrossed } from 'lucide-react';
 import { useState, type ComponentType } from 'react';
 import { useApp } from '../app-context.js';
 import { UserBadge } from '../components/UserBadge.js';
@@ -8,6 +8,7 @@ import { BillDesignSettings } from './BillDesignSettings.js';
 import { DeviceSettings } from './DeviceSettings.js';
 import { FloorSettings } from './FloorSettings.js';
 import { KitchenSettings } from './KitchenSettings.js';
+import { PrinterSettings } from './PrinterSettings.js';
 import { MenuSettings } from './MenuSettings.js';
 import { OutletSettings } from './OutletSettings.js';
 import { CaptainSections } from './CaptainSections.js';
@@ -19,19 +20,21 @@ import { TerminalSettings } from './TerminalSettings.js';
 import { AddonsSettings } from './AddonsSettings.js';
 import { AddonView, useAddonRegistrations } from '../addons/runtime.js';
 
-type SectionKey = 'outlet' | 'bill' | 'backups' | 'devices' | 'floor' | 'menu' | 'kitchen' | 'staff' | 'sections' | 'licence' | 'online' | 'sync' | 'addons' | 'terminal' | `addon:${string}`;
+type SectionKey = 'outlet' | 'bill' | 'backups' | 'devices' | 'floor' | 'menu' | 'kitchen' | 'printers' | 'staff' | 'sections' | 'licence' | 'online' | 'serviceability' | 'sync' | 'addons' | 'terminal' | `addon:${string}`;
 
 const SECTIONS: Array<{ key: SectionKey; label: string; hint: string; icon: ComponentType<{ className?: string }>; right: Right | null }> = [
   { key: 'outlet', label: 'Outlet & bills', hint: 'Name, GSTIN, bill number, round-off, UPI', icon: Store, right: 'admin' },
   { key: 'bill', label: 'Bill design', hint: 'Logo, what the bill shows, footer, preview', icon: ReceiptText, right: 'admin' },
   { key: 'floor', label: 'Floor & tables', hint: 'Areas, tables and the floor layout', icon: LayoutGrid, right: 'admin' },
   { key: 'menu', label: 'Menu', hint: 'Categories, items, options and add-ons', icon: UtensilsCrossed, right: 'admin' },
-  { key: 'kitchen', label: 'Kitchen & printers', hint: 'Stations, printers, test print', icon: ChefHat, right: 'admin' },
+  { key: 'kitchen', label: 'Kitchen', hint: 'Stations, kitchen screens (KDS)', icon: ChefHat, right: 'admin' },
+  { key: 'printers', label: 'Printers', hint: 'USB, Wi-Fi and Bluetooth printers, tests, cash drawer', icon: Printer, right: 'admin' },
   { key: 'backups', label: 'Backups', hint: 'Every 15 minutes; copy folder; restore', icon: DatabaseBackup, right: 'admin' },
   { key: 'devices', label: 'Devices', hint: 'Pair terminals and phones; revoke', icon: MonitorSmartphone, right: 'admin' },
   { key: 'staff', label: 'Staff & roles', hint: 'People, PINs, rights and discount limits', icon: Users, right: 'users.manage' },
   { key: 'sections', label: 'Captain sections', hint: 'Who looks after which areas and tables', icon: MapPinned, right: 'staff.sections' },
-  { key: 'online', label: 'Online orders', hint: 'Order hub, delivery, charges, hours', icon: ShoppingBag, right: 'admin' },
+  { key: 'online', label: 'Online orders', hint: 'Order hub, channels and menu sync, accepting, printing', icon: ShoppingBag, right: 'admin' },
+  { key: 'serviceability', label: 'Serviceability', hint: 'Delivery areas and charges, store location, hours', icon: MapPin, right: 'admin' },
   { key: 'sync', label: 'Cloud sync', hint: 'Sales to the cloud, licence renewals, devices from anywhere', icon: CloudUpload, right: 'admin' },
   { key: 'licence', label: 'Licence', hint: 'Key, end date, seats; this PC’s hardware id', icon: KeyRound, right: 'admin' },
   { key: 'addons', label: 'Add-ons', hint: 'Installed add-ons and whether each is on', icon: Puzzle, right: 'admin' },
@@ -61,18 +64,18 @@ export function SettingsScreen({ onBack, initial }: { onBack: () => void; initia
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
-        <nav className="w-64 shrink-0 overflow-y-auto border-r border-border bg-card p-2" aria-label="Settings sections">
+        <nav className="flex w-64 shrink-0 flex-col gap-2 overflow-y-auto border-r border-border bg-background p-3" aria-label="Settings sections">
           {visible.map(({ key, label, hint, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setActive(key)}
               aria-current={key === current.key ? 'page' : undefined}
-              className={`mb-1 flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left ${key === current.key ? 'bg-foreground text-background' : 'hover:bg-secondary'}`}
+              className={`flex w-full shrink-0 items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${key === current.key ? 'border-primary bg-accent' : 'border-border bg-card hover:border-primary'}`}
             >
-              <Icon className="mt-0.5 h-5 w-5 shrink-0" />
+              <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${key === current.key ? 'text-primary' : 'text-muted-foreground'}`} />
               <span>
                 <span className="block text-sm font-semibold">{label}</span>
-                <span className={`block text-xs ${key === current.key ? 'opacity-80' : 'text-muted-foreground'}`}>{hint}</span>
+                <span className="block text-xs text-muted-foreground">{hint}</span>
               </span>
             </button>
           ))}
@@ -85,10 +88,12 @@ export function SettingsScreen({ onBack, initial }: { onBack: () => void; initia
           {current.key === 'floor' ? <FloorSettings /> : null}
           {current.key === 'menu' ? <MenuSettings /> : null}
           {current.key === 'kitchen' ? <KitchenSettings /> : null}
+          {current.key === 'printers' ? <PrinterSettings /> : null}
           {current.key === 'staff' ? <StaffSettings /> : null}
           {current.key === 'sections' ? <CaptainSections /> : null}
           {current.key === 'licence' ? <LicenceSettings /> : null}
-          {current.key === 'online' ? <OnlineSettings /> : null}
+          {current.key === 'online' ? <OnlineSettings key="orders" part="orders" /> : null}
+          {current.key === 'serviceability' ? <OnlineSettings key="serviceability" part="serviceability" /> : null}
           {current.key === 'sync' ? <CloudSyncSettings /> : null}
           {current.key === 'addons' ? <AddonsSettings /> : null}
           {current.key.startsWith('addon:')

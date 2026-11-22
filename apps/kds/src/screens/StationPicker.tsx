@@ -28,7 +28,7 @@ export function StationPicker({ onPick }: { onPick: (stationId: string) => void 
         ))}
       </ul>
       {menu.isError ? <p className="mt-6 text-center text-danger">Cannot reach the outlet server.</p> : null}
-      {menu.data && stations.length === 0 ? <p className="mt-6 text-center text-muted-foreground">No kitchen stations yet. Add them in Settings › Kitchen & printers.</p> : null}
+      {menu.data && stations.length === 0 ? <p className="mt-6 text-center text-muted-foreground">No kitchen stations yet. Add them in Settings › Kitchen.</p> : null}
     </main>
   );
 }

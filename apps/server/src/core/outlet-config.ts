@@ -1,5 +1,5 @@
 // Outlet settings from the `config` table, with safe defaults (docs/08; keys in shared configSchemas).
-import { configSchemas, DEFAULT_BILL_DISPLAY, DEFAULT_BILL_PREFIX, DEFAULT_ONLINE_SETTINGS, type ConfigKey, type OutletConfig } from '@dinepos/shared';
+import { configSchemas, DEFAULT_BILL_DISPLAY, DEFAULT_BILL_PREFIX, DEFAULT_MENU_SYNC, DEFAULT_ONLINE_SETTINGS, type ConfigKey, type OutletConfig } from '@dinepos/shared';
 import type { Db } from '../db/connection.js';
 
 export const CONFIG_DEFAULTS: OutletConfig = {
@@ -21,8 +21,11 @@ export const CONFIG_DEFAULTS: OutletConfig = {
   'kot.default_station_id': null,
   'kds.amberMin': 10,
   'kds.redMin': 20,
+  'kds.enabled': false,
+  'kds.printPaper': true,
   'reservation.holdMin': 30,
   'online.settings': DEFAULT_ONLINE_SETTINGS,
+  'online.menuSync': DEFAULT_MENU_SYNC,
   'reservation.graceMin': 15,
   'backup.copyDir': null,
   'cloud.remoteDevices': false,

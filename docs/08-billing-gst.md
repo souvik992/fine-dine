@@ -103,6 +103,11 @@ Decided 2026-11-02 with the product owner:
 - The bill is DinePOS's own, at its menu prices (exclusive of GST, as orders without a table are), with no service
   charge and no discount; the hub's total is what the customer was shown. A difference is flagged and staff decide;
   automatic accepting never bills a different total.
+- Menu sync per channel (product owner 2026-11-22, as quickPOS): a channel (app, website, Swiggy, Zomato) may sell at
+  its own prices: the menu price changed by a percentage (rounded to the nearest rupee, half up) or a price set per
+  dish or size (`online.menuSync`). That channel's bill uses those prices, with GST worked out on them, so the bill is
+  what the customer paid; the rule is `channelPrice` in `packages/shared/src/online.ts`, the same as the hub's. The
+  owner's CA should confirm this. Modifier (add-on) prices stay the menu's.
 - Delivery and packaging charges are bill lines taxed at the outlet's setting (Settings › Online orders › GST on
   charges); with no rate set, no charges can be added (the hub then refuses them too). Delivery charge by distance band
   (free above the band's amount), from the outlet's own settings.

@@ -33,15 +33,15 @@ export function heldSummary(items: readonly OrderItemSnapshot[]): { qty: number;
 }
 
 /**
- * The fire buttons: "Fire all" whenever anything is held, plus one per course when more than one course is
- * waiting (with a single course, "Fire all" is the same thing).
+ * The send buttons: "Send all" whenever anything is held, plus one per course when more than one course is
+ * waiting (with a single course, "Send all" is the same thing).
  */
 export function fireChoices(items: readonly OrderItemSnapshot[]): Array<{ label: string; payload: { all: true } | { course: number }; qty: number }> {
   const groups = heldByCourse(items);
   if (groups.length === 0) return [];
-  const all = { label: 'Fire all', payload: { all: true as const }, qty: groups.reduce((n, g) => n + g.qty, 0) };
+  const all = { label: 'Send all', payload: { all: true as const }, qty: groups.reduce((n, g) => n + g.qty, 0) };
   if (groups.length === 1) return [all];
-  return [all, ...groups.map((g) => ({ label: `Fire course ${g.course}`, payload: { course: g.course }, qty: g.qty }))];
+  return [all, ...groups.map((g) => ({ label: `Send course ${g.course}`, payload: { course: g.course }, qty: g.qty }))];
 }
 
 export const kotText = (kotNo: number) => `KOT ${String(kotNo).padStart(4, '0')}`;

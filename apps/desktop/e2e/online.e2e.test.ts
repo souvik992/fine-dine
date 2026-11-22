@@ -125,6 +125,41 @@ describe.skipIf(!hubThere)('online orders through the real order hub', () => {
       return s.menu?.items.some((i) => i.name === 'Butter Chicken (Full)') ? s : null;
     });
     expect(shop.menu!.items.find((i) => i.name === 'Dal Makhani')).toBeDefined();
+
+    // Menu sync (quickPOS ODS): the website leaves the dal out; the app sells everything 10% higher. Save and sync now.
+    await page.getByRole('button', { name: 'Menu sync for Website' }).click();
+    let dlg = page.getByRole('dialog', { name: 'Menu sync: Website' });
+    await dlg.getByRole('radio', { name: /All except/ }).click();
+    await dlg.getByLabel('List Dal Makhani').uncheck();
+    await dlg.getByRole('button', { name: 'Save', exact: true }).click();
+    await dlg.waitFor({ state: 'detached' });
+    await page.getByRole('button', { name: 'Menu sync for App' }).click();
+    dlg = page.getByRole('dialog', { name: 'Menu sync: App' });
+    await dlg.getByText('Different prices').click();
+    await dlg.getByLabel('Price change in percent').fill('10');
+    await dlg.getByRole('button', { name: 'Save and sync now' }).click();
+    await dlg.getByText(/Menu sent to the order hub/).waitFor({ timeout: 15_000 });
+    await dlg.getByRole('button', { name: 'Close' }).last().click();
+    await page.getByRole('button', { name: 'Menu sync for App' }).filter({ hasText: '+10%' }).waitFor();
+    // what customers see on each channel (the hub serves each channel its own menu)
+    type Menu = { menu?: { items: Array<{ name: string; price: number }> } };
+    const posDal = shop.menu!.items.find((i) => i.name === 'Dal Makhani') as unknown as { price: number };
+    await until(async () => ((await hubJson<Menu>('GET', '/v1/stores/spice')).menu?.items.some((i) => i.name === 'Dal Makhani') ? null : true)); // not on the website
+    const onApp = await until(async () => {
+      const s = await hubJson<Menu>('GET', '/v1/stores/spice?channel=app');
+      const d = s.menu?.items.find((i) => i.name === 'Dal Makhani');
+      return d && d.price !== posDal.price ? d : null;
+    });
+    expect(onApp.price).toBe(Math.round((posDal.price * 1.1) / 100) * 100); // +10% on the app, to the rupee
+    // back to everything at the POS price, so the order below is priced as before
+    for (const c of ['Website', 'App']) {
+      await page.getByRole('button', { name: new RegExp(`^Menu sync for ${c}`) }).click();
+      const d = page.getByRole('dialog', { name: `Menu sync: ${c}` });
+      await d.getByRole('radio', { name: /All dishes/ }).click();
+      await d.getByText('Same as the POS').click();
+      await d.getByRole('button', { name: 'Save', exact: true }).click();
+      await d.waitFor({ state: 'detached' });
+    }
     await page.getByRole('button', { name: 'Floor', exact: true }).click();
   });
 

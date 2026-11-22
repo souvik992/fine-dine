@@ -16,11 +16,10 @@ export interface BillPrinter {
   paper: PaperWidth;
 }
 
-/** The configured bill printer, else the first printer whose role is bill/both. Null when none exists. */
+/** The configured bill printer when it is on, else the first printer that is on and prints bills. Null when none. */
 export function billPrinter(db: Db, cfg: OutletConfig): BillPrinter | null {
-  const row = (cfg['bill.printerId']
-    ? db.prepare('SELECT id, width_mm FROM printer WHERE id = ?').get(cfg['bill.printerId'])
-    : db.prepare(`SELECT id, width_mm FROM printer WHERE role IN ('bill', 'both') ORDER BY name COLLATE NOCASE, id LIMIT 1`).get()) as
+  const row = ((cfg['bill.printerId'] ? db.prepare('SELECT id, width_mm FROM printer WHERE id = ? AND active = 1').get(cfg['bill.printerId']) : undefined) ??
+    db.prepare(`SELECT id, width_mm FROM printer WHERE role IN ('bill', 'both') AND active = 1 ORDER BY name COLLATE NOCASE, id LIMIT 1`).get()) as
     | { id: string; width_mm: number }
     | undefined;
   return row ? { id: row.id, paper: row.width_mm === 58 ? 58 : 80 } : null;

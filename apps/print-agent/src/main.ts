@@ -5,7 +5,7 @@
 // Settings and log: %ProgramData%\DinePOS Print Agent\ (DINEPOS_AGENT_DIR overrides).
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { FakeTransport, TcpTransport, WindowsSpoolerTransport } from '@dinepos/printing';
+import { FakeTransport, SerialTransport, TcpTransport, UsbDirectTransport, WindowsSpoolerTransport } from '@dinepos/printing';
 import { normalizeServer, PrintAgent, RefusedError } from './agent.js';
 
 declare const __AGENT_VERSION__: string | undefined;
@@ -30,7 +30,7 @@ function log(level: string, msg: string): void {
 }
 
 function transports() {
-  return { tcp: new TcpTransport(), usb: new WindowsSpoolerTransport(), fake: new FakeTransport(path.join(dir, 'prints')) };
+  return { tcp: new TcpTransport(), usb: new WindowsSpoolerTransport(), usbdirect: new UsbDirectTransport(), serial: new SerialTransport(), fake: new FakeTransport(path.join(dir, 'prints')) };
 }
 
 async function setup(server: string | undefined, key: string | undefined): Promise<number> {
@@ -40,7 +40,7 @@ async function setup(server: string | undefined, key: string | undefined): Promi
     return 1;
   }
   if (!key || key.trim().length < 20) {
-    console.error('Paste the print agent key shown in DinePOS (Settings › Kitchen & printers › Add print agent).');
+    console.error('Paste the print agent key shown in DinePOS (Settings › Printers › Add print agent).');
     return 1;
   }
   try {

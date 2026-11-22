@@ -3,7 +3,7 @@ import { kitchenLevel, type TableKitchen, type TableStateKitchen } from '@dinepo
 import type { Db } from '../db/connection.js';
 
 /**
- * Stations that use a kitchen screen: marked so in Settings › Kitchen & printers, or with a ticket bumped (ready or
+ * Stations that use a kitchen screen: marked so in Settings › Kitchen, or with a ticket bumped (ready or
  * served) on a screen in the last 7 days (a screen works for any station). Paper-only stations never report.
  * The window is on the bump's own time, not the ticket's business date: an outlet that has not closed its day for a
  * week still bumps tickets of that old business day, and those bumps must count.

@@ -312,7 +312,7 @@ export function ServerPanel({ bridge }: { bridge: Bridge }) {
           </Card>
 
           <Card title={`Printers${printerProblems ? ` (${printerProblems} not printing)` : ''}`} icon={<Printer className="h-5 w-5" />} className="lg:col-span-2">
-            {s.printers.length === 0 ? <p className="text-sm text-muted-foreground">No printers set up (Settings › Kitchen & printers).</p> : null}
+            {s.printers.length === 0 ? <p className="text-sm text-muted-foreground">No printers set up (Settings › Printers).</p> : null}
             <ul className="grid grid-cols-1 gap-1.5 text-sm md:grid-cols-2">
               {s.printers.map((p) => (
                 <li key={p.id} className="flex items-start gap-2" title={p.lastError}>

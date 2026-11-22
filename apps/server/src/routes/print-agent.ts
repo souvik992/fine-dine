@@ -23,7 +23,7 @@ export function printAgentRoutes(app: FastifyInstance, deps: PrintAgentRouteDeps
   const agentOf = (req: FastifyRequest) => {
     const key = /^Agent (\S{20,200})$/.exec(String(req.headers.authorization ?? ''))?.[1];
     const row = key ? (deps.db.prepare('SELECT id, name FROM print_agent WHERE key_hash = ? AND revoked_at IS NULL').get(agentKeyHash(key)) as { id: string; name: string } | undefined) : undefined;
-    if (!row) throw new PosError('UNAUTHENTICATED', 'This print agent key is not valid (it was removed, or mistyped). Add the agent again in Settings › Kitchen & printers.');
+    if (!row) throw new PosError('UNAUTHENTICATED', 'This print agent key is not valid (it was removed, or mistyped). Add the agent again in Settings › Printers.');
     const version = String(req.headers['x-agent-version'] ?? '').slice(0, 40) || null;
     // last seen, like a device's: telemetry, not outlet data
     deps.db.prepare('UPDATE print_agent SET last_seen_at = ?, version = coalesce(?, version) WHERE id = ?').run(deps.now().toISOString(), version, row.id);

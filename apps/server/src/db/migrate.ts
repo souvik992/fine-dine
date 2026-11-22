@@ -21,6 +21,9 @@ export const MIGRATIONS_DIR = fileURLToPath(new URL('./migrations/', import.meta
 
 const FILE_RE = /^(\d{4})_([a-z0-9][a-z0-9_-]*)\.sql$/;
 
+/** First line of a migration that must run with foreign keys off (it rebuilds a referenced table). */
+export const FK_OFF_MARKER = '-- dinepos: foreign-keys-off';
+
 export function checksum(sql: string): string {
   return createHash('sha256').update(sql.replace(/\r\n/g, '\n')).digest('hex');
 }
@@ -77,15 +80,29 @@ export function migrate(db: Db, migrations: Migration[] = loadMigrations(), now:
   const newlyApplied: number[] = [];
   for (const m of migrations) {
     if (done.has(m.version)) continue;
-    db.transaction(() => {
-      db.exec(m.sql);
-      db.prepare('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)').run(
-        m.version,
-        m.name,
-        now().toISOString(),
-      );
-      recordChecksums(db, known);
-    }).immediate();
+    // A migration that rebuilds a table other tables point at (SQLite's 12-step ALTER) starts with
+    // FK_OFF_MARKER: foreign keys are switched off around it (the PRAGMA is a no-op inside a transaction) and every
+    // reference is checked before it commits, so a rebuild can never leave a dangling row.
+    const fkOff = m.sql.startsWith(FK_OFF_MARKER);
+    const fkWasOn = fkOff && db.pragma('foreign_keys', { simple: true }) === 1;
+    if (fkWasOn) db.pragma('foreign_keys = OFF');
+    try {
+      db.transaction(() => {
+        db.exec(m.sql);
+        if (fkOff) {
+          const broken = db.prepare('PRAGMA foreign_key_check').all();
+          if (broken.length) throw new StartupError('MIGRATION_FK', `Migration ${m.version} (${m.name}) would leave ${broken.length} broken reference(s); nothing was changed.`);
+        }
+        db.prepare('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)').run(
+          m.version,
+          m.name,
+          now().toISOString(),
+        );
+        recordChecksums(db, known);
+      }).immediate();
+    } finally {
+      if (fkWasOn) db.pragma('foreign_keys = ON');
+    }
     newlyApplied.push(m.version);
   }
 

@@ -203,16 +203,6 @@ export function FloorScreen({
         <time className="w-14 text-right text-sm font-semibold tabular-nums" dateTime={now.toISOString()}>
           {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })}
         </time>
-        {can('order.create') ? (
-          <>
-            <button className="btn btn-primary h-10" onClick={() => setStarting('takeaway')} title="Start a takeaway order" data-testid="new-takeaway">
-              <ShoppingBag className="h-4 w-4" /> <Plus className="-ml-1 h-3.5 w-3.5" /> Takeaway
-            </button>
-            <button className="btn btn-primary h-10" onClick={() => setStarting('delivery')} title="Start a delivery order" data-testid="new-delivery">
-              <Bike className="h-4 w-4" /> <Plus className="-ml-1 h-3.5 w-3.5" /> Delivery
-            </button>
-          </>
-        ) : null}
         {can('reservation.manage') || can('order.create') ? <BookingsButton onClick={onBookings} /> : null}
         {can('online.orders') ? (
           <OnlineButton onClick={onOnline} />
@@ -247,6 +237,17 @@ export function FloorScreen({
         <button className="btn h-10 w-10 px-0" onClick={onSettings} aria-label="Settings" title="Settings">
           <Settings className="h-5 w-5" />
         </button>
+        {/* on the same line as the modules, at the right end */}
+        {can('order.create') ? (
+          <div className="ml-auto flex gap-2">
+            <button className="btn btn-primary h-10" onClick={() => setStarting('takeaway')} title="Start a takeaway order" data-testid="new-takeaway">
+              <ShoppingBag className="h-4 w-4" /> <Plus className="-ml-1 h-3.5 w-3.5" /> Takeaway
+            </button>
+            <button className="btn btn-primary h-10" onClick={() => setStarting('delivery')} title="Start a delivery order" data-testid="new-delivery">
+              <Bike className="h-4 w-4" /> <Plus className="-ml-1 h-3.5 w-3.5" /> Delivery
+            </button>
+          </div>
+        ) : null}
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
