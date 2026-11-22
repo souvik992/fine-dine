@@ -1,0 +1,48 @@
+name: Mac apps
+
+# DinePOS and DinePOS Kitchen for Mac, built on GitHub's Mac machines (they cannot be built on Windows): the tests on
+# a Mac, then the Apple-chip and Intel disk images. The built DinePOS.app is checked: the outlet server, its Node
+# runtime and SQLite are inside, and that server starts and answers. Downloads: the run's page > Artifacts; the vendor
+# uploads them to DinePOS Cloud (customer portal > Downloads). Ad-hoc signed until an Apple Developer ID is added.
+on:
+  push:
+    branches: [main, 'mac-*'] # mac-*: try a Mac change on its own branch before it reaches main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mac:
+    name: Mac disk images
+    runs-on: macos-latest # Apple chip; electron-builder also builds the Intel (x64) image here
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test
+      - name: DinePOS disk images
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run dist:mac -w @dinepos/desktop
+      - name: Check the built DinePOS.app (server, Node runtime and SQLite inside; the server starts)
+        run: node apps/desktop/scripts/inspect-mac.mjs
+      - name: DinePOS Kitchen disk images
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run dist:mac -w @dinepos/kitchen
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DinePOS-Mac
+          path: |
+            apps/desktop/release/*.dmg
+            apps/kitchen/release/*.dmg
+          if-no-files-found: error

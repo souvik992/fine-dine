@@ -8,6 +8,7 @@ import { app, BrowserWindow, Menu, protocol, session, shell, type MenuItemConstr
 import { CSP, isAppUrl, resolveAppFile, SCHEME, START_URL } from './protocol.js';
 import { ADDON_FILES, loadAddonFile, parseAddonUrl } from './addons.js';
 import { runServerMode } from './server-mode.js';
+import { IS_MAC, isMainComputer, macMenus, macServerMenu, startServerHere } from './mac.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const RENDERER_DIR = path.join(here, '..', 'dist-renderer');
@@ -101,7 +102,8 @@ function buildMenu(): void {
       submenu: [{ role: 'reload' }, { role: 'togglefullscreen' }, ...(app.isPackaged ? [] : [{ role: 'toggleDevTools' } as const])],
     },
   ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  // a Mac: its app and Edit menus (⌘C / ⌘V / ⌘Q), and the Server menu (this Mac as the main computer)
+  Menu.setApplicationMenu(Menu.buildFromTemplate(IS_MAC ? macMenus([...template, macServerMenu(buildMenu)]) : template));
 }
 
 app.on('second-instance', () => {
@@ -131,6 +133,8 @@ void app.whenReady().then(() => {
   session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === 'clipboard-sanitized-write'));
   protocol.handle(SCHEME, serveApp);
   if (SERVER_MODE) return runServerMode(DEV_URL);
+  // the Mac that runs the outlet: its server starts with DinePOS (does nothing when it already runs)
+  if (isMainComputer()) startServerHere(false);
   buildMenu();
   createWindow();
   app.on('activate', () => {

@@ -118,6 +118,7 @@ export function powershellRunner(timeoutMs = 30_000, script = SPOOLER_SCRIPT): S
   const encoded = Buffer.from(script, 'utf16le').toString('base64');
   return (r) =>
     new Promise((resolve) => {
+      if (process.platform !== 'win32') return resolve({ code: 1, stdout: '', stderr: 'USB, Bluetooth and Windows-installed printers print from Windows only. On a Mac, use a network (Wi-Fi or LAN) printer, or a print agent on a Windows PC.' });
       const child = spawn(powershellPath(), ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {
         env: { ...process.env, DINEPOS_SPOOL_PRINTER: r.printerName, DINEPOS_SPOOL_DOC: r.docName },
         windowsHide: true,

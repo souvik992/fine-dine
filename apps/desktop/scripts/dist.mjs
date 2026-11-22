@@ -1,3 +1,4 @@
+// --mac (on a Mac): the Mac disk images instead (Apple chip and Intel), release/DinePOS-<version>-mac-<arch>.dmg.
 // Builds the Windows installer: server bundle → desktop build → verified runtime binaries → staged app →
 // electron-builder (NSIS). Output: apps/desktop/release/DinePOS-Setup-<version>.exe (+ win-unpacked/).
 import { execFileSync } from 'node:child_process';
@@ -12,13 +13,14 @@ const repo = fileURLToPath(new URL('../../..', import.meta.url));
 // Run npm through the current Node (npm_execpath is set by `npm run`), so no shell is involved.
 const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error('Run this through npm: npm run dist -w @dinepos/desktop');
+const mac = process.argv.includes('--mac');
 const run = (args, cwd = repo) => execFileSync(process.execPath, [npmCli, ...args], { cwd, stdio: 'inherit' });
 
 // The workspace packages (@dinepos/shared, ...) are used from their compiled dist/; a fresh checkout (CI) has none.
 run(['run', 'build']);
-run(['run', 'bundle', '-w', '@dinepos/server']);
+run(['run', 'bundle', '-w', '@dinepos/server', ...(mac ? ['--', '--mac'] : [])]);
 run(['run', 'build', '-w', '@dinepos/desktop']);
-await fetchRuntime();
+await fetchRuntime(mac ? 'darwin' : 'win32');
 // Electron's own binary (node_modules/electron/dist): electron has no install script, so a fresh `npm ci` (CI) has
 // none until something runs it. Its install.js downloads it (checksum-verified) and exits at once if it is there.
 // Three tries: GitHub's download server sometimes answers 504.
@@ -45,6 +47,11 @@ writeFileSync(
 
 const { build } = createRequire(import.meta.url)('electron-builder');
 const config = createRequire(import.meta.url)(`${here}electron-builder.config.cjs`);
-await build({ projectDir: here, config, win: ['nsis'], publish: 'never' });
-console.warn(`installer written to ${here}release`);
-execFileSync(process.execPath, [`${here}scripts/inspect-release.mjs`], { stdio: 'inherit' });
+if (mac) {
+  await build({ projectDir: here, config, mac: ['dmg'], publish: 'never' });
+  console.warn(`Mac disk images written to ${here}release`);
+} else {
+  await build({ projectDir: here, config, win: ['nsis'], publish: 'never' });
+  console.warn(`installer written to ${here}release`);
+  execFileSync(process.execPath, [`${here}scripts/inspect-release.mjs`], { stdio: 'inherit' });
+}

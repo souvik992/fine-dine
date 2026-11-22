@@ -103,6 +103,18 @@ archive holds node_modules or `resources/server` misses anything the server need
    keeps the server running (tray icon by the clock); Quit stops it after asking.
 6. Uninstall → shortcuts gone, `%ProgramData%\DinePOS\dinepos.db` still present.
 
+## Mac app
+`npm run dist:mac -w @dinepos/desktop` (on a Mac; GitHub Actions "Mac apps" runs it on every push to main) →
+`release/DinePOS-<version>-mac-arm64.dmg` (Apple chip) and `-mac-x64.dmg` (Intel). Each carries the Node runtime for
+its processor (`build-cache/node-darwin-<arch>`, pinned in `scripts/fetch-runtime.mjs`) and the Mac SQLite libraries
+beside the outlet server; `scripts/inspect-mac.mjs` checks the built app and starts that server.
+- No installer script on a Mac: **Server › This Mac is the main computer** stands in for "Install as master" and
+  "Start with Windows". DinePOS then starts the DinePOS Server (tray icon in the menu bar) whenever it opens, and opens
+  when someone signs in to the Mac. Data: `/Users/Shared/DinePOS`.
+- Printers: network (Wi-Fi / LAN) printers print from a Mac. USB, Bluetooth and Windows-installed printers print from
+  Windows only (they say so), or through a print agent on a Windows PC.
+- Ad-hoc signed (no Apple Developer ID yet): the first time, right-click DinePOS in Applications › Open.
+
 ## Conflict handling
 `VERSION_CONFLICT` → if command is "safe" (see `docs/05-sync-offline.md`) resend with the returned
 version; otherwise show `ConflictBanner` with what changed and who did it.
