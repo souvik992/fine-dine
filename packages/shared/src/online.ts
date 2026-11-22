@@ -142,7 +142,7 @@ export const onlineSettingsSchema = z
     channels: z.object({ app: z.boolean(), website: z.boolean(), swiggy: z.boolean().default(false), zomato: z.boolean().default(false) }).strict(),
     fulfilment: z.object({ pickup: z.boolean(), delivery: z.boolean() }).strict(),
     payments: z.object({ online: z.boolean(), cod: z.boolean() }).strict(),
-    /** GST on delivery and packaging charges (basis points). Null: no fees can be charged (the hub refuses them). */
+    /** GST on delivery and packaging charges (basis points); 0% (exempt) unless chosen. Null ("Not set"): no fees can be charged (the hub refuses them). */
     feeTaxBp: z.number().int().min(0).max(2800).nullable(),
     /** Kitchen time used when accepting without changing it. */
     prepMinutes: z.number().int().min(1).max(180),
@@ -158,7 +158,7 @@ export const DEFAULT_ONLINE_SETTINGS: OnlineSettings = {
   channels: { app: true, website: true, swiggy: false, zomato: false },
   fulfilment: { pickup: true, delivery: false },
   payments: { online: true, cod: true },
-  feeTaxBp: null,
+  feeTaxBp: 0,
   prepMinutes: 20,
   serviceability: DEFAULT_SERVICEABILITY,
 };

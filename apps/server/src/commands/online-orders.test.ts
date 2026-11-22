@@ -67,6 +67,11 @@ describe('online orders', () => {
   const row = (id: string) => h.db.prepare('SELECT * FROM online_order WHERE id = ?').get(id) as { state: string; local_order_id: string | null; bill_id: string | null; alert: string | null; pos_total_paise: number };
   const outbox = (id: string) => h.db.prepare('SELECT action, body_json, idem_key FROM online_outbox WHERE order_id = ? ORDER BY id').all(id) as Array<{ action: string; body_json: string; idem_key: string }>;
 
+  it('an outlet that never chose a GST rate for delivery and packaging charges gets 0% (exempt)', () => {
+    h.db.prepare("DELETE FROM config WHERE key = 'online.settings'").run();
+    expect(getConfig(h.db)['online.settings'].feeTaxBp).toBe(0);
+  });
+
   it('an order from the hub is stored once and confirmed (received); a replayed event is ignored', () => {
     const o = receive(hubOrder());
     h.run('ApplyHubEvent', { event: { seq, type: 'order.created', at: 0, order: o } }); // the same event again
