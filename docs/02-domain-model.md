@@ -56,7 +56,7 @@ Stock: StockItem, StockMovement, Purchase + PurchaseLine, RecipeLine (see "Stock
 | 8 | otherwise | `KOT_RUNNING` |
 
 Kitchen counts (6–7): the order's tickets with food still on it, at stations using a screen (marked for one, or with a
-ticket bumped there in the last 7 business days), `apps/server/src/queries/kitchen-status.ts`. Without screens the
+ticket bumped there in the last 7 days, by the time of the bump), `apps/server/src/queries/kitchen-status.ts`. Without screens the
 states are as before (KOT_RUNNING until the bill).
 
 ## Order item states

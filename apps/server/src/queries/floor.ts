@@ -48,7 +48,7 @@ export function getFloor(db: Db, now: Date, timeZone: string, badges?: () => Map
   const bookings = nextBookings(db, now, timeZone);
   const cfg = getConfig(db);
   const limits = { amberMin: cfg['kds.amberMin'], redMin: cfg['kds.redMin'] };
-  const stations = screenStations(db, now, timeZone);
+  const stations = screenStations(db, now);
   const tables: FloorTable[] = rows.map((r) => {
     // the kitchen screens' view of the food: chips on the tile, and FOOD_READY / SERVED once nothing is cooking
     const counts = r.order_id && r.has_kot === 1 ? kitchenCounts(db, r.order_id, stations) : null;
@@ -94,7 +94,7 @@ export function getFloor(db: Db, now: Date, timeZone: string, badges?: () => Map
   tables.sort(
     (a, b) => (areaOrder.get(a.areaId) ?? 0) - (areaOrder.get(b.areaId) ?? 0) || collator.compare(a.label, b.label),
   );
-  return { serverTime: isoInZone(now, timeZone), areas, tables, counterOrders: counterOrders(db, now) };
+  return { serverTime: isoInZone(now, timeZone), areas, tables, counterOrders: counterOrders(db, now, stations) };
 }
 
 interface CounterRow {
@@ -111,8 +111,15 @@ interface CounterRow {
   item_count: number;
 }
 
+/** Where a sent counter order's food is: ready / served once the kitchen screens bumped all of it (as a table). */
+function kitchenStage(db: Db, orderId: string, stations: Set<string>): CounterOrder['stage'] {
+  const k = kitchenCounts(db, orderId, stations);
+  if (k && k.unknown === 0 && k.cooking === 0 && k.ready + k.served > 0) return k.ready > 0 ? 'ready' : 'served';
+  return 'kitchen';
+}
+
 /** Open takeaway and delivery orders (no table), oldest first, for the strip above the tables. */
-export function counterOrders(db: Db, now: Date): CounterOrder[] {
+export function counterOrders(db: Db, now: Date, stations: Set<string> = screenStations(db, now)): CounterOrder[] {
   const rows = db
     .prepare(
       `SELECT o.id, o.version, o.type, o.ticket_no, o.customer_name, o.customer_phone, o.delivery_address, o.state, o.opened_at,
@@ -128,7 +135,7 @@ export function counterOrders(db: Db, now: Date): CounterOrder[] {
       orderId: r.id,
       orderVersion: r.version,
       type: r.type,
-      stage: r.state === 'billed' ? 'billed' : r.sent ? 'kitchen' : 'new',
+      stage: r.state === 'billed' ? 'billed' : r.sent ? kitchenStage(db, r.id, stations) : 'new',
       since: r.opened_at,
       elapsedMin: Math.max(0, Math.floor((now.getTime() - Date.parse(r.opened_at)) / 60_000)),
       amountPaise: getOrderSnapshot(db, r.id)?.totals.totalPaise ?? 0,

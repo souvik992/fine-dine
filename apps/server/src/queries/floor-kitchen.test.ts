@@ -41,11 +41,42 @@ describe('kitchen status on the floor', () => {
     expect(t1().kitchen).toBeUndefined();
   });
 
-  it('a station not marked for a screen counts once a ticket there was bumped on one (in the last 7 business days)', () => {
+  it('a station not marked for a screen counts once a ticket there was bumped on one (in the last 7 days)', () => {
     const tandoorKot = h.db.prepare('SELECT id FROM kot WHERE station_id = ? AND order_id = ?').pluck().get(S.tandoor, orderId) as string;
     h.run('MarkKotReady', { kotId: tandoorKot });
     expect(t1().kitchen).toMatchObject({ cooking: 1, ready: 1 }); // the kitchen still cooking, the tandoor ready
     expect(t1(new Date(TEST_NOW().getTime() + 8 * 86_400_000)).kitchen).toMatchObject({ cooking: 1, ready: 0 }); // that bump is old news a week on
+  });
+
+  it('a bump counts by when it happened, even when the business day was not closed for weeks (its tickets carry an old date)', () => {
+    // the outlet has not run Day end for 12 days: the open business day, and so every ticket, is dated 12 days ago
+    h.db.prepare("UPDATE kot SET business_date = '2026-01-01'").run();
+    const tandoorKot = h.db.prepare('SELECT id FROM kot WHERE station_id = ? AND order_id = ?').pluck().get(S.tandoor, orderId) as string;
+    h.run('MarkKotReady', { kotId: tandoorKot });
+    expect(t1().kitchen).toMatchObject({ cooking: 1, ready: 1 }); // the Tandoor (no screen ticked) now reports
+  });
+
+  it('takeaway and delivery follow the kitchen too: In the kitchen → Food ready → Served, then Billed', () => {
+    const id = h.run('OpenCounterOrder', { type: 'takeaway' }).order!.id;
+    const stage = () => getFloor(h.db, TEST_NOW(), 'Asia/Kolkata').counterOrders!.find((c) => c.orderId === id)!.stage;
+    expect(stage()).toBe('new');
+    o.run('AddItems', id, { items: [line(S.dalMakhani)] });
+    const kot = (o.run('FireKOT', id, { all: true }).result as { kots: Array<{ id: string }> }).kots[0]!.id;
+    expect(stage()).toBe('kitchen');
+    h.run('MarkKotReady', { kotId: kot });
+    expect(stage()).toBe('ready');
+    h.run('MarkKotServed', { kotId: kot });
+    expect(stage()).toBe('served');
+    o.run('PrintBill', id, {});
+    expect(stage()).toBe('billed');
+  });
+
+  it('a takeaway with food at a paper-only station stays In the kitchen (nobody reports that food)', () => {
+    const id = h.run('OpenCounterOrder', { type: 'takeaway' }).order!.id;
+    o.run('AddItems', id, { items: [line(S.dalMakhani), line(S.butterNaan)] });
+    const kot = (o.run('FireKOT', id, { all: true }).result as { kots: Array<{ id: string; stationId: string }> }).kots.find((k) => k.stationId === S.kitchen)!.id;
+    h.run('MarkKotReady', { kotId: kot });
+    expect(getFloor(h.db, TEST_NOW(), 'Asia/Kolkata').counterOrders!.find((c) => c.orderId === id)!.stage).toBe('kitchen');
   });
 
   it('the table state follows the kitchen: KOT running → Food ready → Served, then Bill printed; a paper-only station keeps it running', () => {

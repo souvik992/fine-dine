@@ -12,6 +12,8 @@ export const COUNTER_TYPE_LABEL: Record<CounterType, string> = {
 export const STAGE_META: Record<CounterOrder['stage'], { label: string; className: string }> = {
   new: { label: 'Taking order', className: 'tile-seated' },
   kitchen: { label: 'In the kitchen', className: 'tile-kot' },
+  ready: { label: 'Food ready', className: 'tile-ready' },
+  served: { label: 'Served · print bill', className: 'tile-served' },
   billed: { label: 'Billed · to pay', className: 'tile-bill' },
 };
 

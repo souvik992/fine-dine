@@ -201,8 +201,11 @@ export interface CounterOrder {
   customerName?: string;
   customerPhone?: string;
   address?: string;
-  /** new: nothing sent to the kitchen yet; kitchen: food sent; billed: bill printed, waiting for payment. */
-  stage: 'new' | 'kitchen' | 'billed';
+  /**
+   * new: nothing sent to the kitchen yet; kitchen: food sent; ready / served: the kitchen screens bumped every ticket
+   * (as a table's FOOD_READY / SERVED); billed: bill printed, waiting for payment.
+   */
+  stage: 'new' | 'kitchen' | 'ready' | 'served' | 'billed';
   since: string;
   elapsedMin: number;
   amountPaise: number;

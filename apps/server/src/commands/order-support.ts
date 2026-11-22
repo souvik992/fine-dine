@@ -193,7 +193,7 @@ export function emitTableState(ctx: CommandContext, tableId: string | null): voi
   const hasKot = order
     ? ctx.db.prepare('SELECT 1 FROM kot WHERE order_id = @id UNION ALL SELECT 1 FROM order_item WHERE order_id = @id AND kot_id IS NOT NULL LIMIT 1').get({ id: order.id }) !== undefined
     : false;
-  const kitchen = order && hasKot ? kitchenCounts(ctx.db, order.id, screenStations(ctx.db, ctx.now, ctx.timeZone)) : null;
+  const kitchen = order && hasKot ? kitchenCounts(ctx.db, order.id, screenStations(ctx.db, ctx.now)) : null;
   const state = deriveTableState(
     { status: t.status },
     order ? { hasFiredKot: hasKot, lastKotAt: order.last_kot_at, billPrintedAt: order.bill_printed_at, kitchen } : null,

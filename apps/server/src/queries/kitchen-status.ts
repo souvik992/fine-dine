@@ -1,18 +1,20 @@
 // What the kitchen screens say about an order's food, for the floor (tile chips, table state) and `table.state`.
-import { kitchenLevel, localDate, type TableKitchen, type TableStateKitchen } from '@dinepos/shared';
+import { kitchenLevel, type TableKitchen, type TableStateKitchen } from '@dinepos/shared';
 import type { Db } from '../db/connection.js';
 
 /**
  * Stations that use a kitchen screen: marked so in Settings › Kitchen & printers, or with a ticket bumped (ready or
- * served) on a screen in the last 7 business days (a screen works for any station). Paper-only stations never report.
+ * served) on a screen in the last 7 days (a screen works for any station). Paper-only stations never report.
+ * The window is on the bump's own time, not the ticket's business date: an outlet that has not closed its day for a
+ * week still bumps tickets of that old business day, and those bumps must count.
  */
-export function screenStations(db: Db, now: Date, timeZone: string): Set<string> {
-  const since = localDate(new Date(now.getTime() - 7 * 86_400_000), timeZone);
+export function screenStations(db: Db, now: Date): Set<string> {
+  const since = new Date(now.getTime() - 7 * 86_400_000).toISOString(); // ready_at / served_at are UTC ISO (ctx.nowIso)
   return new Set(
     db
-      .prepare(`SELECT id FROM station WHERE has_kds = 1 UNION SELECT DISTINCT station_id FROM kot WHERE business_date >= ? AND (ready_at IS NOT NULL OR served_at IS NOT NULL)`)
+      .prepare(`SELECT id FROM station WHERE has_kds = 1 UNION SELECT DISTINCT station_id FROM kot WHERE ready_at >= @since OR served_at >= @since`)
       .pluck()
-      .all(since) as string[],
+      .all({ since }) as string[],
   );
 }
 
