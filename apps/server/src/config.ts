@@ -62,6 +62,8 @@ function defaultDataDir(
 ): string {
   if (mode !== 'production') return path.resolve(cwd, 'data');
   if (platform === 'win32') return path.win32.join(env.ProgramData ?? 'C:\\ProgramData', 'DinePOS');
+  // the Mac app: shared by every account on the Mac, like ProgramData on Windows
+  if (platform === 'darwin') return '/Users/Shared/DinePOS';
   return '/var/lib/dinepos';
 }
 

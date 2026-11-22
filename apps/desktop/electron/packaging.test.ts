@@ -10,6 +10,9 @@ const config = createRequire(import.meta.url)('../electron-builder.config.cjs') 
   nsis: Record<string, unknown>;
   extraResources: Array<{ from: string; to: string }>;
   files: string[];
+  win: { extraResources: Array<{ from: string; to: string }> };
+  mac: { target: unknown; extraResources: Array<{ from: string; to: string }> };
+  dmg: { artifactName: string };
 };
 
 describe('installer script (NSIS): standalone server like the order hub', () => {
@@ -69,7 +72,14 @@ describe('electron-builder config', () => {
 
   it('ships the server, its node_modules, node.exe and the stop script', () => {
     const to = config.extraResources.map((r) => r.to);
-    expect(to).toEqual(expect.arrayContaining(['server', 'server/node_modules', 'server/node.exe', 'server/stop-server.ps1']));
+    expect(to).toEqual(expect.arrayContaining(['server', 'server/node_modules']));
+    expect(config.win.extraResources.map((r) => r.to)).toEqual(['server/node.exe', 'server/stop-server.ps1']);
+  });
+
+  it('the Mac app: Apple chip and Intel disk images, each with its own Node runtime beside the server', () => {
+    expect(config.mac.target).toEqual([{ target: 'dmg', arch: ['arm64', 'x64'] }]);
+    expect(config.mac.extraResources).toEqual([{ from: 'build-cache/node-darwin-${arch}', to: 'server/node' }]);
+    expect(config.dmg.artifactName).toBe('DinePOS-${version}-mac-${arch}.${ext}');
   });
 
   it('keeps node_modules out of the app archive (everything is bundled)', () => {

@@ -253,7 +253,8 @@ app.on('second-instance', () => {
 });
 
 void app.whenReady().then(() => {
-  Menu.setApplicationMenu(null);
+  // a Mac keeps its app and Edit menus (⌘Q, typing the server address); Windows shows none
+  Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }]) : null);
   session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false)); // no camera, mic, location…
   protocol.handle(SCHEME, handle);
   powerSaveBlocker.start('prevent-display-sleep'); // a kitchen screen stays on

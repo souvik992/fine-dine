@@ -22,7 +22,9 @@ const repo = fileURLToPath(new URL('../../..', import.meta.url));
 // posinext-cloud repository (checked out next to this one, or POSINEXT_CLOUD_DIR); commit it there.
 const cloud = process.argv.includes('--cloud');
 const out = cloud ? `${process.env.POSINEXT_CLOUD_DIR ?? `${repo}../posinext-cloud`}/outlet-server/` : `${root}dist-bundle/`;
-const platforms = cloud ? ['linux-x64', 'linux-arm64'] : ['win32-x64'];
+// --mac: the server inside the Mac app (Apple chip and Intel disk images share the bundle)
+const mac = process.argv.includes('--mac');
+const platforms = cloud ? ['linux-x64', 'linux-arm64'] : mac ? ['darwin-arm64', 'darwin-x64'] : ['win32-x64'];
 const pkg = JSON.parse(readFileSync(`${root}package.json`, 'utf8'));
 
 rmSync(out, { recursive: true, force: true });

@@ -12,7 +12,8 @@
     "test": "vitest run --root ../.. apps/desktop/",
     "test:e2e": "npm run build && vitest run --root ../.. --config apps/desktop/vitest.e2e.config.ts",
     "dist": "node scripts/dist.mjs",
-    "fetch-runtime": "node scripts/fetch-runtime.mjs"
+    "fetch-runtime": "node scripts/fetch-runtime.mjs",
+    "dist:mac": "node scripts/dist.mjs --mac"
   },
   "dependencies": {
     "qrcode-generator": "1.4.4",

@@ -22,6 +22,14 @@ module.exports = {
     executableName: 'DinePOSKitchen',
     artifactName: 'DinePOS-Kitchen-Setup-${version}.${ext}',
   },
+  // the Mac app (`npm run dist:mac` on a Mac or GitHub's Mac machines): Apple chip and Intel disk images
+  mac: {
+    target: [{ target: 'dmg', arch: ['arm64', 'x64'] }],
+    category: 'public.app-category.business',
+    icon: '../desktop/build/icon.png',
+    extendInfo: { NSLocalNetworkUsageDescription: 'DinePOS Kitchen shows the kitchen tickets from the DinePOS server on your network.' },
+  },
+  dmg: { artifactName: 'DinePOS-Kitchen-${version}-mac-${arch}.${ext}' },
   nsis: {
     oneClick: false,
     perMachine: true,

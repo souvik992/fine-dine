@@ -11,16 +11,18 @@ import { ORIGIN } from './protocol.js';
 import { opensWindowAtStart, ServerSupervisor, type ServerCommand } from './server-supervisor.js';
 
 /** How to run the server: the installed bundle, or (development and tests) DINEPOS_SERVER_NODE / _ARGS / _CWD. */
-export function serverCommand(env: NodeJS.ProcessEnv = process.env, resources = process.resourcesPath): ServerCommand {
+export function serverCommand(env: NodeJS.ProcessEnv = process.env, resources = process.resourcesPath, platform: NodeJS.Platform = process.platform): ServerCommand {
   const port = Number(env.DINEPOS_PORT ?? 7420) || 7420;
-  const dataDir = env.DATA_DIR ?? path.join(env.ProgramData ?? 'C:\\ProgramData', 'DinePOS');
+  // the server's own default (apps/server/src/config.ts): ProgramData on Windows, /Users/Shared on a Mac
+  const dataDir = env.DATA_DIR ?? (platform === 'darwin' ? '/Users/Shared/DinePOS' : path.join(env.ProgramData ?? 'C:\\ProgramData', 'DinePOS'));
   const clean: NodeJS.ProcessEnv = { ...env };
   delete clean.ELECTRON_RUN_AS_NODE;
   if (env.DINEPOS_SERVER_NODE) {
     return { node: env.DINEPOS_SERVER_NODE, args: JSON.parse(env.DINEPOS_SERVER_ARGS ?? '[]') as string[], cwd: env.DINEPOS_SERVER_CWD ?? process.cwd(), env: clean, port, dataDir };
   }
   const dir = path.join(resources, 'server');
-  return { node: path.join(dir, 'node.exe'), args: [path.join(dir, 'server.mjs')], cwd: dir, env: { ...clean, NODE_ENV: 'production' }, port, dataDir };
+  // the Node runtime packed beside the server: node.exe on Windows, node (Apple chip or Intel build) in the Mac app
+  return { node: path.join(dir, platform === 'win32' ? 'node.exe' : 'node'), args: [path.join(dir, 'server.mjs')], cwd: dir, env: { ...clean, NODE_ENV: 'production' }, port, dataDir };
 }
 
 /** A small round tray icon (green running, amber starting, red stopped), drawn here: no image file needed. */
@@ -176,7 +178,8 @@ export function runServerMode(devUrl: string | undefined): void {
   });
 
   void (async () => {
-    Menu.setApplicationMenu(null);
+    // a Mac keeps its app and Edit menus (⌘C / ⌘V / ⌘Q); Windows needs none in this window
+    Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }]) : null);
     tray = new Tray(icons.starting);
     tray.setToolTip('DinePOS Server');
     tray.setContextMenu(
@@ -190,7 +193,7 @@ export function runServerMode(devUrl: string | undefined): void {
     tray.on('click', show);
     // only the tray icon (after install, at Windows start, from the shortcut); --show opens the window too
     if (opensWindowAtStart()) show();
-    else tray.displayBalloon({ title: 'DinePOS Server is running', content: 'It runs in the background. Click the DinePOS icon by the clock to open it.', noSound: true });
+    else if (process.platform === 'win32') tray.displayBalloon({ title: 'DinePOS Server is running', content: 'It runs in the background. Click the DinePOS icon by the clock to open it.', noSound: true });
     await supervisor.start();
     addons.start();
     setInterval(() => void supervisor.poll(), 3000).unref();

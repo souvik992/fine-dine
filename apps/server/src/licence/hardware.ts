@@ -21,6 +21,11 @@ export function machineIdentifiers(): string[] {
     const serial = /([0-9A-F]{4}-[0-9A-F]{4})/i.exec(run('cmd', ['/c', 'vol', drive]))?.[1] ?? '';
     return [guid, serial];
   }
+  if (platform() === 'darwin') {
+    // the Mac's hardware UUID: the same after reinstalling macOS or DinePOS
+    const uuid = /"IOPlatformUUID"\s*=\s*"([0-9A-F-]+)"/i.exec(run('ioreg', ['-rd1', '-c', 'IOPlatformExpertDevice']))?.[1] ?? '';
+    return [uuid || hostname()];
+  }
   let machineId = '';
   try {
     machineId = readFileSync('/etc/machine-id', 'utf8').trim();

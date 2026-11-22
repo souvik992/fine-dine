@@ -19,8 +19,12 @@ export interface PsRequest {
 }
 export type PsRunner = (r: PsRequest) => Promise<PsResult>;
 
+/** Off Windows (the Mac app) there is no PowerShell: say which printers work there instead. */
+export const NOT_WINDOWS = 'USB, Bluetooth and Windows-installed printers print from Windows only. On a Mac, use a network (Wi-Fi or LAN) printer, or a print agent on a Windows PC.';
+
 export const runPowerShell: PsRunner = (r) =>
   new Promise((resolve) => {
+    if (process.platform !== 'win32') return resolve({ code: 1, stdout: '', stderr: NOT_WINDOWS });
     const encoded = Buffer.from(r.script, 'utf16le').toString('base64');
     const max = r.maxOutput ?? 4096;
     const child = spawn(powershellPath(), ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {
