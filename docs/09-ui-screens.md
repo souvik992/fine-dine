@@ -19,7 +19,7 @@ Every state also has a text label and icon — colour is never the only signal.
 
 ## Desktop app (Electron)
 ### 1. Floor (built in P1-08: area tabs, table search, health dots, clock, tiles, seat dialog, arrow keys)
-- Top bar: area tabs, search table (type `T7` + Enter), order-type buttons (Takeaway), clock, sync/print health dots.
+- Top bar: area tabs, search table (type `T7` + Enter), **+ Takeaway** and **+ Delivery** (start a counter order; the strip of open ones shows above the tables only while any is open), clock, sync/print health dots.
 - Layout / Grid switch (remembered per terminal): Layout shows tables where they were placed in Settings ›
   Floor & tables; areas without a saved layout fall back to the grid.
 - Tile: label, covers, elapsed min, amount, captain initials, state label.

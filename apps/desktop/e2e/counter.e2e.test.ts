@@ -116,11 +116,11 @@ describe('takeaway and delivery from the floor', () => {
     rmSync(dataDir, { recursive: true, force: true });
   });
 
-  it('the floor offers new takeaway and delivery orders above the tables', async () => {
-    const strip = page.getByTestId('counter-orders');
-    await strip.getByText('No open takeaway or delivery orders.').waitFor();
-    await strip.getByTestId('new-takeaway').waitFor();
-    await strip.getByTestId('new-delivery').waitFor();
+  it('the floor offers new takeaway and delivery orders in the top bar; no strip while none is open', async () => {
+    const bar = page.getByRole('banner');
+    await bar.getByTestId('new-takeaway').waitFor();
+    await bar.getByTestId('new-delivery').waitFor();
+    expect(await page.getByTestId('counter-orders').count()).toBe(0);
     expect(await page.locator('[data-table]').count()).toBe(8); // the tables are still there
   });
 

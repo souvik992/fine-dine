@@ -1,56 +1,32 @@
 import { formatINR, type CounterOrder } from '@dinepos/shared';
-import { Bike, Phone, Plus, ShoppingBag } from 'lucide-react';
+import { Bike, Phone, ShoppingBag } from 'lucide-react';
 import { useState } from 'react';
 import { counterOrdersOf, COUNTER_TYPE_LABEL, STAGE_META, type CounterType } from './counter-model.js';
 import { elapsedMinutes, formatElapsed } from './floor-model.js';
 
 /**
- * The floor's strip for orders without a table: "New takeaway" / "New delivery", then one card per open order, oldest
- * first. A card opens the order to punch, bill or settle it, like a table tile.
+ * The floor's strip for orders without a table: one card per open order, oldest first (new ones are started from
+ * the top bar's + Takeaway / + Delivery). A card opens the order to punch, bill or settle it, like a table tile.
+ * Nothing open: no strip.
  */
-export function CounterOrders({
-  orders,
-  now,
-  canCreate,
-  onNew,
-  onOpen,
-}: {
-  orders: CounterOrder[] | undefined;
-  now: Date;
-  canCreate: boolean;
-  onNew: (type: CounterType) => void;
-  onOpen: (orderId: string) => void;
-}) {
+export function CounterOrders({ orders, now, onOpen }: { orders: CounterOrder[] | undefined; now: Date; onOpen: (orderId: string) => void }) {
   const [filter, setFilter] = useState<CounterType | 'all'>('all');
   const all = orders ?? [];
   const shown = counterOrdersOf(all, filter);
   const count = (t: CounterType) => all.filter((o) => o.type === t).length;
+  if (all.length === 0) return null;
 
   return (
     <section className="mb-4 rounded-xl border border-border bg-card p-3" aria-label="Takeaway and delivery orders" data-testid="counter-orders">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="mr-1 font-display text-base font-semibold">Takeaway &amp; delivery</h2>
-        {all.length ? (
-          <span className="flex gap-1" role="radiogroup" aria-label="Show">
-            {(['all', 'takeaway', 'delivery'] as const).map((f) => (
-              <button key={f} role="radio" aria-checked={filter === f} aria-selected={filter === f} className="tab h-7" onClick={() => setFilter(f)}>
-                {f === 'all' ? `All ${all.length}` : `${COUNTER_TYPE_LABEL[f]} ${count(f)}`}
-              </button>
-            ))}
-          </span>
-        ) : (
-          <span className="text-sm text-muted-foreground">No open takeaway or delivery orders.</span>
-        )}
-        {canCreate ? (
-          <span className="ml-auto flex gap-2">
-            <button className="btn btn-primary h-10" onClick={() => onNew('takeaway')} data-testid="new-takeaway">
-              <ShoppingBag className="h-4 w-4" /> <Plus className="-ml-1 h-3.5 w-3.5" /> Takeaway
+        <span className="flex gap-1" role="radiogroup" aria-label="Show">
+          {(['all', 'takeaway', 'delivery'] as const).map((f) => (
+            <button key={f} role="radio" aria-checked={filter === f} aria-selected={filter === f} className="tab h-7" onClick={() => setFilter(f)}>
+              {f === 'all' ? `All ${all.length}` : `${COUNTER_TYPE_LABEL[f]} ${count(f)}`}
             </button>
-            <button className="btn btn-primary h-10" onClick={() => onNew('delivery')} data-testid="new-delivery">
-              <Bike className="h-4 w-4" /> <Plus className="-ml-1 h-3.5 w-3.5" /> Delivery
-            </button>
-          </span>
-        ) : null}
+          ))}
+        </span>
       </div>
 
       {shown.length ? (

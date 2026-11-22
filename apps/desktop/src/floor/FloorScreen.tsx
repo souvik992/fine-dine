@@ -1,6 +1,6 @@
 import type { FloorSnapshot, FloorTable } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Banknote, ChartColumn, MoonStar, Puzzle, ReceiptText, RefreshCw, Search, Settings } from 'lucide-react';
+import { Banknote, Bike, ChartColumn, MoonStar, Plus, Puzzle, ReceiptText, RefreshCw, Search, Settings, ShoppingBag } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
@@ -203,6 +203,16 @@ export function FloorScreen({
         <time className="w-14 text-right text-sm font-semibold tabular-nums" dateTime={now.toISOString()}>
           {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })}
         </time>
+        {can('order.create') ? (
+          <>
+            <button className="btn btn-primary h-10" onClick={() => setStarting('takeaway')} title="Start a takeaway order" data-testid="new-takeaway">
+              <ShoppingBag className="h-4 w-4" /> <Plus className="-ml-1 h-3.5 w-3.5" /> Takeaway
+            </button>
+            <button className="btn btn-primary h-10" onClick={() => setStarting('delivery')} title="Start a delivery order" data-testid="new-delivery">
+              <Bike className="h-4 w-4" /> <Plus className="-ml-1 h-3.5 w-3.5" /> Delivery
+            </button>
+          </>
+        ) : null}
         {can('reservation.manage') || can('order.create') ? <BookingsButton onClick={onBookings} /> : null}
         {can('online.orders') ? (
           <OnlineButton onClick={onOnline} />
@@ -256,7 +266,7 @@ export function FloorScreen({
           <p className="mt-16 text-center text-muted-foreground">Loading floor…</p>
         ) : (
           <>
-            <CounterOrders orders={data.counterOrders} now={now} canCreate={can('order.create')} onNew={setStarting} onOpen={onOpenOrder} />
+            <CounterOrders orders={data.counterOrders} now={now} onOpen={onOpenOrder} />
             {tables.length === 0 ? (
               <p className="mt-16 text-center text-muted-foreground">No tables in this area yet. Add them in Settings.</p>
             ) : (
