@@ -43,7 +43,10 @@ child.stdout.on('data', (d) => (log += d));
 child.stderr.on('data', (d) => (log += d));
 child.on('error', (e) => (log += `could not start ${node}: ${e.message}\n`)); // e.g. an Intel runtime without Rosetta
 let ok = false;
-for (let i = 0; i < 60 && !ok; i++) {
+let exited = null;
+child.on('exit', (code, signal) => (exited = signal ?? `exit code ${code}`));
+// up to 2 minutes: the Intel runtime's first start through Rosetta translates all of Node first
+for (let i = 0; i < 240 && !ok && exited === null; i++) {
   await new Promise((r) => setTimeout(r, 500));
   try {
     const r = await fetch(`http://127.0.0.1:${port}/v1/health`);
@@ -56,7 +59,7 @@ child.kill();
 const db = readdirSync(dataDir).some((f) => f.endsWith('.db'));
 rmSync(dataDir, { recursive: true, force: true });
 if (!ok || !db) {
-  console.error(`✖ the server in ${appDir} did not start (health ${ok ? 'ok' : 'no answer'}, database ${db ? 'made' : 'missing'})\n${log.slice(-3000)}`);
+  console.error(`✖ the server in ${appDir} did not start (health ${ok ? 'ok' : 'no answer'}, database ${db ? 'made' : 'missing'}, process ${exited ?? 'still running'})\n${log.slice(-3000)}`);
   process.exit(1);
 }
 console.warn(`✔ ${path.basename(appDir)} (${path.basename(path.dirname(appDir))}): server, Node runtime and SQLite inside; the server starts and answers /v1/health`);
