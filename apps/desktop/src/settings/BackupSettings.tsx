@@ -1,10 +1,11 @@
 import type { OutletConfig } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { DatabaseBackup, History, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { ChevronLeft, ChevronRight, DatabaseBackup, History, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { Modal } from '../components/Modal.js';
+import { paginate } from '../components/paginate.js';
 import { ErrorText, Field, SectionHeader, useSave } from './common.js';
 
 interface BackupInfo {
@@ -25,6 +26,8 @@ interface BackupStatus {
 const KIND: Record<BackupInfo['kind'], string> = { auto: 'Automatic', dayend: 'Day end', manual: 'Made by hand', restore: 'Before a restore' };
 const when = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 const size = (b: number) => (b > 1_048_576 ? `${(b / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+/** Backups listed per page. */
+const PAGE_SIZE = 10;
 const age = (min: number) => (min < 1 ? 'just now' : min < 60 ? `${min} min ago` : min < 1440 ? `${Math.floor(min / 60)} h ago` : `${Math.floor(min / 1440)} days ago`);
 
 /** Settings › Backups (P2-08): every 15 minutes and at day end, verified; a copy folder; restore with the Owner's PIN. */
@@ -38,6 +41,7 @@ export function BackupSettings() {
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [restoring, setRestoring] = useState<BackupInfo | null>(null);
+  const [page, setPage] = useState(1);
   useEffect(() => {
     if (config.data && copyDir === null) setCopyDir(config.data['backup.copyDir'] ?? '');
   }, [config.data, copyDir]);
@@ -45,6 +49,7 @@ export function BackupSettings() {
   if (!data.data) return <p className="text-muted-foreground">Loading…</p>;
   const { status, backups } = data.data;
   const healthy = status.ageMin !== null && status.ageMin <= 60 && !status.lastError;
+  const shown = paginate(backups, page, PAGE_SIZE); // newest first, as the server lists them
 
   const backupNow = async () => {
     setRunning(true);
@@ -52,6 +57,7 @@ export function BackupSettings() {
     try {
       const r = await api.send<{ backup: BackupInfo }>('POST', '/v1/admin/backups');
       setMessage({ ok: true, text: `Backup made and checked (${size(r.backup.bytes)}).` });
+      setPage(1); // the new backup is the first row
       await qc.invalidateQueries({ queryKey: ['backups'] });
     } catch (e) {
       setMessage({ ok: false, text: e instanceof ApiError ? e.message : 'The backup could not be made.' });
@@ -110,7 +116,7 @@ export function BackupSettings() {
       <h3 className="mb-2 font-semibold">Backups on this PC</h3>
       <table className="w-full rounded-xl border border-border bg-card text-sm" aria-label="Backups">
         <tbody>
-          {backups.map((b) => (
+          {shown.rows.map((b) => (
             <tr key={b.file} className="border-b border-border last:border-0">
               <td className="px-3 py-2 font-semibold">{when(b.at)}</td>
               <td className="px-3 py-2 text-muted-foreground">{KIND[b.kind]}</td>
@@ -131,6 +137,22 @@ export function BackupSettings() {
           ) : null}
         </tbody>
       </table>
+      {shown.pages > 1 ? (
+        <nav className="mt-2 flex items-center justify-end gap-2 text-sm" aria-label="Backup pages">
+          <span className="mr-auto text-muted-foreground" role="status">
+            Showing {shown.from}–{shown.to} of {shown.total}
+          </span>
+          <button className="btn h-8" onClick={() => setPage(shown.page - 1)} disabled={shown.page <= 1} aria-label="Previous page">
+            <ChevronLeft className="h-4 w-4" /> Previous
+          </button>
+          <span className="tabular-nums" aria-current="page">
+            Page {shown.page} of {shown.pages}
+          </span>
+          <button className="btn h-8" onClick={() => setPage(shown.page + 1)} disabled={shown.page >= shown.pages} aria-label="Next page">
+            Next <ChevronRight className="h-4 w-4" />
+          </button>
+        </nav>
+      ) : null}
       {restoring ? <RestoreDialog backup={restoring} onClose={() => setRestoring(null)} /> : null}
     </div>
   );

@@ -106,3 +106,7 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-21 fix: DinePOS Server tray offers a restart when an add-on is installed, updated or removed while the server runs (electron/addon-watch.ts), for every add-on
 - 2026-11-22 fix: billing Photos view no longer squeezes dish tiles to fit the screen (names and prices were cut off when a category had many dishes); the grid scrolls
 - 2026-11-22 fix: kitchen screen bumps reach the floor again on outlets whose business day was not closed for a week (7-day window by bump time, not business date); takeaway and delivery tiles show Food ready and Served from the kitchen screens
+- 2026-11-22 + Takeaway and + Delivery moved to the floor's top bar; the takeaway & delivery strip shows only while an order is open
+- 2026-11-22 GST on delivery and packaging charges is 0% (exempt) by default (was Not set)
+- 2026-11-22 Settings › Online orders › Delivery: the store's address comes from the place searched or the point clicked on the map (shown read-only as Selected address); the separate typed address field is gone
+- 2026-11-22 Settings › Backups lists 10 backups a page (Previous / Next, newest first)
