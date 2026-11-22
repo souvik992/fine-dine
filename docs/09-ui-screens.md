@@ -64,7 +64,11 @@ quantity instead of adding a second line (lines already sent to the kitchen are 
 - After the KOT (P2-04): each sent line has a pencil button: "Keep" stepper (0 = cancel the line), reason chips or
   typed reason, "Not prepared yet" (ingredients back to stock); a manager PIN is asked when the role needs it.
   Cancelled lines stay in their KOT, struck through. Each KOT group has "Reprint". When the bill is printed the
-  Bill button becomes "Reprint" (F9), printing a DUPLICATE with the same number.
+  Bill button (F9) prints it again, a DUPLICATE with the same number.
+- Bill dialog (F9): **Discount** (% or ₹ with a reason) or **Coupon code** (as quickPOS: type the code, Apply or Enter;
+  it shows what it takes off, or why it cannot be used, and the preview names it "Coupon CODE").
+- Settings › Coupons / Offers (admin): the coupons with what they take off, minimum bill, dates, uses and status
+  (Active, Off, Not started, Ended, Used up); Add coupon / Edit.
 - Sold out (P2-11): right-click an item tile to mark it sold out or back on (`menu.stock`). Sold-out tiles stay
   visible, greyed, with a "Sold out" label; choosing one explains why.
 
@@ -142,12 +146,15 @@ The button shows how many materials are low or need a count. Tabs:
   and wasted value; Download CSV.
 
 ## Online orders (built in P4-06: `apps/desktop/src/online/`, Floor header "Online")
-- Columns New / In the kitchen / Ready / Out for delivery, finished on demand. A card: order number, PICKUP or
-  DELIVERY, PAID ONLINE / CASH ON DELIVERY / PAY AT PICKUP, website or app, placed time and the minutes left before the
-  hub rejects it, customer and mobile, address and distance, rider, dishes with options and notes, the customer's total
-  and the bill (red when they differ), and any alert. Actions: Accept (or "Accept at ₹… " after a price refusal),
-  Reject (reason, a word for the customer), Preparing, Ready, Out for delivery (rider name and phone), Delivered /
-  Collected, Bill (opens the order), Cancel order (voids the bill).
+- Laid out as quickPOS's ODS (product owner 2026-11-22): a hub status pill and the channels switched on, then four
+  column cards New / Preparing / Ready / On the way (icon and count), and "Finished recently" below (4, or all).
+  A card has a coloured left edge for its channel (Swiggy orange, Zomato red, website blue, app purple), a new order is
+  highlighted. On it: channel logo and name, order number, Pickup or Delivery · km, "n min ago", "Accept within m:ss",
+  the preparation clock, customer and mobile, address (Map), dishes with options, notes and line totals, Swiggy/Zomato
+  details, delivery and packaging charges, how it is paid (Paid online / Collect on delivery / Pay at pickup) with the
+  customer's total, the bill (red when it differs), rider and any alert. Actions: Accept (or "Accept at ₹… " after a
+  price refusal), Reject (reason, a word for the customer), Preparing, Ready, Out for delivery (rider name and phone),
+  Delivered / Collected, Cancel order (voids the bill); then Open bill, and KOT / Bill for what was not printed.
 - On every other screen: "N new online orders". The chime repeats every 3 s on every screen (the Online orders screen
   too) until no order waits to be accepted, also for orders already waiting when the app starts; an order accepted
   automatically chimes once. The window plays it without a tap first (`autoplayPolicy`).

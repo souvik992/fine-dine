@@ -43,6 +43,15 @@ breakup adds up. Addon qty in step 1 is the addon's own quantity on the line (no
 
 Inclusive pricing: tax = round(line × rate / (10000 + rate)); taxable = line − tax.
 
+## Coupons and offers (as quickPOS; product owner 2026-11-22)
+- The owner or an admin makes codes in Settings › Coupons / Offers: a percent (optionally "up to" an amount) or an
+  amount, a minimum bill, dates (from / to, business date, inclusive), a number of uses, on / off.
+- A coupon is the bill discount: a percent of the subtotal (half up), at most its cap and the subtotal, taken off as an
+  amount before GST (step 3 above), printed as the discount with the reason "Coupon CODE". It replaces a manual
+  discount on that bill and needs no manager PIN (the owner approved it when making it).
+- Checked when the bill is printed: the minimum bill is the bill total before the coupon. A use is a bill printed with
+  it that is not void; printing the same bill again counts once. A used coupon keeps its code.
+
 ## Split bills
 - `equal`: n parts; each part gets every line at qty/n using proportional amounts; remainders to the last part.
 - `items`: each item (or item quantity) assigned to exactly one part; unassigned items are an error.

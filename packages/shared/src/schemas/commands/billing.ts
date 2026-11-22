@@ -1,4 +1,5 @@
 // Payload schemas for PrintBill, Settle, DayEnd and SetConfig (docs/03-command-api.md).
+import { couponCodeSchema } from '../../coupons.js';
 import { menuSyncSchema, onlineSettingsSchema } from '../../online.js';
 import { z } from 'zod';
 import { gstinProblem } from '../../gstin.js';
@@ -43,8 +44,11 @@ export const printBillSchema = z
       .strict()
       .nullable()
       .default(null),
+    /** A coupon code (Settings › Coupons / Offers): becomes the bill discount, so `discount` must be empty. */
+    coupon: couponCodeSchema.nullable().default(null),
   })
-  .strict();
+  .strict()
+  .refine((p) => !p.coupon || !p.discount || p.discount.value === 0, { message: 'a coupon replaces the discount: give one or the other', path: ['coupon'] });
 
 export { TENDER_MODES, tendersSchema, type PaymentMode, type TenderMode } from './tenders.js';
 

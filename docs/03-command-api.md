@@ -82,7 +82,7 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 | `SeatReservation` | reservationId, tableId?, covers? | order.create | | new order (as OpenTable), booking seated | |
 | `AddToWaitlist` / `LeaveWaitlist` | guestName, phone?, partySize, quotedMin? / entryId, outcome: left \| cancelled | reservation.manage | | waitlist row | |
 | `SeatFromWaitlist` | entryId, tableId, covers?, ignoreReservation? | order.create | | new order, entry seated | |
-| `PrintBill` | discount?{kind: pct\|amount, value, reason}, serviceCharge?{enabled, rateBp}, customer?{name, phone, gstin} | bill.print | if discount > role limit | bill row(s), billNo assigned, table → BILL_PRINTED | |
+| `PrintBill` | discount?{kind: pct\|amount, value, reason} or coupon?, serviceCharge?{enabled, rateBp}, customer?{name, phone, gstin} | bill.print | if discount > role limit | bill row(s), billNo assigned, table → BILL_PRINTED | |
 | `SplitBill` | mode: equal\|items\|proportion, parts | bill.split | | replaces unsettled bill rows | |
 | `Settle` | billId, tenders[{mode, amountPaise, ref?}] | bill.settle | | payment rows; when all parts paid → settled, table FREE | |
 | `VoidBill` | billId, reason | bill.void | yes | reversal, order → void | yes |
@@ -130,6 +130,10 @@ All writes: `POST /v1/commands`. All reads: `GET /v1/...`. Base URL `http://<mas
 - `PrintBill` discount `{ kind: pct|amount, value, reason }`: pct in basis points, amount in paise, reason
   required when value > 0. `serviceCharge.rateBp` defaults to setting `bill.serviceChargeBp`. Result
   `{ billId, billNo, revision, totalPaise, printerId, warning? }` (warning when no bill printer exists).
+- `PrintBill` `coupon` (a code, any case; not with a discount): checked against the bill total before it on the
+  business date (switched on, dates, minimum bill, uses), else `INVALID_STATE { reason: "coupon", code }` with the
+  reason (no bill number used). It becomes an amount discount with reason `Coupon <CODE>` and needs no manager PIN; the
+  use is kept in `coupon_use` (printing the same bill again replaces it; a void bill gives it back).
 - `Settle` result `{ billId, paidPaise, changePaise }`. `DayEnd` result `{ closedDate, nextDate, zReport }`.
 - `SetConfig` `{ values: { "<key>": value } }`, keys: `outlet.name`, `outlet.addressLines`, `outlet.gstin`,
   `outlet.fssai`, `outlet.phone`, `bill.prefix`, `bill.footerLines`, `bill.roundOffStep`, `bill.roundOffTie`,
@@ -266,9 +270,14 @@ Stock queries (need a session with `stock.manage`): `GET /v1/stock` → `{ items
 
 ## Admin endpoints (also commands, admin right)
 `UpsertArea`, `UpsertTable`, `UpsertCategory`, `UpsertMenuItem`, `UpsertAddonGroup`, `UpsertStation`,
-`UpsertPrinter`, `RemovePrinter`, `UpsertUser`, `UpsertRole`, `PairDevice`, `RevokeDevice`, `SetConfig`.
+`UpsertPrinter`, `RemovePrinter`, `UpsertCoupon`, `UpsertUser`, `UpsertRole`, `PairDevice`, `RevokeDevice`, `SetConfig`.
 `UpsertPrinter` also takes `device`, `profile`, `active`, `drawer` and `stationIds` (the stations whose KOTs it prints,
 set from the printer); `RemovePrinter { printerId }` deletes a printer that never printed, else turns it off.
+`UpsertCoupon { couponId?, code, description, kind: pct|amount, value, maxDiscountPaise, minBillPaise, validFrom,
+validTo, maxUses, active }` (schema `packages/shared/src/coupons.ts`): a code another coupon has, or changing a used
+coupon's code, is `INVALID_STATE`; result `{ coupon: CouponView, created }`. Reads: `GET /v1/coupons` (admin) →
+`{ coupons: CouponView[] }` with uses and today's status; `GET /v1/coupons/:code` (bill.print) → `{ coupon, today }`
+for the bill dialog's preview, `NOT_FOUND` for an unknown code.
 
 Built in P1-05 (payload schemas in `packages/shared/src/schemas/commands/admin.ts`): every `Upsert*` takes the
 record `id` (ULID) and inserts or updates it; result `{ id, created }`. Right `admin`; allowed while the day is

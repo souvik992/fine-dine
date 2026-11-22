@@ -167,7 +167,7 @@ export function OnlineSettings({ part = 'orders' }: { part?: 'orders' | 'service
 
         <section className="mt-6 rounded-xl border border-border bg-card p-4" aria-label="Printing on accepting">
           <h3 className="mb-1 font-semibold">When an order is accepted, print</h3>
-          <p className="mb-2 text-xs text-muted-foreground">By staff or automatically. Anything not printed here can be printed from the order card (Print bill, Print KOT).</p>
+          <p className="mb-2 text-xs text-muted-foreground">By staff or automatically. Anything not printed here can be printed from the order card (Bill, KOT).</p>
           <div className="space-y-1">
             <Toggle checked={s.printOnAccept.bill} onChange={(v) => set({ printOnAccept: { ...s.printOnAccept, bill: v } })} label="The bill" />
             <Toggle checked={s.printOnAccept.kot} onChange={(v) => set({ printOnAccept: { ...s.printOnAccept, kot: v } })} label="Kitchen tickets (KOT)" hint="On the stations’ printers, as set in Settings › Kitchen." />

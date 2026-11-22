@@ -98,6 +98,10 @@ states are as before (KOT_RUNNING until the bill).
 - Stock never blocks service: balances may go negative ("Count needed").
 - Sold out (`menu_item.available = 0`) is separate from stock and set by people (`SetItemAvailability`).
 
+## Coupons (migration 0021)
+- `coupon` (code unique, kind pct|amount, value, max_discount_paise, min_bill_paise, valid_from/to, max_uses, active)
+  and `coupon_use` (bill_id primary key, coupon_id, code and discount as printed). Rules in `docs/08-billing-gst.md`.
+
 ## Dish photos (migration 0014)
 | Entity | Key fields | Notes |
 | --- | --- | --- |

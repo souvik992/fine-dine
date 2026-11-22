@@ -16,6 +16,7 @@ import { createPrintAgent } from './create-print-agent.js';
 import { revokePrintAgent } from './revoke-print-agent.js';
 import { setPrinterAgent } from './set-printer-agent.js';
 import { removePrinter } from './remove-printer.js';
+import { upsertCoupon } from './upsert-coupon.js';
 import { addToWaitlist } from './add-to-waitlist.js';
 import { assignCaptain } from './assign-captain.js';
 import { adjustStock } from './adjust-stock.js';
@@ -88,6 +89,7 @@ export const coreHandlers: readonly CommandHandler<unknown, unknown>[] = [
   revokePrintAgent,
   setPrinterAgent,
   removePrinter,
+  upsertCoupon,
   // admin
   upsertArea,
   upsertTable,

@@ -43,7 +43,7 @@ interface Toast {
 }
 
 /**
- * Order / billing screen (docs/09 §2). Keyboard: type a code + Enter (Shift+Enter for options), F8 Print KOT / Send to KDS,
+ * Order / billing screen (docs/09 §2). Keyboard: type a code + Enter (Shift+Enter for options), F8 KOT / Send to KDS,
  * Alt+↑/↓ pick a held line, + / − its quantity, Delete removes it, Esc clears the search or goes back.
  */
 export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: () => void }) {

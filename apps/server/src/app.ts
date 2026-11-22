@@ -44,6 +44,7 @@ import { licenceActivationRoutes } from './routes/licence-activation.js';
 import { queryRoutes } from './routes/queries.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { stockRoutes } from './routes/stock.js';
+import { couponRoutes } from './routes/coupons.js';
 import { cashierRoutes } from './routes/cashier.js';
 import { deviceRoutes } from './routes/devices.js';
 import { reportRoutes } from './routes/reports.js';
@@ -331,6 +332,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
   whatsappRoutes(app, { db, now, ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}) });
   sessionRoutes(app, { db, now, timeZone });
   stockRoutes(app, { db, now });
+  couponRoutes(app, { db, now, timeZone });
   cashierRoutes(app, { db, now });
   deviceRoutes(app, { db, now });
   reportRoutes(app, { db, now, timeZone });

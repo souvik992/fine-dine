@@ -17,6 +17,7 @@ export * from './schemas/commands/billing.js';
 export * from './schemas/commands/orders.js';
 export * from './schemas/commands/reservations.js';
 export * from './online.js';
+export * from './coupons.js';
 export * from './sync.js';
 export * from './schemas/commands/stock.js';
 export * from './schemas/commands/users.js';

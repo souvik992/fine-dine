@@ -203,4 +203,48 @@ describe('takeaway and delivery from the floor', () => {
     await expect.poll(() => page.locator('[data-counter="Takeaway #3"]').count(), { timeout: 5_000 }).toBe(0);
     await page.screenshot({ path: path.join(SHOTS, 'dinepos-floor-counter.png') });
   });
+
+  it('coupons and offers (as quickPOS): the owner adds a code in Settings; the bill takes it off before GST', async () => {
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('button', { name: /^Coupons \/ Offers/ }).click();
+    await page.getByRole('button', { name: 'Add coupon' }).click();
+    const add = page.getByRole('dialog', { name: 'Add coupon' });
+    await add.getByLabel('Coupon code').fill('save10');
+    await add.getByLabel('How much').fill('10');
+    await add.getByLabel('Maximum discount').fill('20');
+    await add.getByRole('button', { name: 'Save coupon' }).click();
+    await add.waitFor({ state: 'detached' });
+    const row = page.locator('[data-coupon="SAVE10"]');
+    await row.getByText('10% off, up to ₹20.00').waitFor();
+    await row.getByText('Active').waitFor();
+    await page.getByRole('button', { name: /Floor|Back/ }).first().click();
+
+    // a takeaway of Dal Makhani (₹280): 10% is ₹28, at most ₹20 → ₹260 + 5% GST = ₹273
+    await page.getByTestId('new-takeaway').click();
+    await page.getByRole('dialog', { name: 'New takeaway order' }).getByRole('button', { name: 'Start order' }).click();
+    await page.getByTestId('order-title').getByText('Takeaway #4').waitFor({ timeout: 5_000 });
+    await page.keyboard.type('dm');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => page.getByTestId('held-items').locator('li').count(), { timeout: 5_000 }).toBe(1);
+    await page.keyboard.press('F8');
+    await expect.poll(() => page.getByTestId('held-items').locator('li').count(), { timeout: 5_000 }).toBe(0);
+    await page.keyboard.press('F9');
+    const bill = page.getByRole('dialog', { name: 'Print bill' });
+    await bill.getByRole('tab', { name: 'Coupon code' }).click();
+    await bill.getByLabel('Coupon code').fill('NOPE');
+    await bill.getByRole('button', { name: 'Apply' }).click();
+    await bill.getByText('No coupon with this code. Check the spelling.').waitFor();
+    await bill.getByLabel('Coupon code').fill('save10');
+    await bill.getByLabel('Coupon code').press('Enter');
+    const preview = bill.getByLabel('Bill preview');
+    await preview.getByText('Coupon SAVE10').waitFor();
+    expect(await preview.innerText()).toMatch(/-₹20\.00[\s\S]*₹273\.00/);
+    await page.screenshot({ path: path.join(SHOTS, 'dinepos-bill-coupon.png') });
+    await bill.getByRole('button', { name: /^Print bill/ }).click();
+    await bill.waitFor({ state: 'detached' });
+
+    const bills = (await (await fetch(`${SERVER}/v1/bills`, { headers: { 'x-user-session': token } })).json()) as { bills: Array<{ table: string; totalPaise: number }> };
+    expect(bills.bills.find((b) => b.table === 'Takeaway #4')?.totalPaise).toBe(27_300);
+    await page.getByRole('button', { name: /Floor|Back/ }).first().click().catch(() => undefined);
+  });
 });

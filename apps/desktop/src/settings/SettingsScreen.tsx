@@ -1,10 +1,11 @@
 import type { Right } from '@dinepos/shared';
-import { ArrowLeft, ChefHat, CloudUpload, DatabaseBackup, KeyRound, LayoutGrid, MapPin, MapPinned, MonitorSmartphone, Printer, Puzzle, ShoppingBag, ReceiptText, Store, Users, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, ChefHat, CloudUpload, DatabaseBackup, KeyRound, LayoutGrid, MapPin, MapPinned, MonitorSmartphone, Printer, Puzzle, ShoppingBag, ReceiptText, Store, Ticket, Users, UtensilsCrossed } from 'lucide-react';
 import { useState, type ComponentType } from 'react';
 import { useApp } from '../app-context.js';
 import { UserBadge } from '../components/UserBadge.js';
 import { BackupSettings } from './BackupSettings.js';
 import { BillDesignSettings } from './BillDesignSettings.js';
+import { CouponSettings } from './CouponSettings.js';
 import { DeviceSettings } from './DeviceSettings.js';
 import { FloorSettings } from './FloorSettings.js';
 import { KitchenSettings } from './KitchenSettings.js';
@@ -20,11 +21,12 @@ import { TerminalSettings } from './TerminalSettings.js';
 import { AddonsSettings } from './AddonsSettings.js';
 import { AddonView, useAddonRegistrations } from '../addons/runtime.js';
 
-type SectionKey = 'outlet' | 'bill' | 'backups' | 'devices' | 'floor' | 'menu' | 'kitchen' | 'printers' | 'staff' | 'sections' | 'licence' | 'online' | 'serviceability' | 'sync' | 'addons' | 'terminal' | `addon:${string}`;
+type SectionKey = 'outlet' | 'bill' | 'backups' | 'devices' | 'floor' | 'menu' | 'kitchen' | 'printers' | 'coupons' | 'staff' | 'sections' | 'licence' | 'online' | 'serviceability' | 'sync' | 'addons' | 'terminal' | `addon:${string}`;
 
 const SECTIONS: Array<{ key: SectionKey; label: string; hint: string; icon: ComponentType<{ className?: string }>; right: Right | null }> = [
   { key: 'outlet', label: 'Outlet & bills', hint: 'Name, GSTIN, bill number, round-off, UPI', icon: Store, right: 'admin' },
   { key: 'bill', label: 'Bill design', hint: 'Logo, what the bill shows, footer, preview', icon: ReceiptText, right: 'admin' },
+  { key: 'coupons', label: 'Coupons / Offers', hint: 'Coupon codes and offers for bills', icon: Ticket, right: 'admin' },
   { key: 'floor', label: 'Floor & tables', hint: 'Areas, tables and the floor layout', icon: LayoutGrid, right: 'admin' },
   { key: 'menu', label: 'Menu', hint: 'Categories, items, options and add-ons', icon: UtensilsCrossed, right: 'admin' },
   { key: 'kitchen', label: 'Kitchen', hint: 'Stations, kitchen screens (KDS)', icon: ChefHat, right: 'admin' },
@@ -83,6 +85,7 @@ export function SettingsScreen({ onBack, initial }: { onBack: () => void; initia
         <main className="min-w-0 flex-1 overflow-y-auto px-8 py-6">
           {current.key === 'outlet' ? <OutletSettings /> : null}
           {current.key === 'bill' ? <BillDesignSettings /> : null}
+          {current.key === 'coupons' ? <CouponSettings /> : null}
           {current.key === 'backups' ? <BackupSettings /> : null}
           {current.key === 'devices' ? <DeviceSettings /> : null}
           {current.key === 'floor' ? <FloorSettings /> : null}

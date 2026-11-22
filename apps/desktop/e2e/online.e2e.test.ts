@@ -188,7 +188,7 @@ describe.skipIf(!hubThere)('online orders through the real order hub', () => {
     // On the counter: the new order alert, then the Online orders screen.
     await page.getByTestId('online-alert').click({ timeout: 15_000 });
     const card = page.locator(`[data-online="${order.number}"]`);
-    await card.getByText('PAY AT PICKUP').waitFor();
+    await card.getByText('Pay at pickup').waitFor();
     await card.getByText('2 ×').waitFor();
     await card.getByRole('button', { name: 'Accept' }).click();
     await card.getByText(/^Bill B\//).waitFor({ timeout: 10_000 });

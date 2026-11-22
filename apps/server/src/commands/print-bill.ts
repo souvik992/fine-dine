@@ -1,9 +1,10 @@
 import { renderBill, type BillDocument } from '@dinepos/printing';
-import { calculateBill, financialYearAt, formatBillNo, newId, printBillSchema, type BillDiscount } from '@dinepos/shared';
+import { calculateBill, couponOff, couponProblem, financialYearAt, formatBillNo, newId, printBillSchema, type BillDiscount } from '@dinepos/shared';
 import { defineCommand, type OrderRow } from '../core/command-handler.js';
 import { PosError } from '../core/errors.js';
 import { getConfig } from '../core/outlet-config.js';
 import { billLogoBits, billOutlet } from './bill-design.js';
+import { couponByCode, couponRule, couponUses, type CouponRow } from './coupon-support.js';
 import { billableItems, billPrinter, orderPlace, printedDateTime, toBillLines, userName } from './billing-support.js';
 import { onlineRef } from '../online/online-support.js';
 import { emitTableState, nextCounter } from './order-support.js';
@@ -54,24 +55,40 @@ export const printBill = defineCommand({
 
     const cfg = getConfig(db);
     const place = orderPlace(db, o);
-    const discount: BillDiscount | null =
-      p.discount && p.discount.value > 0
+    const serviceChargeBp = p.serviceCharge?.enabled ? (p.serviceCharge.rateBp ?? cfg['bill.serviceChargeBp']) : 0;
+    const calcOptions = {
+      pricingMode: place.pricingMode,
+      interState: false,
+      serviceChargeBp,
+      roundOffStep: cfg['bill.roundOffStep'],
+      roundOffTie: cfg['bill.roundOffTie'],
+    };
+
+    // A coupon (Settings › Coupons / Offers, as quickPOS) is the bill discount, as an amount: checked against the bill
+    // before it (business date, minimum bill, uses), with no manager PIN (the owner approved it when making it).
+    let coupon: { row: CouponRow; off: number } | null = null;
+    if (p.coupon) {
+      const row = couponByCode(db, p.coupon);
+      if (!row) throw new PosError('INVALID_STATE', 'No coupon with this code. Check the spelling.', { reason: 'coupon', code: p.coupon });
+      const before = calculateBill(toBillLines(items), { ...calcOptions, discount: null });
+      const sameBill = (db.prepare('SELECT id FROM bill WHERE order_id = ? AND split_no = 0').pluck().get(o.id) as string | undefined) ?? null;
+      const problem = couponProblem(couponRule(row), couponUses(db, row.id, sameBill), ctx.businessDate, before.total);
+      if (problem) throw new PosError('INVALID_STATE', problem, { reason: 'coupon', code: row.code });
+      coupon = { row, off: couponOff(couponRule(row), before.subtotal) };
+    }
+    const discountReason = coupon ? `Coupon ${coupon.row.code}` : (p.discount?.reason ?? null);
+    const discount: BillDiscount | null = coupon
+      ? coupon.off > 0
+        ? { kind: 'amount', valuePaise: coupon.off }
+        : null
+      : p.discount && p.discount.value > 0
         ? p.discount.kind === 'pct'
           ? { kind: 'pct', valueBp: p.discount.value }
           : { kind: 'amount', valuePaise: p.discount.value }
         : null;
-    const serviceChargeBp = p.serviceCharge?.enabled ? (p.serviceCharge.rateBp ?? cfg['bill.serviceChargeBp']) : 0;
-
     let breakup;
     try {
-      breakup = calculateBill(toBillLines(items), {
-        pricingMode: place.pricingMode,
-        interState: false,
-        discount,
-        serviceChargeBp,
-        roundOffStep: cfg['bill.roundOffStep'],
-        roundOffTie: cfg['bill.roundOffTie'],
-      });
+      breakup = calculateBill(toBillLines(items), { ...calcOptions, discount });
     } catch (e) {
       if (e instanceof RangeError) throw new PosError('VALIDATION', `Cannot apply that discount: ${e.message}.`);
       throw e;
@@ -79,7 +96,7 @@ export const printBill = defineCommand({
 
     // Discount above the role's limit needs a manager PIN (docs/07) and is a leakage flag (docs/02).
     let overLimit = false;
-    if (breakup.discount > 0 && ctx.actor.userId) {
+    if (breakup.discount > 0 && ctx.actor.userId && !coupon) {
       const limitBp = (db.prepare('SELECT r.discount_limit_bp FROM app_user u JOIN role r ON r.id = u.role_id WHERE u.id = ?').pluck().get(ctx.actor.userId) as number | undefined) ?? 0;
       // Effective discount as a share of the subtotal, rounded up so 10.001% counts as above a 10% limit.
       const requestedBp = Math.ceil((breakup.discount * 10_000) / breakup.subtotal);
@@ -95,7 +112,7 @@ export const printBill = defineCommand({
     let billNoText: string;
     let revision: number;
     const customerGstin = p.customer?.gstin ?? null;
-    const amounts = [breakup.subtotal, breakup.discount, p.discount?.reason ?? null, breakup.serviceCharge, breakup.cgst, breakup.sgst, breakup.igst, breakup.roundOff, breakup.total, customerGstin];
+    const amounts = [breakup.subtotal, breakup.discount, discountReason, breakup.serviceCharge, breakup.cgst, breakup.sgst, breakup.igst, breakup.roundOff, breakup.total, customerGstin];
     if (existing) {
       if (existing.state !== 'superseded') throw new PosError('INVALID_STATE', 'This order already has a bill.', { billId: existing.id, state: existing.state });
       billId = existing.id;
@@ -129,6 +146,9 @@ export const printBill = defineCommand({
       ctx.audit({ entity: 'bill', entityId: id, action: 'bill.void', before: { state: 'superseded' }, after: { state: 'void' }, reason: 'Split part not needed after the bill was printed again' });
     }
     db.prepare('UPDATE bill SET split_of = 1 WHERE id = ?').run(billId);
+    // the coupon this print used (printing again replaces it; a void bill gives the use back)
+    db.prepare('DELETE FROM coupon_use WHERE bill_id = ?').run(billId);
+    if (coupon) db.prepare('INSERT INTO coupon_use (bill_id, coupon_id, code, discount_paise, used_at) VALUES (?, ?, ?, ?, ?)').run(billId, coupon.row.id, coupon.row.code, breakup.discount, ctx.nowIso);
 
     if (p.customer) db.prepare('UPDATE "order" SET customer_name = ?, customer_phone = ? WHERE id = ?').run(p.customer.name, p.customer.phone, o.id);
     db.prepare(`UPDATE "order" SET state = 'billed', bill_printed_at = ? WHERE id = ?`).run(ctx.nowIso, o.id);
@@ -156,7 +176,7 @@ export const printBill = defineCommand({
         addons: i.addons.map((a) => ({ name: a.name, qty: a.qty, amountPaise: a.pricePaise * a.qty })),
       })),
       breakup,
-      discountReason: p.discount?.reason ?? null,
+      discountReason,
       serviceChargeBp: serviceChargeBp || null,
       interState: false,
       upi: cfg['bill.upiVpa'] ? { vpa: cfg['bill.upiVpa'], payeeName: cfg['bill.upiPayeeName'] ?? cfg['outlet.name'] } : null,
@@ -184,7 +204,7 @@ export const printBill = defineCommand({
       entity: 'bill',
       entityId: billId,
       action: revision === 1 ? 'bill.print' : 'bill.reissue',
-      after: { billNo: billNoText, revision, total: breakup.total, discount: breakup.discount, discountReason: p.discount?.reason ?? null, serviceCharge: breakup.serviceCharge },
+      after: { billNo: billNoText, revision, total: breakup.total, discount: breakup.discount, discountReason, serviceCharge: breakup.serviceCharge, ...(coupon ? { coupon: coupon.row.code } : {}) },
       reason: overLimit ? 'discount above role limit (manager PIN)' : null,
       leakage: overLimit,
     });
