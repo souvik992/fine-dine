@@ -8,6 +8,7 @@ import { billableItems, billPrinter, orderPlace, printedDateTime, toBillLines, u
 import { onlineRef } from '../online/online-support.js';
 import { emitTableState, nextCounter } from './order-support.js';
 import { salesFacts } from './sales-facts.js';
+import { hubBill, shareCode, whatsappQrUrl } from '../cloud/whatsapp-bill.js';
 
 interface ExistingBill {
   id: string;
@@ -161,6 +162,9 @@ export const printBill = defineCommand({
       upi: cfg['bill.upiVpa'] ? { vpa: cfg['bill.upiVpa'], payeeName: cfg['bill.upiPayeeName'] ?? cfg['outlet.name'] } : null,
       display: cfg['bill.display'],
     };
+    // Bills on WhatsApp: the QR the guest scans (only while linked with PosiNext Cloud); the bill goes up with bill.printed
+    const whatsappUrl = cfg['bill.display'].whatsappQr ? whatsappQrUrl(db, billId) : null;
+    if (whatsappUrl) doc.whatsappQr = { url: whatsappUrl };
     db.prepare('INSERT INTO bill_document (bill_id, revision, bill_no_text, doc_json, created_at, command_id) VALUES (?, ?, ?, ?, ?, ?)').run(
       billId,
       revision,
@@ -185,7 +189,7 @@ export const printBill = defineCommand({
       leakage: overLimit,
     });
     // the last five fields feed the portal's Analytics page (sales-facts.ts)
-    ctx.outbox('bill.printed', { billId, orderId: o.id, billNo: billNoText, totalPaise: breakup.total, businessDate: ctx.businessDate, ...salesFacts(db, o, items, breakup, ctx.actor.deviceId) });
+    ctx.outbox('bill.printed', { billId, orderId: o.id, billNo: billNoText, totalPaise: breakup.total, businessDate: ctx.businessDate, ...salesFacts(db, o, items, breakup, ctx.actor.deviceId), ...(whatsappUrl ? { share: { code: shareCode(db, billId), receipt: hubBill(doc, ctx.nowIso) } } : {}) });
     emitTableState(ctx, o.table_id);
     return {
       result: {

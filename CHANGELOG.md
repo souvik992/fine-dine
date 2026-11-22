@@ -110,3 +110,4 @@ One line per finished roadmap task: `YYYY-MM-DD P1-01 short description`.
 - 2026-11-22 GST on delivery and packaging charges is 0% (exempt) by default (was Not set)
 - 2026-11-22 Settings › Online orders › Delivery: the store's address comes from the place searched or the point clicked on the map (shown read-only as Selected address); the separate typed address field is gone
 - 2026-11-22 Settings › Backups lists 10 backups a page (Previous / Next, newest first)
+- 2026-11-22 Bills on WhatsApp (PosiNext Cloud): optional "Get this bill on WhatsApp" QR on the bill (Settings › Bill design, off by default; the bill goes up with bill.printed) and "Send on WhatsApp" in Today's bills

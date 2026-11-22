@@ -2,6 +2,7 @@ import { newId } from '@dinepos/shared';
 import { OnlineConnector, SYSTEM_ACTOR, type Execute } from './online/connector.js';
 import { onlineRoutes } from './routes/online.js';
 import { syncRoutes } from './routes/sync.js';
+import { whatsappRoutes } from './routes/whatsapp.js';
 import { SyncAgent } from './sync/sync-agent.js';
 import { executeCommand, type ExecuteDeps } from './core/execute-command.js';
 import fastifyCors from '@fastify/cors';
@@ -319,6 +320,7 @@ export function buildApp(deps: AppDeps): DinePosApp {
   const cloudUrl = deps.cloudUrl ?? process.env.DINEPOS_CLOUD_URL;
   licenceActivationRoutes(app, { db, now, licence: licenceGate, execute, connector: online, ...(cloudUrl ? { cloudUrl } : {}), ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}) });
   syncRoutes(app, { db, now, agent: sync });
+  whatsappRoutes(app, { db, now, ...(deps.onlineFetch ? { fetch: deps.onlineFetch } : {}) });
   sessionRoutes(app, { db, now, timeZone });
   stockRoutes(app, { db, now });
   cashierRoutes(app, { db, now });

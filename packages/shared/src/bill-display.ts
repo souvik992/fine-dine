@@ -26,6 +26,11 @@ export const billDisplaySchema = z
     showTaxableAmount: z.boolean().default(true),
     /** "Items 5 · Qty 9" above the subtotal. */
     showItemCount: z.boolean().default(false),
+    /**
+     * A "Get this bill on WhatsApp" QR at the bottom (needs the PosiNext Cloud link, Settings › Online orders). The
+     * guest scans it and sends the message it opens; PosiNext Cloud answers with the bill as a PDF (free for the outlet).
+     */
+    whatsappQr: z.boolean().default(false),
   })
   .strict();
 

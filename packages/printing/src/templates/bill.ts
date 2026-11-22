@@ -57,6 +57,8 @@ export interface BillDocument {
   sample?: boolean;
   /** VoidBill (P2-06): printed with VOID at the top and bottom, and why. */
   voided?: { reason: string; at: string } | null;
+  /** Bills on WhatsApp: the PosiNext Cloud address the guest scans to get this bill on WhatsApp (bill display `whatsappQr`). */
+  whatsappQr?: { url: string } | null;
 }
 
 export interface BillLogoBits {
@@ -166,6 +168,10 @@ export function renderBill(doc: BillDocument, opts: { paper: PaperWidth; feed?: 
   if (doc.upi && b.total > 0) {
     p.center('Scan to pay with any UPI app');
     p.qr(upiUri(doc.upi.vpa, doc.upi.payeeName, b.total, `Bill ${doc.billNo}`), 'UPI QR');
+  }
+  if (doc.whatsappQr && !doc.voided) {
+    p.center('Get this bill on WhatsApp');
+    p.qr(doc.whatsappQr.url, 'WhatsApp QR');
   }
   for (const f of doc.outlet.footerLines ?? []) p.center(f);
   if (doc.sample) p.bold(true).center(SAMPLE).bold(false);

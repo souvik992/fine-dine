@@ -19,6 +19,7 @@ const SHOW: Array<[keyof BillDisplay, string, string?]> = [
   ['showFreeChoices', 'Free choices', 'Spice level, no onion… (priced add-ons always print).'],
   ['showTaxableAmount', 'Taxable amount on GST lines', '80 mm paper only.'],
   ['showItemCount', 'Item and quantity count'],
+  ['whatsappQr', 'WhatsApp bill QR', 'Guests scan it to get the bill on WhatsApp. Needs the PosiNext Cloud link (Settings › Online orders).'],
 ];
 
 const LOGO_SIZES: Array<[string, number]> = [

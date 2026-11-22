@@ -68,6 +68,17 @@ GST lines, and an "Items n / Qty m" line. Never optional: outlet name, address, 
 number, date/time, every tax line, round-off, total, a guest GSTIN, priced add-ons. Defaults print the standard
 bill byte for byte.
 
+Bills on WhatsApp (through PosiNext Cloud, `apps/server/src/cloud/whatsapp-bill.ts`; off by default):
+- "WhatsApp bill QR" (`display.whatsappQr`): while the outlet is linked with the cloud (Settings › Online orders),
+  PrintBill puts `whatsappQr.url` = `<cloud>/wa/bill/<code>` on the document and the bill prints "Get this bill on
+  WhatsApp" and that QR under the UPI QR (never on a VOID bill). The code is 12 characters made from the bill id and
+  the sync stream id, so a reprint prints the same one. The bill goes up with `bill.printed` (`share.code`,
+  `share.receipt`: the printed figures, nothing recalculated). The guest scans, sends the message WhatsApp opens, and
+  the cloud answers with the bill as a PDF (free: the guest wrote first).
+- Today's bills › "Send on WhatsApp" (bill.settle right; shown when the cloud can send bills): the server posts the
+  printed bill with its payments to `<cloud>/v1/pos/bills/<code>/whatsapp`, which sends it with an approved template
+  (Meta charges per message). Nothing is stored on the POS. Not yet tried against a real WhatsApp account.
+
 ### Z-report (day-end)
 Sales by mode, by area, by category; discounts; voids; cancelled-after-fire count; cash expected vs counted.
 

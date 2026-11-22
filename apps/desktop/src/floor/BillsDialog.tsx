@@ -1,17 +1,23 @@
 import { formatINR, type DayBill } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Printer, Search } from 'lucide-react';
+import { Ban, MessageCircle, Printer, Search } from 'lucide-react';
 import { useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { Modal } from '../components/Modal.js';
 import { BILL_STATE as STATE, billMatches } from './bills-search.js';
 
-/** Today's bills (P2-06): reprint any, void one (reason; manager PIN when the role needs it). VOID bills keep their number. */
+/**
+ * Today's bills (P2-06): reprint any, void one (reason; manager PIN when the role needs it). VOID bills keep their number.
+ * Bills on WhatsApp: when PosiNext Cloud can send bills, any bill can be sent to the guest's mobile.
+ */
 export function BillsDialog({ onClose }: { onClose: () => void }) {
   const { api, can } = useApp();
   const qc = useQueryClient();
   const bills = useQuery({ queryKey: ['day-bills'], queryFn: () => api.get<{ date: string; bills: DayBill[] }>('/v1/bills') });
+  const whatsapp = useQuery({ queryKey: ['whatsapp'], queryFn: () => api.get<{ linked: boolean; bills: boolean }>('/v1/whatsapp'), staleTime: 60_000, retry: false });
+  const [sending, setSending] = useState<DayBill | null>(null);
+  const [mobile, setMobile] = useState('');
   const [voiding, setVoiding] = useState<DayBill | null>(null);
   const [reason, setReason] = useState('');
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -84,6 +90,21 @@ export function BillsDialog({ onClose }: { onClose: () => void }) {
                         <Printer className="h-4 w-4" />
                       </button>
                     ) : null}
+                    {b.state !== 'void' && whatsapp.data?.bills ? (
+                      <button
+                        className="btn ml-1 h-8 px-2"
+                        disabled={busy}
+                        aria-label={`Send ${b.billNo} on WhatsApp`}
+                        title="Send on WhatsApp"
+                        onClick={() => {
+                          setSending(b);
+                          setVoiding(null);
+                          setMobile('');
+                        }}
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </button>
+                    ) : null}
                     {b.state !== 'void' && can('bill.void', true) ? (
                       <button
                         className="btn ml-1 h-8 px-2 text-danger"
@@ -92,6 +113,7 @@ export function BillsDialog({ onClose }: { onClose: () => void }) {
                         title="Void"
                         onClick={() => {
                           setVoiding(b);
+                          setSending(null);
                           setReason('');
                         }}
                       >
@@ -104,6 +126,40 @@ export function BillsDialog({ onClose }: { onClose: () => void }) {
           </tbody>
         </table>
       </div>
+
+      {sending ? (
+        <form
+          className="mt-4 rounded-xl border border-border bg-secondary/40 p-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void act(
+              () => api.send<{ to: string }>('POST', `/v1/bills/${encodeURIComponent(sending.billId)}/whatsapp`, { mobile }),
+              `${sending.billNo} sent on WhatsApp to ${mobile.replace(/^(\d{2})\d{6}(\d{2})$/, '$1******$2')}.`,
+            ).then((ok) => ok && setSending(null));
+          }}
+        >
+          <p className="text-sm font-semibold">Send {sending.billNo} ({formatINR(sending.totalPaise)}) on WhatsApp</p>
+          <p className="text-xs text-muted-foreground">The guest gets the bill as a PDF. Send it only when the guest asks for it.</p>
+          <input
+            data-autofocus
+            className="input mt-2"
+            inputMode="numeric"
+            maxLength={14}
+            placeholder="Guest's mobile number"
+            aria-label="Guest's mobile number"
+            value={mobile}
+            onChange={(e) => setMobile(e.target.value.replace(/[^\d+ ]/g, ''))}
+          />
+          <div className="mt-3 flex justify-end gap-2">
+            <button type="button" className="btn" onClick={() => setSending(null)}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={busy || mobile.replace(/\D/g, '').length < 10}>
+              Send on WhatsApp
+            </button>
+          </div>
+        </form>
+      ) : null}
 
       {voiding ? (
         <form

@@ -145,6 +145,17 @@ describe('renderBill', () => {
     expect(preview).not.toContain('[UPI QR]');
   });
 
+  it('prints the WhatsApp bill QR when given, after the UPI QR; never on a void bill', () => {
+    const url = 'https://cloud.posinext.com/wa/bill/ABCDEFGH2345';
+    const preview = renderBill({ ...doc, whatsappQr: { url } }, { paper: 58 }).preview;
+    expect(preview).toContain('Get this bill on WhatsApp');
+    expect(preview.indexOf('[WhatsApp QR]')).toBeGreaterThan(preview.indexOf('[UPI QR]'));
+    expect(preview.indexOf('[WhatsApp QR]')).toBeLessThan(preview.indexOf('Thank you! Visit again.'));
+    expect(Buffer.from(renderBill({ ...doc, whatsappQr: { url } }, { paper: 80 }).bytes).toString('latin1')).toContain(url);
+    expect(renderBill(doc, { paper: 80 }).preview).not.toContain('WhatsApp');
+    expect(renderBill({ ...doc, whatsappQr: { url }, voided: { reason: 'Wrong table', at: '02-11-26 21:30' } }, { paper: 80 }).preview).not.toContain('WhatsApp');
+  });
+
   it('bytes contain a QR code command and end with a cut', () => {
     const { bytes } = renderBill(doc, { paper: 80 });
     const hex = Buffer.from(bytes).toString('hex');

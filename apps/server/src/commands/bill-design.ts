@@ -60,6 +60,8 @@ export function sampleBillDocument(cfg: OutletConfig, now: Date, timeZone: strin
     interState: false,
     upi: cfg['bill.upiVpa'] ? { vpa: cfg['bill.upiVpa'], payeeName: cfg['bill.upiPayeeName'] ?? cfg['outlet.name'] } : null,
     display: cfg['bill.display'],
+    // the preview shows where the WhatsApp QR prints (a made-up address: a sample is never on the cloud)
+    whatsappQr: cfg['bill.display'].whatsappQr ? { url: 'https://cloud.posinext.com/wa/bill/SAMPLE' } : null,
     sample: true,
   };
 }
