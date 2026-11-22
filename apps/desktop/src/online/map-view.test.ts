@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { directionsUrl, mapView, parsePlaces, placeSearchUrl, pointAt, project, pxPerKm, TILE, unproject, viewAt } from './map-view.js';
+import { directionsUrl, mapView, parsePlaces, placeReverseUrl, placeSearchUrl, pointAt, project, pxPerKm, TILE, unproject, viewAt } from './map-view.js';
 
 const store = { lat: 22.5726, lng: 88.3639 };
 const customer = { lat: 22.5535, lng: 88.3517 };
@@ -57,6 +57,8 @@ describe('delivery map', () => {
 
   it('searches places in India by name as you type and reads the matches', () => {
     expect(placeSearchUrl(' marathah ')).toBe('https://photon.komoot.io/api/?q=marathah&limit=6&lang=en&bbox=68,6,98,38');
+    // a click on the map: the address of that point (the same answer format, read by parsePlaces)
+    expect(placeReverseUrl({ lat: 22.5726, lng: 88.3639 })).toBe('https://photon.komoot.io/reverse?lat=22.5726&lon=88.3639&lang=en&limit=1');
     const pt = (lng: number, lat: number) => ({ type: 'Point', coordinates: [lng, lat] });
     const body = {
       features: [

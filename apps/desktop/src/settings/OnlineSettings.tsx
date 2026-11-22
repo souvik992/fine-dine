@@ -178,15 +178,22 @@ export function OnlineSettings() {
           <Field label="Store longitude">
             <input className="input" inputMode="decimal" value={svc.location?.lng ?? ''} onChange={(e) => setSvc({ location: { lat: svc.location?.lat ?? 0, lng: Number(e.target.value), label: svc.location?.label ?? '' } })} placeholder="88.3639" aria-label="Longitude" />
           </Field>
-          <Field label="Address shown to customers">
-            <input className="input" maxLength={200} value={svc.location?.label ?? ''} onChange={(e) => setSvc({ location: { lat: svc.location?.lat ?? 0, lng: svc.location?.lng ?? 0, label: e.target.value } })} aria-label="Store address" />
+          <Field label="Selected address">
+            <input
+              className="input bg-secondary"
+              readOnly
+              value={svc.location?.label ?? ''}
+              placeholder="Search the area below or click the map"
+              title={svc.location?.label || undefined}
+              aria-label="Selected address"
+            />
           </Field>
         </div>
         <StoreLocationMap
           location={svc.location}
           bandsKm={svc.zones.map((z) => z.upToKm)}
           roadFactor={svc.roadFactor}
-          onPick={(p) => setSvc({ location: { lat: p.lat, lng: p.lng, label: svc.location?.label ?? '' } })}
+          onPick={(p, address) => setSvc({ location: { lat: p.lat, lng: p.lng, label: address } })}
         />
         <table className="mt-3 w-full text-sm" aria-label="Delivery bands">
           <thead className="text-left text-muted-foreground">

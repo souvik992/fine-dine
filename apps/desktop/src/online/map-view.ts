@@ -107,6 +107,11 @@ export function placeSearchUrl(query: string): string {
   return `https://photon.komoot.io/api/?q=${encodeURIComponent(query.trim())}&limit=6&lang=en&bbox=68,6,98,38`;
 }
 
+/** Photon's address for a point on the map (reverse search; same answer format as a search). */
+export function placeReverseUrl(p: { lat: number; lng: number }): string {
+  return `https://photon.komoot.io/reverse?lat=${p.lat}&lon=${p.lng}&lang=en&limit=1`;
+}
+
 /** The matches from a Photon answer (GeoJSON), in India only, skipping anything malformed or repeated. */
 export function parsePlaces(body: unknown): Place[] {
   const features = (body as { features?: unknown } | null)?.features;

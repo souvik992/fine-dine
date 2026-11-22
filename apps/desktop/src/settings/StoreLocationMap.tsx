@@ -1,6 +1,6 @@
 import { Minus, Plus, Search } from 'lucide-react';
 import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from 'react';
-import { parsePlaces, placeSearchUrl, pointAt, project, pxPerKm, unproject, viewAt, type LatLng, type Place } from '../online/map-view.js';
+import { parsePlaces, placeReverseUrl, placeSearchUrl, pointAt, project, pxPerKm, unproject, viewAt, type LatLng, type Place } from '../online/map-view.js';
 
 const H = 360;
 const INDIA: LatLng = { lat: 22.35, lng: 78.67 };
@@ -9,9 +9,31 @@ const INDIA: LatLng = { lat: 22.35, lng: 78.67 };
  * Settings › Online orders › Delivery: the store on a map with a ring for each delivery band. Click to put the store
  * there; drag to move around; + / − or the mouse wheel to zoom. Rings are the straight-line reach of each band
  * (its km ÷ the road factor), since bands count road distance. Type an area name to search as you type and jump there.
+ * `onPick` gets the point and its address: the chosen place's name, or for a click on the map the address found for
+ * that point (first '' while it is looked up, then the address; '' when none is found).
  */
-export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { location: LatLng | null; bandsKm: number[]; roadFactor: number; onPick: (p: LatLng) => void }) {
+export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { location: LatLng | null; bandsKm: number[]; roadFactor: number; onPick: (p: LatLng, address: string) => void }) {
   const box = useRef<HTMLDivElement>(null);
+  // the latest onPick: an address found after a click must not undo edits made while it was looked up
+  const pickRef = useRef(onPick);
+  pickRef.current = onPick;
+  const lookup = useRef<AbortController | null>(null);
+  const pickPoint = (p: LatLng) => {
+    lookup.current?.abort();
+    const ctl = new AbortController();
+    lookup.current = ctl;
+    pickRef.current(p, '');
+    void (async () => {
+      try {
+        const res = await fetch(placeReverseUrl(p), { headers: { accept: 'application/json' }, signal: ctl.signal });
+        if (!res.ok) return;
+        const name = parsePlaces(await res.json())[0]?.name;
+        if (name && !ctl.signal.aborted) pickRef.current(p, name.slice(0, 200));
+      } catch {
+        // offline or no answer: the point is set, the address stays empty (search the area name to fill it)
+      }
+    })();
+  };
   const [width, setWidth] = useState(800);
   const [zoom, setZoom] = useState(location ? 13 : 5);
   const [centre, setCentre] = useState<LatLng>(location ?? INDIA);
@@ -61,7 +83,7 @@ export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { lo
     drag.current = null;
     if (!d || d.moved) return;
     const r = e.currentTarget.getBoundingClientRect();
-    onPick(pointAt(centre, zoom, width, H, e.clientX - r.left, e.clientY - r.top));
+    pickPoint(pointAt(centre, zoom, width, H, e.clientX - r.left, e.clientY - r.top));
   };
   // search as you type: 400 ms after the last key, the newest search wins
   const skip = useRef(false);
@@ -107,7 +129,8 @@ export function StoreLocationMap({ location, bandsKm, roadFactor, onPick }: { lo
     setCentre(p);
     setZoom(16);
     setPlaces(null);
-    onPick({ lat: p.lat, lng: p.lng });
+    lookup.current?.abort(); // a click's address still on its way is not wanted any more
+    onPick({ lat: p.lat, lng: p.lng }, p.name.slice(0, 200));
   };
 
   const wheel = (e: WheelEvent<HTMLDivElement>) => zoomBy(e.deltaY < 0 ? 1 : -1);
