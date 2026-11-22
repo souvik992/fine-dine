@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = fileURLToPath(new URL('..', import.meta.url));
 const arch = process.arch === 'arm64' ? 'mac-arm64' : 'mac';
-const appDir = process.argv[2] ?? path.join(here, 'release', arch, 'DinePOS.app');
+const appDir = path.resolve(process.argv[2] ?? path.join(here, 'release', arch, 'DinePOS.app'));
 const problems = [];
 const need = (rel) => {
   const p = path.join(appDir, rel);
@@ -41,6 +41,7 @@ const child = spawn(node, [path.join(server, 'server.mjs')], {
 let log = '';
 child.stdout.on('data', (d) => (log += d));
 child.stderr.on('data', (d) => (log += d));
+child.on('error', (e) => (log += `could not start ${node}: ${e.message}\n`)); // e.g. an Intel runtime without Rosetta
 let ok = false;
 for (let i = 0; i < 60 && !ok; i++) {
   await new Promise((r) => setTimeout(r, 500));
@@ -58,4 +59,4 @@ if (!ok || !db) {
   console.error(`✖ the server in ${appDir} did not start (health ${ok ? 'ok' : 'no answer'}, database ${db ? 'made' : 'missing'})\n${log.slice(-3000)}`);
   process.exit(1);
 }
-console.warn(`✔ ${path.basename(appDir)} (${process.arch}): server, Node ${process.versions.node === undefined ? '' : ''}runtime and SQLite inside; the server starts and answers /v1/health`);
+console.warn(`✔ ${path.basename(appDir)} (${path.basename(path.dirname(appDir))}): server, Node runtime and SQLite inside; the server starts and answers /v1/health`);
