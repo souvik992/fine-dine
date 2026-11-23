@@ -79,7 +79,16 @@ export function FloorScreen({
   const counts = stateCounts(tables);
   const [view, setView] = useState<'layout' | 'grid'>(() => (localStorage.getItem('dinepos.floorView') === 'grid' ? 'grid' : 'layout'));
   const layout = hasLayout(tables.map((t) => ({ id: t.id, layoutX: t.layoutX ?? null, layoutY: t.layoutY ?? null })));
-  const showLayout = layout && view === 'layout';
+  // the room plan is drawn to fit the width; below 90 % (phones, tablets upright) its tiles are too small to read, so the
+  // grid is shown instead (same tables, full-size tiles)
+  const [width, setWidth] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const on = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
+  }, []);
+  const layoutFits = width - 40 >= 0.9 * canvasSize(tables.map((t) => ({ id: t.id, layoutX: t.layoutX ?? null, layoutY: t.layoutY ?? null }))).w;
+  const showLayout = layout && view === 'layout' && layoutFits;
   const room = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const size = canvasSize(tables.map((t) => ({ id: t.id, layoutX: t.layoutX ?? null, layoutY: t.layoutY ?? null })));
@@ -146,7 +155,7 @@ export function FloorScreen({
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex flex-wrap items-center gap-3 border-b border-border bg-card px-5 py-3">
+      <header className="flex flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2.5 sm:gap-3 sm:px-5 sm:py-3 max-sm:[&_.btn:not(.btn-primary)]:gap-0 max-sm:[&_.btn:not(.btn-primary)]:px-3 max-sm:[&_.btn:not(.btn-primary)]:text-[0px]">
         <div className="mr-2 flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary font-display text-lg text-primary-foreground">D</div>
           <span className="font-display text-xl font-semibold">Floor</span>
@@ -200,7 +209,7 @@ export function FloorScreen({
           ) : null}
         </form>
         <HealthDots />
-        <time className="w-14 text-right text-sm font-semibold tabular-nums" dateTime={now.toISOString()}>
+        <time className="hidden w-14 text-right text-sm font-semibold tabular-nums sm:block" dateTime={now.toISOString()}>
           {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })}
         </time>
         {can('reservation.manage') || can('order.create') ? <BookingsButton onClick={onBookings} /> : null}
@@ -233,7 +242,9 @@ export function FloorScreen({
             <MoonStar className="h-4 w-4" /> Day end
           </button>
         ) : null}
-        <UserBadge />
+        <div className="hidden md:block">
+          <UserBadge />
+        </div>
         <button className="btn h-10 w-10 px-0" onClick={onSettings} aria-label="Settings" title="Settings">
           <Settings className="h-5 w-5" />
         </button>
@@ -250,7 +261,7 @@ export function FloorScreen({
         ) : null}
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <main className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5 sm:py-4">
         {floor.isError ? (
           <div role="alert" className="mx-auto mt-16 max-w-md rounded-xl border border-border bg-card p-6 text-center">
             <p className="font-semibold">{floor.error instanceof ApiError ? floor.error.message : 'Could not load the floor.'}</p>
@@ -281,7 +292,16 @@ export function FloorScreen({
               {layout ? (
                 <span className="ml-auto flex gap-1" role="radiogroup" aria-label="Floor view">
                   {(['layout', 'grid'] as const).map((v) => (
-                    <button key={v} role="radio" aria-checked={view === v} className="tab h-7" aria-selected={view === v} onClick={() => switchView(v)}>
+                    <button
+                      key={v}
+                      role="radio"
+                      aria-checked={v === 'layout' ? showLayout : !showLayout}
+                      className="tab h-7 disabled:opacity-50"
+                      aria-selected={v === 'layout' ? showLayout : !showLayout}
+                      disabled={v === 'layout' && !layoutFits}
+                      title={v === 'layout' && !layoutFits ? 'The floor plan shows on a wider screen (turn the tablet sideways)' : undefined}
+                      onClick={() => switchView(v)}
+                    >
                       {v === 'layout' ? 'Layout' : 'Grid'}
                     </button>
                   ))}

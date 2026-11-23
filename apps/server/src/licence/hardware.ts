@@ -21,6 +21,12 @@ export function machineIdentifiers(): string[] {
     const serial = /([0-9A-F]{4}-[0-9A-F]{4})/i.exec(run('cmd', ['/c', 'vol', drive]))?.[1] ?? '';
     return [guid, serial];
   }
+  if (platform() === 'android') {
+    // DinePOS for Android: the device's ANDROID_ID, passed by the app (Android gives apps no other stable machine id).
+    // Read only on Android, so it can never change a Windows or Mac licence id.
+    const id = process.env.DINEPOS_ANDROID_ID ?? '';
+    return [/^[0-9a-f]{8,64}$/i.test(id) ? `android:${id.toLowerCase()}` : hostname()];
+  }
   if (platform() === 'darwin') {
     // the Mac's hardware UUID: the same after reinstalling macOS or DinePOS
     const uuid = /"IOPlatformUUID"\s*=\s*"([0-9A-F-]+)"/i.exec(run('ioreg', ['-rd1', '-c', 'IOPlatformExpertDevice']))?.[1] ?? '';

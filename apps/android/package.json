@@ -1,0 +1,11 @@
+{
+  "name": "@dinepos/android",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DinePOS for Android: the whole outlet (server, database and billing screens) on an Android phone, tablet or POS machine, no PC.",
+  "type": "module",
+  "scripts": {
+    "prepare-apk": "node scripts/prepare.mjs",
+    "apk": "node scripts/prepare.mjs && node scripts/gradle.mjs apk"
+  }
+}

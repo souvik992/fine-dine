@@ -28,3 +28,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test
+      # DinePOS for Android runs the server on Node's built-in node:sqlite: the server's tests on that driver too
+      - if: matrix.os == 'ubuntu-latest'
+        run: npm run test -w @dinepos/server
+        env:
+          DINEPOS_SQLITE: node

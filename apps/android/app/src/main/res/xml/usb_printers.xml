@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- USB devices that open DinePOS when plugged in: printers (USB class 7, on the device or any of its interfaces). -->
+<resources>
+    <usb-device class="7" />
+</resources>

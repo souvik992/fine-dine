@@ -3,7 +3,8 @@
 // server runs and applied at the next start, before the database is opened (single-writer rule).
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
+import { openSqlite } from '../db/sqlite.js';
 import type { Db } from '../db/connection.js';
 import { loadMigrations } from '../db/migrate.js';
 
@@ -34,7 +35,7 @@ function removeSidecars(file: string): void {
 export function verifyBackup(file: string): { ok: boolean; schemaVersion: number; problems: string[] } {
   let db: Database.Database | undefined;
   try {
-    db = new Database(file, { readonly: true, fileMustExist: true });
+    db = openSqlite(file, { readonly: true, fileMustExist: true });
     const check = db.pragma('quick_check') as Array<{ quick_check: string }>;
     const problems = check.map((r) => r.quick_check).filter((m) => m !== 'ok');
     const version = (db.prepare('SELECT max(version) FROM schema_migrations').pluck().get() as number | null) ?? 0;

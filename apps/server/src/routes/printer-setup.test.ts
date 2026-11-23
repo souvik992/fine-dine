@@ -5,6 +5,7 @@ import { buildApp } from '../app.js';
 import type { Db } from '../db/connection.js';
 import { DEV_OWNER, DEV_STAFF, devSeedCommands, devSetupCommand, seedId } from '../seed/dev-seed.js';
 import { createTestDb } from '../testing/test-db.js';
+import { usbDevices } from './printer-setup.js';
 
 // Settings › Printers (quickPOS printer setup): the USB printers plugged into the server PC, matched to the printers
 // already set up; owner/manager only.
@@ -64,6 +65,18 @@ describe('printer setup routes', () => {
       expect.objectContaining({ transport: 'usbdirect', device: '04b8:0e15:abc', name: 'TM-T82 58mm', detail: 'USB, WinUSB driver (04b8:0e15)', widthMm: 58, printerId: null }),
       expect.objectContaining({ transport: 'usb', windowsName: 'POS-80', printerName: 'Counter', detail: 'USB, Windows driver POS-80 Series on USB001' }), // matched without case
     ]);
+  });
+
+  it('DinePOS for Android: a printer plugged into the device says so, and whether Android lets DinePOS use it yet', () => {
+    const android: UsbPrinterInfo[] = [
+      { id: '0416:5011', vid: '0416', pid: '5011', serial: null, name: 'POS-80', vendor: null, driver: 'android', allowed: false },
+      { id: '28e9:0289', vid: '28e9', pid: '0289', serial: null, name: 'USB receipt printer', vendor: null, driver: 'android', allowed: true },
+    ];
+    expect(usbDevices(db, android, [])).toEqual([
+      expect.objectContaining({ device: '0416:5011', detail: 'USB, plugged into this device: tap Allow (0416:5011)', allowed: false }),
+      expect.objectContaining({ device: '28e9:0289', detail: 'USB, plugged into this device (28e9:0289)', allowed: true }),
+    ]);
+    expect(usbDevices(db, usb, windows).every((d) => d.allowed)).toBe(true); // a PC never asks
   });
 
   it('looks at the PC at most every 15 seconds unless asked to refresh', async () => {

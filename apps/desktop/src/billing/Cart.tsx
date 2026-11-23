@@ -35,7 +35,7 @@ export function Cart({ order, selectedId, busy, onSelect, onQty, onRemove, onCha
   const courses = new Set(held.map((i) => i.course));
 
   return (
-    <aside className="flex min-h-0 w-[380px] flex-1 shrink-0 flex-col border-l border-border bg-card" aria-label="Order">
+    <aside className="flex min-h-0 w-full flex-1 flex-col bg-card" aria-label="Order">
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         <h2 className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wide text-muted-foreground">
           <span>Not sent yet</span>

@@ -20,7 +20,8 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : typeof v === 'n
  * Safety: constant script; the ids go in environment variables, the bytes on stdin (see powershell.ts).
  */
 
-export interface UsbPrinterInfo { id: string; vid: string; pid: string; serial: string | null; name: string; vendor: string | null; driver: 'usbprint' | 'winusb' }
+/** `android`: plugged into the Android device DinePOS runs on (USB or Type-C); `allowed` false until Android lets DinePOS use it. */
+export interface UsbPrinterInfo { id: string; vid: string; pid: string; serial: string | null; name: string; vendor: string | null; driver: 'usbprint' | 'winusb' | 'android'; allowed?: boolean }
 
 const VENDORS: Record<string, string> = {
   '0416': 'Winbond (common in 58/80 mm POS printers)', '04b8': 'Epson', '0519': 'Star Micronics', '0dd4': 'Custom', '1504': 'Bixolon',

@@ -14,6 +14,7 @@ coverage/
 dist-renderer/
 dist-electron/
 dist-bundle/
+dist-android/
 .stage/
 release/
 build-cache/

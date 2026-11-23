@@ -67,8 +67,9 @@ export const upsertPrinterSchema = z
     message: 'a USB printer with no driver needs its USB id (vendor:product)',
     path: ['device'],
   })
-  .refine((p) => p.transport !== 'serial' || /^COM[1-9]\d{0,2}(:(9600|19200|38400|57600|115200))?$/i.test(p.device ?? ''), {
-    message: 'a Bluetooth / COM printer needs its COM port, like COM5',
+  // a COM port on Windows; in DinePOS for Android the Bluetooth printer's own address
+  .refine((p) => p.transport !== 'serial' || /^COM[1-9]\d{0,2}(:(9600|19200|38400|57600|115200))?$/i.test(p.device ?? '') || /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/i.test(p.device ?? ''), {
+    message: 'a Bluetooth / COM printer needs its COM port (like COM5) or, on Android, its Bluetooth address',
     path: ['device'],
   })
   .refine((p) => p.backupPrinterId !== p.id, { message: 'a printer cannot back itself up', path: ['backupPrinterId'] });

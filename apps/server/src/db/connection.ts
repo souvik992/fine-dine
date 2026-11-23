@@ -1,4 +1,5 @@
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
+import { openSqlite } from './sqlite.js';
 import { StartupError } from '../core/errors.js';
 
 export type Db = Database.Database;
@@ -11,7 +12,7 @@ const MEMORY = ':memory:';
  * committed bills could be lost on a power cut.
  */
 export function openDatabase(file: string): Db {
-  const db = new Database(file);
+  const db = openSqlite(file);
   try {
     db.pragma('busy_timeout = 5000');
     db.pragma('foreign_keys = ON');

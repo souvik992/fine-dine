@@ -12,7 +12,8 @@
     "seed": "tsx src/seed/cli.ts",
     "test": "vitest run --root ../.. apps/server/",
     "bundle": "node scripts/bundle.mjs",
-    "bundle:cloud": "node scripts/bundle.mjs --cloud"
+    "bundle:cloud": "node scripts/bundle.mjs --cloud",
+    "bundle:android": "node scripts/bundle.mjs --android"
   },
   "dependencies": {
     "@dinepos/printing": "0.1.0",

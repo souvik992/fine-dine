@@ -36,6 +36,15 @@ options**; **Add printer** in steps (connection → which printer, from `GET /v1
 `RemovePrinter` deletes a printer that never printed, else turns it off. A turned-off printer is skipped for KOTs,
 bills and as a backup. Driverless USB and Bluetooth printing run through Windows PowerShell (no native module).
 
+DinePOS for Android (apps/android): printers are those of the phone, tablet or POS machine, through the app's printer
+bridge (`packages/printing/src/transports/android.ts`, `PrinterBridge.java`): USB as `usbdirect` ("vid:pid"), paired
+Bluetooth (incl. a POS machine's built-in "InnerPrinter") as `serial` with the Bluetooth address. A USB printer on a
+Type-C / OTG cable starts DinePOS (manifest USB_DEVICE_ATTACHED filter, USB class 7); Android's OK lets DinePOS use
+it. While DinePOS is open, plugging one in asks Android at once (not at the first bill) and the app sends the
+`dinepos-usb-printer` page event (connected · needs-allow · not-allowed · unplugged): any screen then offers **Use for
+bills** for a printer not set up yet, or says it is connected / unplugged. `GET /v1/printers/usb-devices` gives
+`allowed: false` for one Android does not let DinePOS use yet (Settings › Printers shows **Allow**).
+
 ## Templates (`packages/printing/src/templates`)
 ### KOT (no prices)
 ```

@@ -90,6 +90,12 @@ async function main(): Promise<void> {
   };
   // SIGHUP: the server window was closed (Windows gives the process a few seconds to finish).
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGBREAK', 'SIGHUP'] as const) process.on(signal, () => stop(signal));
+  // DinePOS for Android: the app keeps this process's input open; when the app is gone (even killed), it ends and the
+  // server stops cleanly instead of running on alone with the database
+  if (process.env.DINEPOS_STOP_WITH_STDIN === '1') {
+    process.stdin.on('end', () => stop('app gone'));
+    process.stdin.resume();
+  }
 }
 
 /** In the shop's server window, keep a start-up error on screen instead of closing the window at once. */

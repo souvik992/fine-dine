@@ -14,6 +14,7 @@ import { BillingScreen } from './billing/BillingScreen.js';
 import { BookingsScreen } from './bookings/BookingsScreen.js';
 import { OnlineAlerts } from './online/OnlineAlerts.js';
 import { PrintAlarm } from './components/PrintAlarm.js';
+import { UsbPrinterNotice } from './components/UsbPrinterNotice.js';
 import { OnlineScreen } from './online/OnlineScreen.js';
 import { BillRequests } from './floor/BillRequests.js';
 import { FloorScreen } from './floor/FloorScreen.js';
@@ -46,6 +47,7 @@ export function App() {
       <>
         <SettingsScreen onBack={toFloor} initial={screen.section} />
         <ManagerPinDialog />
+        <UsbPrinterNotice />
       </>
     );
   }
@@ -99,6 +101,7 @@ export function App() {
       {addonRegs.map(([id, r]) => (r.overlay ? <AddonView key={id} id={id} reg={r} Comp={r.overlay} nav={addonNav} /> : null))}
       <OnlineAlerts onOpen={() => setScreen({ kind: 'online' })} hidden={screen.kind === 'online'} />
       <PrintAlarm />
+      <UsbPrinterNotice onPrinters={can('admin') ? () => setScreen({ kind: 'settings', section: 'printers' }) : undefined} />
       <BillRequests onOpen={(orderId) => setScreen({ kind: 'order', orderId })} hiddenOrderId={screen.kind === 'order' ? screen.orderId : undefined} compact={screen.kind !== 'floor'} />
       <LicenceBanner onOpen={can('admin') ? () => setScreen({ kind: 'settings', section: 'licence' }) : undefined} />
       <ManagerPinDialog />

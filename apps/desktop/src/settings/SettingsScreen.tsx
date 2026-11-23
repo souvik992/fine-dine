@@ -53,24 +53,29 @@ export function SettingsScreen({ onBack, initial }: { onBack: () => void; initia
   const visible = all.filter((s) => s.right === null || (session && can(s.right)));
   const [active, setActive] = useState<SectionKey>(visible.find((s) => s.key === initial)?.key ?? visible[0]!.key);
   const current = visible.find((s) => s.key === active) ?? visible[0]!;
+  // a phone shows the list of sections, then the chosen one full screen ("All settings" goes back); wider screens both
+  const [listOnPhone, setListOnPhone] = useState(initial === undefined);
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-3 border-b border-border bg-card px-4 py-2.5">
+      <header className="flex items-center gap-3 border-b border-border bg-card px-3 py-2.5 md:px-4">
         <button className="btn" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" /> {session ? 'Floor' : 'Back'}
         </button>
         <h1 className="font-display text-xl font-semibold">Settings</h1>
-        <div className="ml-auto">
+        <div className="ml-auto hidden sm:block">
           <UserBadge />
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
-        <nav className="flex w-64 shrink-0 flex-col gap-2 overflow-y-auto border-r border-border bg-background p-3" aria-label="Settings sections">
+        <nav className={`w-full shrink-0 flex-col gap-2 overflow-y-auto border-border bg-background p-3 md:flex md:w-64 md:border-r ${listOnPhone ? 'flex' : 'hidden'}`} aria-label="Settings sections">
           {visible.map(({ key, label, hint, icon: Icon }) => (
             <button
               key={key}
-              onClick={() => setActive(key)}
+              onClick={() => {
+                setActive(key);
+                setListOnPhone(false);
+              }}
               aria-current={key === current.key ? 'page' : undefined}
               className={`flex w-full shrink-0 items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${key === current.key ? 'border-primary bg-accent' : 'border-border bg-card hover:border-primary'}`}
             >
@@ -82,7 +87,11 @@ export function SettingsScreen({ onBack, initial }: { onBack: () => void; initia
             </button>
           ))}
         </nav>
-        <main className="min-w-0 flex-1 overflow-y-auto px-8 py-6">
+        {/* a phone: form fields side by side on a PC stack in one column */}
+        <main className={`min-w-0 flex-1 overflow-y-auto px-4 py-4 md:block md:px-8 md:py-6 max-md:[&_.grid]:!grid-cols-1 ${listOnPhone ? 'hidden' : 'block'}`}>
+          <button className="btn mb-4 h-9 md:hidden" onClick={() => setListOnPhone(true)}>
+            <ArrowLeft className="h-4 w-4" /> All settings
+          </button>
           {current.key === 'outlet' ? <OutletSettings /> : null}
           {current.key === 'bill' ? <BillDesignSettings /> : null}
           {current.key === 'coupons' ? <CouponSettings /> : null}

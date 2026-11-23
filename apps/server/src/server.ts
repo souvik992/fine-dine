@@ -1,6 +1,6 @@
 import { createWriteStream, mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { FakeTransport, SerialTransport, TcpTransport, UsbDirectTransport, WindowsSpoolerTransport } from '@dinepos/printing';
+import { AndroidTransport, bridgeConfig, FakeTransport, SerialTransport, TcpTransport, UsbDirectTransport, WindowsSpoolerTransport } from '@dinepos/printing';
 import type { FastifyInstance, FastifyServerOptions } from 'fastify';
 import { localDate } from '@dinepos/shared';
 import { buildApp, LOG_REDACT } from './app.js';
@@ -110,8 +110,9 @@ export async function startServer(config: ServerConfig, opts: StartOptions = {})
         fake: new FakeTransport(path.join(config.dataDir, 'prints')),
         tcp: new TcpTransport(),
         usb: new WindowsSpoolerTransport(),
-        usbdirect: new UsbDirectTransport(), // quickPOS: a USB printer with no Windows driver
-        serial: new SerialTransport(), // a Bluetooth or COM port printer
+        // DinePOS for Android: USB and Bluetooth printers through the app (DINEPOS_ANDROID_BRIDGE)
+        usbdirect: bridgeConfig() ? new AndroidTransport() : new UsbDirectTransport(), // quickPOS: a USB printer with no Windows driver
+        serial: bridgeConfig() ? new AndroidTransport() : new SerialTransport(), // a Bluetooth or COM port printer
       },
       log: (level, msg, data) => logSink.log?.(level, msg, data),
     });

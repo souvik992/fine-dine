@@ -1,7 +1,21 @@
 // Settings › Printers (quickPOS printer setup): finding printers on the outlet server PC, so nobody has to type a
 // Windows printer name, COM port or IP address. Read only: these look at the PC and the network and change nothing
 // (setting a printer up is the UpsertPrinter command). Owner/manager only, as setting printers up is.
-import { discoverNetworkPrinters, listSerialPorts, listUsbPrinters, listWindowsPrinters, type UsbPrinterInfo, type WindowsPrinter } from '@dinepos/printing';
+import { bridgeConfig, discoverNetworkPrinters, listAndroidPrinters, listSerialPorts, listUsbPrinters, listWindowsPrinters, type SerialPortInfo, type UsbPrinterInfo, type WindowsPrinter } from '@dinepos/printing';
+
+/** DinePOS for Android: the printers the app sees (USB, and paired Bluetooth incl. a POS machine's built-in one). */
+const onAndroid = () => bridgeConfig() !== null;
+async function androidUsb(): Promise<UsbPrinterInfo[]> {
+  return (await listAndroidPrinters().catch(() => []))
+    .filter((p) => p.transport === 'usbdirect')
+    .map((p) => {
+      const [vid = '', pid = '', serial] = p.device.toLowerCase().split(':');
+      return { id: [vid, pid, serial].filter(Boolean).join(':'), vid, pid, serial: serial ?? null, name: p.name, vendor: null, driver: 'android' as const, allowed: p.allowed };
+    });
+}
+async function androidBluetooth(): Promise<SerialPortInfo[]> {
+  return (await listAndroidPrinters()).filter((p) => p.transport === 'serial').map((p) => ({ port: p.device, name: p.builtin && !/built-in/i.test(p.name) ? `${p.name} (built-in printer)` : p.name, bluetooth: true }));
+}
 import type { FastifyInstance } from 'fastify';
 import { requireRight } from '../auth/require-right.js';
 import type { Db } from '../db/connection.js';
@@ -25,7 +39,18 @@ export interface UsbDevice {
   widthMm: 58 | 80;
   printerId: string | null;
   printerName: string | null;
+  /** False for a printer plugged into the Android device that Android does not let DinePOS use yet (tap Allow / OK). */
+  allowed: boolean;
 }
+
+const usbDetail = (u: UsbPrinterInfo) =>
+  u.driver === 'android'
+    ? u.allowed === false
+      ? `USB, plugged into this device: tap Allow (${u.vid}:${u.pid})`
+      : `USB, plugged into this device (${u.vid}:${u.pid})`
+    : u.driver === 'winusb'
+      ? `USB, WinUSB driver (${u.vid}:${u.pid})`
+      : `USB, no driver needed (${u.vid}:${u.pid})`;
 
 const guessWidth = (s: string): 58 | 80 => (/(^|\D)58(\D|$)|58\s?mm/i.test(s) ? 58 : 80);
 
@@ -51,10 +76,11 @@ export function usbDevices(db: Db, usb: UsbPrinterInfo[], windows: WindowsPrinte
       device: u.id,
       windowsName: null,
       name: name.slice(0, 80),
-      detail: u.driver === 'winusb' ? `USB, WinUSB driver (${u.vid}:${u.pid})` : `USB, no driver needed (${u.vid}:${u.pid})`,
+      detail: usbDetail(u),
       widthMm: guessWidth(u.name),
       printerId: p?.id ?? null,
       printerName: p?.name ?? null,
+      allowed: u.allowed !== false,
     });
   }
   for (const w of windows) {
@@ -70,6 +96,7 @@ export function usbDevices(db: Db, usb: UsbPrinterInfo[], windows: WindowsPrinte
       widthMm: guessWidth(`${w.name} ${w.driver}`),
       printerId: p?.id ?? null,
       printerName: p?.name ?? null,
+      allowed: true,
     });
   }
   return out;
@@ -77,7 +104,7 @@ export function usbDevices(db: Db, usb: UsbPrinterInfo[], windows: WindowsPrinte
 
 export function printerSetupRoutes(app: FastifyInstance, deps: PrinterSetupDeps): void {
   const { db, now } = deps;
-  const scan = deps.scan ?? { usb: () => listUsbPrinters().catch(() => []), windows: () => listWindowsPrinters().catch(() => []) };
+  const scan = deps.scan ?? (onAndroid() ? { usb: androidUsb, windows: () => Promise.resolve([]) } : { usb: () => listUsbPrinters().catch(() => []), windows: () => listWindowsPrinters().catch(() => []) });
   // the Printers screen asks every few seconds; the PC is looked at no more than every 15 s unless asked to refresh
   let last: { at: number; usb: UsbPrinterInfo[]; windows: WindowsPrinter[] } | null = null;
   let running: Promise<{ at: number; usb: UsbPrinterInfo[]; windows: WindowsPrinter[] }> | null = null;
@@ -101,7 +128,7 @@ export function printerSetupRoutes(app: FastifyInstance, deps: PrinterSetupDeps)
   });
   app.get('/v1/printers/serial-ports', async (req) => {
     requireRight(db, req, 'admin', now());
-    return { ports: await listSerialPorts() };
+    return { ports: onAndroid() ? await androidBluetooth() : await listSerialPorts() };
   });
   // connects to port 9100 of each address of the server's own network (sends nothing); a few seconds
   app.get<{ Querystring: { port?: string } }>('/v1/printers/network-scan', async (req) => {

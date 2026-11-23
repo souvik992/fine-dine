@@ -21,10 +21,12 @@ const repo = fileURLToPath(new URL('../../..', import.meta.url));
 // P6-04: `npm run bundle:cloud` writes the same server for PosiNext Cloud's hosted outlets (Linux) to outlet-server/ in the
 // posinext-cloud repository (checked out next to this one, or POSINEXT_CLOUD_DIR); commit it there.
 const cloud = process.argv.includes('--cloud');
-const out = cloud ? `${process.env.POSINEXT_CLOUD_DIR ?? `${repo}../posinext-cloud`}/outlet-server/` : `${root}dist-bundle/`;
+// --android: DinePOS for Android (node:sqlite, no compiled add-on), into dist-android/
+const android = process.argv.includes('--android');
+const out = android ? `${root}dist-android/` : cloud ? `${process.env.POSINEXT_CLOUD_DIR ?? `${repo}../posinext-cloud`}/outlet-server/` : `${root}dist-bundle/`;
 // --mac: the server inside the Mac app (Apple chip and Intel disk images share the bundle)
 const mac = process.argv.includes('--mac');
-const platforms = cloud ? ['linux-x64', 'linux-arm64'] : mac ? ['darwin-arm64', 'darwin-x64'] : ['win32-x64'];
+const platforms = android ? [] : cloud ? ['linux-x64', 'linux-arm64'] : mac ? ['darwin-arm64', 'darwin-x64'] : ['win32-x64'];
 const pkg = JSON.parse(readFileSync(`${root}package.json`, 'utf8'));
 
 rmSync(out, { recursive: true, force: true });
@@ -38,7 +40,7 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node22',
-  sourcemap: cloud ? false : 'linked',
+  sourcemap: cloud || android ? false : 'linked',
   // Native and optional modules stay outside the bundle.
   external: ['better-sqlite3', 'bufferutil', 'utf-8-validate'],
   define: { __DINEPOS_VERSION__: JSON.stringify(pkg.version) },
@@ -71,6 +73,7 @@ if (cloud) {
   rmSync(tmp);
 }
 
+if (platforms.length) {
 // better-sqlite3: only what runs (no sources, no build tooling), the prebuilds for where it runs.
 const sqlite = `${repo}node_modules/better-sqlite3/`;
 const sqliteOut = `${out}node_modules/better-sqlite3/`;
@@ -80,6 +83,7 @@ for (const pl of platforms) cpSync(`${sqlite}prebuilds/${pl}.node`, `${sqliteOut
 cpSync(`${sqlite}LICENSE`, `${sqliteOut}LICENSE`);
 const sqlitePkg = JSON.parse(readFileSync(`${sqlite}package.json`, 'utf8'));
 writeFileSync(`${sqliteOut}package.json`, JSON.stringify({ name: sqlitePkg.name, version: sqlitePkg.version, main: sqlitePkg.main, license: sqlitePkg.license }, null, 2));
+}
 
 writeFileSync(`${out}package.json`, JSON.stringify({ name: '@dinepos/server-bundle', version: pkg.version, private: true, type: 'module' }, null, 2));
 console.warn(`server bundle ${pkg.version} -> ${out}`);

@@ -2,6 +2,7 @@ import { formatINR, newId, type MenuItem, type MenuSnapshot, type OrderItemSnaps
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRightLeft, Ban, Bike, DoorOpen, Flame, Merge, MonitorUp, MoveRight, Printer, ReceiptText, Search, Split, TriangleAlert, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useScreen } from '../components/use-screen.js';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { HealthDots } from '../components/HealthDots.js';
@@ -64,6 +65,9 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
   const [query, setQuery] = useState('');
   const [sheet, setSheet] = useState<{ item: MenuItem; qty: number } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // a phone shows the menu or the order (tabs); a tablet or PC shows both side by side
+  const [pane, setPane] = useState<'menu' | 'order'>('menu');
+  const { compact } = useScreen();
   const [pending, setPending] = useState(0);
   const [toast, setToast] = useState<Toast | null>(null);
   const [dialog, setDialog] = useState<'bill' | 'settle' | null>(null);
@@ -271,7 +275,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-3 border-b border-border bg-card px-4 py-2.5">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-3 py-2.5 lg:px-4">
         <button className="btn" onClick={onBack} title="Back to floor (Esc)">
           <ArrowLeft className="h-4 w-4" /> Floor
         </button>
@@ -280,7 +284,8 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
         </h1>
         <span className="text-sm text-muted-foreground">
           {counter ? [order.customer?.name, order.customer?.phone].filter(Boolean).join(' · ') || 'Walk-in' : `${order.covers} covers`}
-          {elapsed ? ` · ${elapsed}` : ''} · v{order.version}
+          {elapsed ? ` · ${elapsed}` : ''}
+          <span className="hidden sm:inline"> · v{order.version}</span>
         </span>
         {order.customer?.address ? (
           <span className="flex max-w-xs items-center gap-1 truncate rounded-full bg-muted px-3 py-1 text-xs font-semibold" title={order.customer.address} data-testid="delivery-address">
@@ -299,7 +304,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
           </button>
         ) : null}
         {order.state === 'open' || order.state === 'billed' ? (
-          <div className="ml-4 flex gap-1" aria-label="Table actions">
+          <div className={`flex flex-wrap gap-1 lg:ml-4 ${compact ? '[&_.btn]:gap-0 [&_.btn]:px-3 [&_.btn]:text-[0px]' : ''}`} aria-label="Table actions">
             {!counter && can('table.move', true) ? (
               <button className="btn h-9" onClick={() => setTableAction('move')}>
                 <MoveRight className="h-4 w-4" /> Move
@@ -327,7 +332,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
             ) : null}
           </div>
         ) : null}
-        <div className="ml-auto flex items-center gap-4">
+        <div className={`ml-auto items-center gap-4 ${compact ? 'hidden' : 'flex'}`}>
           <HealthDots />
           <UserBadge />
         </div>
@@ -344,8 +349,15 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
         </div>
       ) : null}
 
+      <div className={`border-b border-border bg-card ${compact ? 'flex' : 'hidden'}`} role="tablist" aria-label="Menu or order">
+        {(['menu', 'order'] as const).map((p) => (
+          <button key={p} role="tab" aria-selected={pane === p} onClick={() => setPane(p)} className={`flex-1 py-3 text-sm font-bold ${pane === p ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`}>
+            {p === 'menu' ? 'Menu' : `Order${order.items.length ? ` · ${order.items.filter((i) => i.status !== 'cancelled').length}` : ''}${held.length ? ` (${held.length} to send)` : ''}`}
+          </button>
+        ))}
+      </div>
       <div className="flex min-h-0 flex-1">
-        <nav className="w-44 shrink-0 overflow-y-auto border-r border-border bg-card p-2" aria-label="Categories">
+        <nav className={`w-44 shrink-0 overflow-y-auto border-r border-border bg-card p-2 ${compact ? 'hidden' : 'hidden lg:block'}`} aria-label="Categories">
           {menu.categories.map((c) => (
             <button
               key={c.id}
@@ -360,9 +372,24 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
           ))}
         </nav>
 
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className={`min-w-0 flex-1 flex-col ${compact && pane === 'order' ? 'hidden' : 'flex'}`}>
+          {/* phones and tablets in portrait: the categories as a row of chips */}
+          <div className={`flex shrink-0 gap-2 overflow-x-auto border-b border-border px-3 py-2 ${compact ? '' : 'lg:hidden'}`} aria-label="Categories (row)">
+            {menu.categories.map((c) => (
+              <button
+                key={c.id}
+                className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold ${!query && c.id === activeCategory ? 'border-foreground bg-foreground text-background' : 'border-border bg-card'}`}
+                onClick={() => {
+                  setCategoryId(c.id);
+                  setQuery('');
+                }}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
           <form
-            className="flex items-center gap-3 border-b border-border px-4 py-3"
+            className="flex items-center gap-2 border-b border-border px-3 py-2 lg:gap-3 lg:px-4 lg:py-3"
             onSubmit={(e) => {
               e.preventDefault();
             }}
@@ -389,7 +416,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
           <div
             // auto-rows-max: rows keep their tiles' full height and the list scrolls. Without it a photo tile
             // (overflow-hidden, so its minimum height is 0) is squeezed to fit the screen and its name is cut off.
-            className={`grid min-h-0 flex-1 auto-rows-max content-start gap-2 overflow-y-auto p-4 ${menuView === 'photos' ? '[grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]' : '[grid-template-columns:repeat(auto-fill,minmax(170px,1fr))]'}`}
+            className={`grid min-h-0 flex-1 auto-rows-max content-start gap-2 overflow-y-auto p-3 lg:p-4 ${menuView === 'photos' ? '[grid-template-columns:repeat(auto-fill,minmax(150px,1fr))] lg:[grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]' : '[grid-template-columns:repeat(auto-fill,minmax(150px,1fr))] lg:[grid-template-columns:repeat(auto-fill,minmax(170px,1fr))]'}`}
             aria-label="Items"
           >
             {items.map((it) => (
@@ -399,7 +426,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
           </div>
         </main>
 
-        <div className="flex min-h-0 flex-col">
+        <div className={`min-h-0 flex-col ${compact ? `w-full ${pane === 'menu' ? 'hidden' : 'flex'}` : 'flex w-[340px] shrink-0 lg:w-[380px]'}`}>
           <Cart
             order={order}
             selectedId={selected?.id ?? null}
@@ -410,7 +437,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
             onChangeSent={order.state === 'open' || order.state === 'billed' ? setChanging : undefined}
             onReprintKot={reprintKot}
           />
-          <div className="grid w-[380px] grid-cols-3 gap-2 border-l border-t border-border bg-card p-3">
+          <div className={`grid w-full grid-cols-3 gap-2 border-t border-border bg-card p-3 ${compact ? '' : 'border-l'}`}>
             {/* Settings › Kitchen › "Use kitchen screens": new items go to the screens, else a paper KOT */}
             <button className="btn btn-primary h-12 whitespace-normal px-2 leading-tight" onClick={fire} disabled={held.length === 0} data-testid="send-kitchen">
               {configQuery.data?.['kds.enabled'] ? (

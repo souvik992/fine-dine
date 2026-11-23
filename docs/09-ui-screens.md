@@ -122,6 +122,9 @@ Sections are shown by right; every save is a command, so it is audited and other
   **Turn off / on**, **Edit**, **Remove**; **Add printer** in steps (USB, Wi-Fi with Find printers, Bluetooth COM port,
   Screen only → name and paper → bills and cash drawer, KOT stations → copies, backup printer, cutter, slow speed, on);
   print agents.
+  On Android the panel is "USB printers plugged into this device" (USB or Type-C, with **Allow** until Android lets
+  DinePOS use it), Bluetooth lists the printers paired with the device, and plugging a printer in shows a card on any
+  screen: **USB printer connected: <name>** with **Use for bills** / **Printer settings** (or connected / unplugged).
 - **Backups** (admin, P2-08): last backup and its health, "Back up now", the copy folder, the list of backups
   (time, kind, size) and, for staff managers, **Restore** (type RESTORE + Owner PIN; the app reconnects when the server
   is back). The top bar shows "Backup late" when there was no backup for an hour.
@@ -190,6 +193,22 @@ The button shows how many materials are low or need a count. Tabs:
 - Floor: a table held by a booking is RESERVED and its tile reads "14:00 · Sharma (4)"; later bookings show the same
   line on a free tile. Seating a held table asks: "These are Sharma's guests" (seats the booking) or "A walk-in: seat
   anyway". The header button shows bookings still to come and a badge with how many are waiting.
+
+## Phones, tablets and POS machines (DinePOS for Android, `apps/android`; product owner 2026-11-23)
+The billing screens (the same `/pos` pages as the browser) fit every screen. `useScreen()` (`components/use-screen.ts`)
+calls a screen **compact** when it is under 768 px wide or under 500 px tall (a phone, upright or sideways).
+- Order screen: compact → **Menu / Order** tabs (the Order tab says how many lines and how many to send), category
+  chips in a row, Move / Merge / Move items / Release as icons, no status dots or staff badge. 768–1023 px (a tablet
+  upright) → category chips above the menu, the order beside it (340 px). 1024 px and wider (tablet sideways, POS
+  machines such as 1024 × 600, PCs) → as before.
+- Floor: the room plan (Layout) only where it fits at 90 % or more; otherwise the Grid, and Layout says it shows on a
+  wider screen. Under 640 px the tool buttons are icons (their names stay for screen readers); + Takeaway and
+  + Delivery keep their words.
+- Settings under 768 px: the list of sections, then the chosen one full screen with **All settings**; fields side by side
+  on a PC stack in one column.
+- The Android app runs the outlet server on the device (Node 24 for Android, `node:sqlite`, data in the app's own
+  storage) and shows `http://127.0.0.1:7420/pos/`; captain phones and kitchen screens connect to the device on the
+  Wi-Fi. USB and Bluetooth printers (and a POS machine's built-in one) print through the app.
 
 ## Captain PWA (phone/tablet)
 - Login with PIN → My tables (assigned areas first) → table → order screen.

@@ -1,12 +1,15 @@
 import { newId, type FailedPrintJob } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bluetooth, CircleAlert, Monitor, Pencil, Plus, Power, Printer, RefreshCw, RotateCw, Search, Trash2, Usb, Wifi } from 'lucide-react';
-import { useState, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
+import { androidApp, printerHost, USB_PRINTER_EVENT } from '../components/android-app.js';
 import { Modal } from '../components/Modal.js';
 import { Empty, ErrorText, Field, SectionHeader, Toggle, useCatalog, useSave, type AdminCatalog } from './common.js';
 import { PrintAgents, usePrintAgents } from './PrintAgents.js';
+
+const BLUETOOTH_MAC = /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/i;
 
 type PrinterRow = AdminCatalog['printers'][number];
 type Station = AdminCatalog['stations'][number];
@@ -20,8 +23,8 @@ interface PrinterStatus {
   lastError?: string;
   agent?: { id: string; name: string };
 }
-/** A USB printer plugged into the outlet server PC (GET /v1/printers/usb-devices). */
-interface UsbDevice {
+/** A USB printer plugged into the outlet server PC, or the Android device DinePOS runs on (GET /v1/printers/usb-devices). */
+export interface UsbDevice {
   key: string;
   transport: 'usbdirect' | 'usb';
   device: string | null;
@@ -31,6 +34,8 @@ interface UsbDevice {
   widthMm: 58 | 80;
   printerId: string | null;
   printerName: string | null;
+  /** False: plugged into the Android device, but Android does not let DinePOS use it yet (Allow). */
+  allowed: boolean;
 }
 interface WindowsPrinter {
   name: string;
@@ -45,11 +50,11 @@ interface SerialPortInfo {
   bluetooth: boolean;
 }
 
-const KINDS: Array<{ kind: Kind; label: string; hint: string; icon: ComponentType<{ className?: string }> }> = [
-  { kind: 'usb', label: 'USB', hint: 'Plugged into the main PC with a USB cable', icon: Usb },
+const kinds = (): Array<{ kind: Kind; label: string; hint: string; icon: ComponentType<{ className?: string }> }> => [
+  { kind: 'usb', label: 'USB', hint: androidApp() ? 'Plugged into this device with a USB or Type-C cable' : 'Plugged into the main PC with a USB cable', icon: Usb },
   { kind: 'wifi', label: 'Wi-Fi / network', hint: 'On the shop Wi-Fi or a network cable', icon: Wifi },
-  { kind: 'bluetooth', label: 'Bluetooth', hint: 'Paired with the main PC over Bluetooth', icon: Bluetooth },
-  { kind: 'screen', label: 'Screen only', hint: 'No printer: prints are kept as text on the main PC', icon: Monitor },
+  { kind: 'bluetooth', label: 'Bluetooth', hint: `Paired with ${printerHost()} over Bluetooth`, icon: Bluetooth },
+  { kind: 'screen', label: 'Screen only', hint: `No printer: prints are kept as text on ${printerHost()}`, icon: Monitor },
 ];
 const kindOf = (t: Transport): Kind => (t === 'tcp' ? 'wifi' : t === 'serial' ? 'bluetooth' : t === 'fake' ? 'screen' : 'usb');
 
@@ -155,19 +160,7 @@ export function PrinterSettings() {
 
       <PluggedIn
         printers={printers}
-        onUseForBills={(d) =>
-          void save('UpsertPrinter', {
-            id: newId(),
-            name: d.name,
-            transport: d.transport,
-            windowsName: d.windowsName,
-            device: d.device,
-            widthMm: d.widthMm,
-            role: 'bill',
-            drawer: !printers.some((p) => p.active && p.drawer),
-            stationIds: [],
-          }).then((ok) => ok && done(`${d.name} set up for bills. Press Test print to check it.`))
-        }
+        onUseForBills={(d) => void save('UpsertPrinter', billPrinter(d, printers)).then((ok) => ok && done(`${d.name} set up for bills. Press Test print to check it.`))}
         onOptions={(d) => setEditing({ printer: null, prefill: { name: d.name, transport: d.transport, windowsName: d.windowsName, device: d.device, widthMm: d.widthMm } })}
         onTest={(id) => {
           const p = printers.find((x) => x.id === id);
@@ -229,7 +222,7 @@ export function PrinterSettings() {
                     disabled={busy}
                     onChange={(e) => void save('SetPrinterAgent', { printerId: p.id, agentId: e.target.value || null }).then(() => status.refetch())}
                   >
-                    <option value="">The main PC</option>
+                    <option value="">{androidApp() ? 'This device' : 'The main PC'}</option>
                     {agents.data?.agents.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.name}
@@ -279,6 +272,21 @@ export function PrinterSettings() {
   );
 }
 
+/** UpsertPrinter for a plugged-in USB printer that prints the bills (and opens the drawer if no other printer does). */
+export function billPrinter(d: UsbDevice, printers: PrinterRow[]) {
+  return {
+    id: newId(),
+    name: d.name,
+    transport: d.transport,
+    windowsName: d.windowsName,
+    device: d.device,
+    widthMm: d.widthMm,
+    role: 'bill' as const,
+    drawer: !printers.some((p) => p.active && p.drawer),
+    stationIds: [],
+  };
+}
+
 /** The UpsertPrinter payload for an existing printer, with changes. */
 function payloadOf(p: PrinterRow, patch: Partial<PrinterRow> = {}) {
   const x = { ...p, ...patch };
@@ -302,7 +310,7 @@ function payloadOf(p: PrinterRow, patch: Partial<PrinterRow> = {}) {
   };
 }
 
-/** quickPOS plug and play: USB printers plugged into the main PC, set up in one tap. */
+/** quickPOS plug and play: USB printers plugged into the main PC (or this Android device), set up in one tap. */
 function PluggedIn({ printers, onUseForBills, onOptions, onTest, busy }: { printers: PrinterRow[]; onUseForBills: (d: UsbDevice) => void; onOptions: (d: UsbDevice) => void; onTest: (printerId: string) => void; busy: boolean }) {
   const { api } = useApp();
   const [refresh, setRefresh] = useState(0);
@@ -312,14 +320,25 @@ function PluggedIn({ printers, onUseForBills, onOptions, onTest, busy }: { print
     refetchInterval: 6_000, // a newly plugged printer shows up within seconds
   });
   const devices = scan.data?.devices ?? [];
+  const android = androidApp();
+  // DinePOS for Android: the app says when a printer is plugged in, allowed or unplugged; look at once
+  useEffect(() => {
+    if (!android) return;
+    const on = () => setRefresh((n) => n + 1);
+    window.addEventListener(USB_PRINTER_EVENT, on);
+    return () => window.removeEventListener(USB_PRINTER_EVENT, on);
+  }, [android]);
+  const title = `USB printers plugged into ${printerHost()}`;
   return (
-    <section className="rounded-xl border border-border bg-card p-4" aria-label="USB printers plugged into the main PC">
-      <div className="mb-2 flex items-center gap-2">
-        <Usb className="h-5 w-5 text-primary" />
-        <div>
-          <h3 className="font-semibold">USB printers plugged into the main PC</h3>
+    <section className="rounded-xl border border-border bg-card p-4" aria-label={title}>
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <Usb className="h-5 w-5 shrink-0 text-primary" />
+        <div className="min-w-[14rem] flex-1">
+          <h3 className="font-semibold">{title}</h3>
           <p className="text-xs text-muted-foreground">
-            Plug in the printer and switch it on. It shows here within a few seconds, with or without a Windows driver.
+            {android
+              ? 'Plug the printer into this device’s USB or Type-C port (a USB-C printer cable, or an OTG adapter) and switch it on. When Android asks to open DinePOS or to allow the printer, tap OK. It shows here at once.'
+              : 'Plug in the printer and switch it on. It shows here within a few seconds, with or without a Windows driver.'}
             {scan.data ? ` Last checked ${new Date(scan.data.scannedAt).toLocaleTimeString('en-IN')}.` : ''}
           </p>
         </div>
@@ -333,6 +352,7 @@ function PluggedIn({ printers, onUseForBills, onOptions, onTest, busy }: { print
           <p className="font-medium text-foreground">No USB printer found.</p>
           <ul className="ml-5 list-disc">
             <li>Check the USB cable at both ends and that the printer is switched on (its light is on).</li>
+            {android ? <li>A phone or tablet needs a USB-C to USB printer cable, or an OTG adapter; a charging-only cable does not work.</li> : null}
             <li>Wi-Fi and Bluetooth printers are added with Add printer.</li>
           </ul>
         </div>
@@ -342,7 +362,7 @@ function PluggedIn({ printers, onUseForBills, onOptions, onTest, busy }: { print
           const set = d.printerId ? printers.find((p) => p.id === d.printerId) : undefined;
           return (
             <li key={d.key} className="flex flex-wrap items-center gap-2 py-2 text-sm" data-usb={d.name}>
-              <span className="min-w-0 flex-1">
+              <span className="min-w-[12rem] flex-1">
                 <span className="font-semibold">{d.name}</span>
                 <span className="block text-xs text-muted-foreground">{d.detail}</span>
               </span>
@@ -360,6 +380,11 @@ function PluggedIn({ printers, onUseForBills, onOptions, onTest, busy }: { print
                 </>
               ) : (
                 <>
+                  {!d.allowed && d.device ? (
+                    <button className="btn h-8" onClick={() => android?.allowUsbPrinter?.(d.device!)} disabled={!android?.allowUsbPrinter} title={android ? undefined : 'Allow it on the DinePOS device'}>
+                      Allow
+                    </button>
+                  ) : null}
                   <button className="btn btn-primary h-8" disabled={busy} onClick={() => onUseForBills(d)}>
                     Use for bills
                   </button>
@@ -416,8 +441,10 @@ function PrinterDialog({
   const [device, setDevice] = useState(start.transport === 'usbdirect' ? (start.device ?? '') : '');
   const [host, setHost] = useState(start.host ?? '');
   const [port, setPort] = useState(String(start.port ?? 9100));
-  const [com, setCom] = useState(start.transport === 'serial' ? (start.device ?? '').split(':')[0]! : '');
-  const [baud, setBaud] = useState(start.transport === 'serial' ? ((start.device ?? '').split(':')[1] ?? '') : '');
+  // a COM port and speed ("COM5:9600"), or on Android a Bluetooth address ("AA:BB:CC:DD:EE:FF")
+  const btMac = start.transport === 'serial' && BLUETOOTH_MAC.test(start.device ?? '');
+  const [com, setCom] = useState(start.transport === 'serial' ? (btMac ? start.device! : (start.device ?? '').split(':')[0]!) : '');
+  const [baud, setBaud] = useState(start.transport === 'serial' && !btMac ? ((start.device ?? '').split(':')[1] ?? '') : '');
   const [name, setName] = useState(start.name ?? '');
   const [width, setWidth] = useState<58 | 80>(start.widthMm ?? 80);
   const [bills, setBills] = useState(printer ? printer.role !== 'kot' : !hasBill);
@@ -448,7 +475,8 @@ function PrinterDialog({
     if (transport === 'usb' && !windowsName.trim()) return setError('Choose the USB printer.');
     if (transport === 'usbdirect' && !device) return setError('Choose the USB printer.');
     if (transport === 'tcp' && !host.trim()) return setError('Enter or find the printer’s IP address.');
-    if (transport === 'serial' && !/^COM\d{1,3}$/i.test(com.trim())) return setError('Choose the Bluetooth COM port, like COM5.');
+    const mac = BLUETOOTH_MAC.test(com.trim());
+    if (transport === 'serial' && !mac && !/^COM\d{1,3}$/i.test(com.trim())) return setError(androidApp() ? 'Choose the Bluetooth printer.' : 'Choose the Bluetooth COM port, like COM5.');
     if (!bills && chosen.size === 0) return setError('Choose what this printer prints: bills, kitchen tickets, or both.');
     const ok = await save('UpsertPrinter', {
       id: printer?.id ?? newId(),
@@ -457,7 +485,7 @@ function PrinterDialog({
       host: transport === 'tcp' ? host.trim() : null,
       port: Number(port) || 9100,
       windowsName: transport === 'usb' ? windowsName.trim() : null,
-      device: transport === 'usbdirect' ? device : transport === 'serial' ? `${com.trim().toUpperCase()}${baud ? `:${baud}` : ''}` : null,
+      device: transport === 'usbdirect' ? device : transport === 'serial' ? `${com.trim().toUpperCase()}${baud && !mac ? `:${baud}` : ''}` : null,
       widthMm: width,
       bitmapText: printer?.bitmapText ?? false,
       copies: Math.min(5, Math.max(1, Number(copies) || 1)),
@@ -476,8 +504,8 @@ function PrinterDialog({
     <Modal title={printer ? `Edit ${printer.name}` : 'Add printer'} onClose={onClose} wide>
       <div className="max-h-[70vh] overflow-y-auto pr-1">
         <Step n={1} title="How is the printer connected?">
-          <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Connection">
-            {KINDS.map(({ kind: k, label, hint, icon: Icon }) => (
+          <div className="grid-cols-2 gap-2 [display:grid] sm:grid-cols-4" role="radiogroup" aria-label="Connection">
+            {kinds().map(({ kind: k, label, hint, icon: Icon }) => (
               <button
                 key={k}
                 type="button"
@@ -513,7 +541,7 @@ function PrinterDialog({
             {kind === 'bluetooth' ? <BluetoothPicker com={com} baud={baud} onCom={setCom} onBaud={setBaud} /> : null}
           </Step>
         ) : (
-          <p className="mb-4 text-xs text-muted-foreground">Prints go to text files on the main PC (data\prints). For trying DinePOS without a printer.</p>
+          <p className="mb-4 text-xs text-muted-foreground">Prints go to text files on {printerHost()} (data\prints). For trying DinePOS without a printer.</p>
         )}
 
         <Step n={kind === 'screen' ? 2 : 3} title="Name and paper">
@@ -620,22 +648,23 @@ function Picker({ title, loading, onRefresh, refreshLabel, children }: { title: 
 
 const pickClass = (on: boolean, dim = false) => `flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm ${on ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-secondary'} ${dim ? 'opacity-60' : ''}`;
 
-/** USB: printers plugged in with no driver, and printers installed in Windows on the main PC. */
+/** USB: printers plugged in with no driver, and printers installed in Windows on the main PC (Android: plugged into this device). */
 function UsbPicker({ transport, windowsName, device, onPick }: { transport: Transport; windowsName: string; device: string; onPick: (t: 'usb' | 'usbdirect', value: string, label?: string) => void }) {
   const { api } = useApp();
   const usb = useQuery({ queryKey: ['usb-printers', 'picker'], queryFn: () => api.get<{ devices: UsbDevice[] }>('/v1/printers/usb-devices') });
-  const win = useQuery({ queryKey: ['windows-printers'], queryFn: () => api.get<{ printers: WindowsPrinter[] }>('/v1/printers/windows') });
+  const android = androidApp() !== null;
+  const win = useQuery({ queryKey: ['windows-printers'], queryFn: () => api.get<{ printers: WindowsPrinter[] }>('/v1/printers/windows'), enabled: !android });
   const driverless = (usb.data?.devices ?? []).filter((d) => d.transport === 'usbdirect');
   const installed = (win.data?.printers ?? []).slice().sort((a, b) => Number(b.connection === 'usb') - Number(a.connection === 'usb'));
   return (
-    <Picker title="Printers on the main PC" loading={usb.isFetching || win.isFetching} onRefresh={() => void Promise.all([usb.refetch(), win.refetch()])} refreshLabel="Refresh">
+    <Picker title={`Printers on ${printerHost()}`} loading={usb.isFetching || win.isFetching} onRefresh={() => void Promise.all([usb.refetch(), android ? null : win.refetch()])} refreshLabel="Refresh">
       {win.isError ? <p className="text-sm text-danger">{win.error instanceof ApiError ? win.error.message : 'Windows could not list the printers.'}</p> : null}
       <ul className="max-h-52 space-y-1 overflow-y-auto" aria-label="USB printers">
         {driverless.map((d) => (
           <li key={d.key}>
             <button type="button" aria-pressed={transport === 'usbdirect' && device === d.device} className={pickClass(transport === 'usbdirect' && device === d.device)} onClick={() => onPick('usbdirect', d.device!, d.name)}>
               <span className="min-w-0 flex-1 truncate font-semibold">{d.name}</span>
-              <span className="shrink-0 text-xs text-muted-foreground">{d.detail}</span>
+              <span className="max-w-[55%] truncate text-xs text-muted-foreground">{d.detail}</span>
             </button>
           </li>
         ))}
@@ -651,11 +680,17 @@ function UsbPicker({ transport, windowsName, device, onPick }: { transport: Tran
           </li>
         ))}
       </ul>
-      {usb.data && win.data && !driverless.length && !installed.length ? <p className="text-sm text-muted-foreground">No printers found. Check the cable and that it is switched on, then Refresh.</p> : null}
+      {usb.data && (win.data || android) && !driverless.length && !installed.length ? (
+        <p className="text-sm text-muted-foreground">
+          No printers found. Check the cable{android ? ' (a USB-C printer cable or an OTG adapter)' : ''} and that it is switched on, then Refresh.
+        </p>
+      ) : null}
+      {android ? null : (
       <label className="mt-2 block text-xs text-muted-foreground">
         Or type the Windows printer name
         <input className="input mt-1" value={transport === 'usb' ? windowsName : ''} placeholder="POS-80" onChange={(e) => onPick('usb', e.target.value)} aria-label="Windows printer name" />
       </label>
+      )}
     </Picker>
   );
 }
@@ -703,7 +738,7 @@ function WifiPicker({ host, port, onHost, onPort }: { host: string; port: string
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-muted-foreground">No printer answered on the network. Check it is on the same Wi-Fi as the main PC, or type its IP address (print its self-test page to see it).</p>
+          <p className="mt-2 text-sm text-muted-foreground">No printer answered on the network. Check it is on the same Wi-Fi as {printerHost()}, or type its IP address (print its self-test page to see it).</p>
         )
       ) : null}
     </Picker>
@@ -715,6 +750,7 @@ function BluetoothPicker({ com, baud, onCom, onBaud }: { com: string; baud: stri
   const { api } = useApp();
   const ports = useQuery({ queryKey: ['serial-ports'], queryFn: () => api.get<{ ports: SerialPortInfo[] }>('/v1/printers/serial-ports') });
   const list = (ports.data?.ports ?? []).slice().sort((a, b) => Number(b.bluetooth) - Number(a.bluetooth));
+  if (androidApp()) return <AndroidBluetoothPicker ports={ports} list={list} mac={com} onMac={onCom} />;
   return (
     <Picker title="COM ports on the main PC" loading={ports.isFetching} onRefresh={() => void ports.refetch()} refreshLabel="Refresh">
       <p className="mb-2 text-xs text-muted-foreground">Pair the printer in Windows Bluetooth settings first. Its Outgoing COM port appears here.</p>
@@ -747,6 +783,28 @@ function BluetoothPicker({ com, baud, onCom, onBaud }: { com: string; baud: stri
           </select>
         </Field>
       </div>
+    </Picker>
+  );
+}
+
+/** DinePOS for Android: Bluetooth printers paired with this device, incl. a POS machine's built-in printer. */
+function AndroidBluetoothPicker({ ports, list, mac, onMac }: { ports: { isFetching: boolean; isError: boolean; error: unknown; data?: unknown; refetch: () => unknown }; list: SerialPortInfo[]; mac: string; onMac: (v: string) => void }) {
+  return (
+    <Picker title="Bluetooth printers paired with this device" loading={ports.isFetching} onRefresh={() => void ports.refetch()} refreshLabel="Refresh">
+      <p className="mb-2 text-xs text-muted-foreground">Pair the printer in Android Settings › Bluetooth first. A POS machine’s built-in printer is already there.</p>
+      {ports.isError ? <p className="text-sm text-danger">{ports.error instanceof ApiError ? ports.error.message : 'Could not list the Bluetooth printers.'}</p> : null}
+      <ul className="max-h-44 space-y-1 overflow-y-auto" aria-label="Bluetooth printers">
+        {list.map((p) => (
+          <li key={p.port}>
+            <button type="button" aria-pressed={mac.toUpperCase() === p.port} className={pickClass(mac.toUpperCase() === p.port)} onClick={() => onMac(p.port)}>
+              <Bluetooth className="h-4 w-4 shrink-0" />
+              <span className="min-w-0 flex-1 truncate font-semibold">{p.name}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">{p.port}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {ports.data && !list.length ? <p className="text-sm text-muted-foreground">No paired Bluetooth printer. Turn on Bluetooth, pair the printer in Android Settings, then Refresh.</p> : null}
     </Picker>
   );
 }
