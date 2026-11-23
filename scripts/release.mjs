@@ -1,9 +1,9 @@
 // P8-11: builds the Windows installers on this PC and uploads them to DinePOS Cloud, which offers them in the customer
 // portal (Client area > Downloads). CI only tests; installers are built here.
 //
-//   npm run release                 build DinePOS, Table QR, DinePOS Kitchen (KDS) and the Captain APK, then upload them
+//   npm run release                 build DinePOS, Table QR, DinePOS Kitchen (KDS), the Captain APK and DinePOS for Android, then upload them
 //   npm run release -- --no-build   upload the installers already built (the newest version of each)
-//   npm run release -- --only dinepos   (or --only tableqr, --only kitchen, --only captain)
+//   npm run release -- --only dinepos   (or --only tableqr, --only kitchen, --only captain, --only android)
 //   npm run release -- --allow-dirty    build even with uncommitted changes (not recommended)
 //
 // Where to upload: %USERPROFILE%\.dinepos\release.json  {"hubUrl": "https://cloud.example.com", "adminKey": "..."}
@@ -38,8 +38,18 @@ const ITEMS = [
     id: 'dinepos-captain', name: 'DinePOS Captain (Android)', dir: path.join(repo, 'apps', 'captain-android', 'release'), file: /^DinePOS-Captain-(.+)\.apk$/,
     build: ['run', 'apk', '-w', '@dinepos/captain-android'], needs: () => path.join(repo, 'apps', 'captain-android', 'keystore.properties'),
   },
-].filter((i) => !only || i.id === only || i.id === `dinepos-${only}`);
-if (!ITEMS.length) fail('--only must be dinepos, tableqr, kitchen or captain');
+  // DinePOS for Android, the whole outlet on a phone, tablet or POS machine: apps/android (signed with the captain app's key).
+  // One build makes both: 64-bit for most devices, 32-bit for older POS machines.
+  {
+    id: 'dinepos-android', name: 'DinePOS for Android (64-bit)', dir: path.join(repo, 'apps', 'android', 'release'), file: /^DinePOS-(\d+\.\d+\.\d+)-arm64-v8a-release\.apk$/,
+    build: ['run', 'apk', '-w', '@dinepos/android'], needs: () => path.join(repo, 'apps', 'captain-android', 'keystore.properties'),
+  },
+  {
+    id: 'dinepos-android-32', name: 'DinePOS for Android (32-bit)', dir: path.join(repo, 'apps', 'android', 'release'), file: /^DinePOS-(\d+\.\d+\.\d+)-armeabi-v7a-release\.apk$/,
+    builtWith: 'dinepos-android', needs: () => path.join(repo, 'apps', 'captain-android', 'keystore.properties'),
+  },
+].filter((i) => !only || [i.id, i.builtWith].some((x) => x === only || x === `dinepos-${only}`));
+if (!ITEMS.length) fail('--only must be dinepos, tableqr, kitchen, captain or android');
 
 function fail(msg) { console.error(`\n✖ ${msg}\n`); process.exit(1); }
 
@@ -124,6 +134,7 @@ if (!flag('--no-build')) {
   console.warn(`Building from ${git(['rev-parse', '--abbrev-ref', 'HEAD'])} @ ${git(['rev-parse', '--short', 'HEAD'])}`);
   for (const item of ITEMS) {
     if (item.needs && !existsSync(item.needs())) { console.warn(`\n! ${item.name} skipped: its signing key (${item.needs()}) is not on this PC.`); continue; }
+    if (item.builtWith) { if (built.includes(item.builtWith)) built.push(item.id); continue; } // made by that item's build
     console.warn(`\n=== Building ${item.name}`);
     run('npm', item.build);
     built.push(item.id);
