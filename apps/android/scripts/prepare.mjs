@@ -16,6 +16,8 @@ const REPO = path.resolve(HERE, '..', '..');
 const CACHE = path.join(HERE, '.cache');
 const APP = path.join(HERE, 'app', 'src', 'main');
 const SYSTEM = new Set(['libc.so', 'libm.so', 'libdl.so', 'liblog.so', 'libandroid.so']);
+/** Termux's root certificates (ca-certificates): its OpenSSL looks for them under Termux's own folder, which an app does not have. */
+let certPem = null;
 const sha256 = (b) => createHash('sha256').update(b).digest('hex');
 
 /** The data.tar.* member of a .deb (an "ar" archive). */
@@ -56,6 +58,8 @@ async function runtime(abi, pkgs, repo) {
   }
   const usr = path.join(root, 'data', 'data', 'com.termux', 'files', 'usr');
   const libs = readdirSync(path.join(usr, 'lib'));
+  const cert = path.join(usr, 'etc', 'tls', 'cert.pem');
+  if (existsSync(cert)) certPem = cert;
   const out = path.join(APP, 'jniLibs', abi);
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
@@ -89,6 +93,10 @@ function assets(bundle) {
   const dest = path.join(APP, 'assets', 'dinepos');
   rmSync(dest, { recursive: true, force: true });
   cpSync(server, path.join(dest, 'server'), { recursive: true });
+  // HTTPS from the server (DinePOS Cloud, licences, online orders): the app sets SSL_CERT_FILE to this file
+  if (!certPem) throw new Error('No root certificates (ca-certificates) in the Termux packages: HTTPS would fail on the device');
+  mkdirSync(path.join(dest, 'tls'), { recursive: true });
+  cpSync(certPem, path.join(dest, 'tls', 'cert.pem'));
   // a fingerprint of everything, so the app unpacks the files again only when they changed
   const h = createHash('sha256');
   const walk = (d) => {

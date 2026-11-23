@@ -59,8 +59,12 @@ export function licenceActivationRoutes(
         body: JSON.stringify({ ...parsed.data, hardwareId: deps.licence.hardwareId, outletName, link: !linked, product: PRODUCT }),
         signal: AbortSignal.timeout(20_000),
       });
-    } catch {
-      throw new PosError('INVALID_STATE', 'DinePOS Cloud could not be reached. Connect this PC to the internet to activate, or paste a licence key below.', { reason: 'cloud_unreachable' });
+    } catch (e) {
+      // why (no network, DNS, a certificate problem), for the server log and the screen's details
+      const cause = e instanceof Error ? ((e.cause as { code?: string; message?: string } | undefined)?.code ?? (e.cause as Error | undefined)?.message ?? e.message) : String(e);
+      req.log.warn({ cloud, cause }, 'licence activation: DinePOS Cloud not reached');
+      const here = process.platform === 'android' ? 'this device' : 'this PC';
+      throw new PosError('INVALID_STATE', `DinePOS Cloud could not be reached. Connect ${here} to the internet to activate, or paste a licence key below.`, { reason: 'cloud_unreachable', cause });
     }
     const j = (await res.json().catch(() => null)) as CloudAnswer | null;
     if (!res.ok || !j?.key) {

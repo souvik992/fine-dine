@@ -54,6 +54,10 @@ final class DinePosServer {
                 env.put("DINEPOS_PORT", String.valueOf(PORT));
                 env.put("DINEPOS_HOST", "0.0.0.0");
                 env.put("DINEPOS_STOP_WITH_STDIN", "1");
+                // HTTPS (DinePOS Cloud, licences, online orders): Termux's OpenSSL looks for root certificates under
+                // /data/data/com.termux, which this app does not have; use the copy unpacked with the server
+                File certs = new File(app, "tls/cert.pem");
+                if (certs.isFile()) { env.put("SSL_CERT_FILE", certs.getPath()); env.put("NODE_EXTRA_CA_CERTS", certs.getPath()); }
                 // the licence's hardware id: this device's own id (per app signing key)
                 String androidId = Settings.Secure.getString(ctx.getContentResolver(), Settings.Secure.ANDROID_ID);
                 if (androidId != null) env.put("DINEPOS_ANDROID_ID", androidId);
