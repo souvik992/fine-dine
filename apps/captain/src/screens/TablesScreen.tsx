@@ -1,6 +1,7 @@
 import { formatINR, type FloorSnapshot, type FloorTable } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
 import { BellRing, ChefHat, Clock, Lock, LogOut, Minus, Plus, ReceiptText, TriangleAlert, Users, WifiOff } from 'lucide-react';
+import { BrandMark } from '@dinepos/web-shell';
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../app-context.js';
 import { Sheet } from '../components/Sheet.js';
@@ -49,12 +50,13 @@ export function TablesScreen() {
   const pick = (t: FloorTable) => (t.orderId ? setOpen({ orderId: t.orderId, areaId: t.areaId }) : setPicked(t));
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-10 border-b border-border bg-card px-4 pb-2 pt-3">
-        <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-10 border-b border-border bg-card">
+        <div className="appbar">
+          <BrandMark size={34} inverse />
           <h1 className="font-display text-xl font-semibold">Tables</h1>
-          <span className="ml-auto text-right text-sm leading-tight">
+          <span className="ml-auto min-w-0 truncate text-right text-sm font-semibold leading-tight">
             {session?.user.name}
-            <span className="block text-xs text-muted-foreground">{session?.user.roleName}</span>
+            <span className="block text-xs font-normal opacity-80">{session?.user.roleName}</span>
           </span>
           <button className="btn h-10 w-10 px-0" onClick={() => void lock().catch(() => undefined)} aria-label="Lock">
             <Lock className="h-5 w-5" />
@@ -63,7 +65,7 @@ export function TablesScreen() {
             <LogOut className="h-5 w-5" />
           </button>
         </div>
-        <nav role="tablist" aria-label="Areas" className="no-scrollbar -mx-1 mt-2 flex gap-1 overflow-x-auto px-1">
+        <nav role="tablist" aria-label="Areas" className="no-scrollbar flex gap-1 overflow-x-auto px-3 py-2">
           {mineCount || area === MINE ? (
             <button role="tab" className="tab" aria-selected={area === MINE} onClick={() => setAreaId(MINE)}>
               My tables ({mineCount})

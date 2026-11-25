@@ -19,8 +19,8 @@ android {
         minSdk = 26
         // 36, not 37: Android 17's local-network permission would need a runtime prompt for the shop LAN
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
     }
 
     signingConfigs {

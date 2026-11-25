@@ -1,12 +1,13 @@
 import { addDays, localDate, newId, type FloorSnapshot, type FloorTable, type Reservation, type ReservationDay, type Waitlist } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CalendarPlus, Clock, Phone, Plus, UserPlus, Users } from 'lucide-react';
+import { CalendarPlus, Clock, Phone, Plus, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
 import { Modal } from '../components/Modal.js';
 import { bookingTime } from '../floor/SeatDialog.js';
 import { LOCAL_ZONE, STATUS_LABEL, toInstant, waitClass } from './bookings-model.js';
+import { ScreenBar } from '../components/ScreenBar.js';
 
 /**
  * Bookings and the waitlist (P4-04, docs/09): the day's bookings in time order (seat, change, cancel, no-show) and the
@@ -84,12 +85,19 @@ export function BookingsScreen({ onBack, onOpenOrder }: { onBack: () => void; on
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-3 border-b border-border bg-card px-4 py-2.5">
-        <button className="btn" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4" /> Floor
-        </button>
-        <h1 className="font-display text-xl font-semibold">Bookings</h1>
-        <nav className="ml-4 flex gap-1" aria-label="Day">
+      <ScreenBar
+        title="Bookings"
+        onBack={onBack}
+        badge={false}
+        right={
+          manage ? (
+            <button className="btn" onClick={() => setEditing('new')}>
+              <CalendarPlus className="h-4 w-4" /> New booking
+            </button>
+          ) : null
+        }
+      >
+        <nav className="flex flex-wrap items-center gap-1" aria-label="Day">
           {[
             [today, 'Today'],
             [addDays(today, 1), 'Tomorrow'],
@@ -100,12 +108,7 @@ export function BookingsScreen({ onBack, onOpenOrder }: { onBack: () => void; on
           ))}
           <input type="date" className="input h-8 w-40" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Date" />
         </nav>
-        {manage ? (
-          <button className="btn btn-primary ml-auto" onClick={() => setEditing('new')}>
-            <CalendarPlus className="h-4 w-4" /> New booking
-          </button>
-        ) : null}
-      </header>
+      </ScreenBar>
 
       {message ? (
         <p role="status" className="bg-secondary px-4 py-2 text-sm font-semibold" onClick={() => setMessage(null)}>
@@ -113,7 +116,8 @@ export function BookingsScreen({ onBack, onOpenOrder }: { onBack: () => void; on
         </p>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[1fr_380px]">
+      {/* a phone: the waitlist under the day's bookings, the whole page scrolling */}
+      <div className="min-h-0 flex-1 max-md:overflow-y-auto md:grid md:grid-cols-[1fr_380px]">
         <section className="min-h-0 overflow-y-auto p-4" aria-label="Bookings of the day">
           <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">
             To come · {booked.length}
@@ -129,7 +133,7 @@ export function BookingsScreen({ onBack, onOpenOrder }: { onBack: () => void; on
           ) : null}
         </section>
 
-        <aside className="min-h-0 overflow-y-auto border-l border-border bg-card p-4" aria-label="Waitlist">
+        <aside className="min-h-0 overflow-y-auto border-border bg-card p-4 max-md:border-t md:border-l" aria-label="Waitlist">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Waiting · {waitlist.data?.entries.length ?? 0}</h2>
             {manage ? (

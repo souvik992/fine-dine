@@ -1,6 +1,7 @@
 import { ApiError } from '@dinepos/client';
 import { Smartphone } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { ShellFrame } from './LoginScreen.js';
 import { useShell } from './shell-context.js';
 
 interface Ticket {
@@ -51,8 +52,10 @@ export function PairScreen({ kind, device = 'phone', placeholder = "Ravi's phone
   }, [api, ticket, setDeviceToken]);
 
   return (
-    <main className="flex min-h-full flex-col justify-center px-5 py-8">
-      <Smartphone className="mx-auto h-12 w-12 text-primary" />
+    <ShellFrame>
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <Smartphone className="h-8 w-8" />
+      </div>
       <h1 className="mt-3 text-center font-display text-3xl font-semibold">Pair this {device}</h1>
       <p className="mt-2 text-center text-muted-foreground">{reason}</p>
       {!ticket || expired ? (
@@ -86,6 +89,6 @@ export function PairScreen({ kind, device = 'phone', placeholder = "Ravi's phone
           <p className="text-muted-foreground">Waiting for approval… (10 minutes)</p>
         </div>
       )}
-    </main>
+    </ShellFrame>
   );
 }

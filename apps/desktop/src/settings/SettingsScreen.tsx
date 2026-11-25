@@ -1,5 +1,5 @@
 import type { Right } from '@dinepos/shared';
-import { ArrowLeft, ChefHat, CloudUpload, DatabaseBackup, KeyRound, LayoutGrid, MapPin, MapPinned, MonitorSmartphone, Printer, Puzzle, ShoppingBag, ReceiptText, Store, Ticket, Users, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, ChefHat, ChevronRight, CloudUpload, DatabaseBackup, KeyRound, LayoutGrid, MapPin, MapPinned, MonitorSmartphone, Printer, Puzzle, ShoppingBag, ReceiptText, Store, Ticket, Users, UtensilsCrossed } from 'lucide-react';
 import { useState, type ComponentType } from 'react';
 import { useApp } from '../app-context.js';
 import { UserBadge } from '../components/UserBadge.js';
@@ -49,49 +49,61 @@ export function SettingsScreen({ onBack, initial }: { onBack: () => void; initia
   // P5-01: add-ons' own settings sections, after DinePOS's
   const addonRegs = useAddonRegistrations();
   const addonSections = addonRegs.flatMap(([id, r]) => (r.settings ? [{ key: `addon:${id}` as SectionKey, label: r.settings.label, hint: r.settings.hint ?? 'Add-on', icon: Puzzle, right: r.settings.right ?? 'admin' }] : []));
-  const all = [...SECTIONS.slice(0, -1), ...addonSections, SECTIONS[SECTIONS.length - 1]!];
+  // This terminal first (it is the one anybody may open, signed in or not), then DinePOS's sections, then add-ons'
+  const all = [SECTIONS[SECTIONS.length - 1]!, ...SECTIONS.slice(0, -1), ...addonSections];
   const visible = all.filter((s) => s.right === null || (session && can(s.right)));
-  const [active, setActive] = useState<SectionKey>(visible.find((s) => s.key === initial)?.key ?? visible[0]!.key);
+  const [active, setActive] = useState<SectionKey>(visible.find((s) => s.key === initial)?.key ?? (visible.find((s) => s.key !== 'terminal') ?? visible[0]!).key);
   const current = visible.find((s) => s.key === active) ?? visible[0]!;
   // a phone shows the list of sections, then the chosen one full screen ("All settings" goes back); wider screens both
   const [listOnPhone, setListOnPhone] = useState(initial === undefined);
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-3 border-b border-border bg-card px-3 py-2.5 md:px-4">
-        <button className="btn" onClick={onBack}>
+      <header className="appbar short:min-h-12">
+        {/* a phone: the arrow goes back to the list from a section, and to the floor from the list */}
+        <button className="btn h-10 w-10 px-0 md:hidden" onClick={listOnPhone ? onBack : () => setListOnPhone(true)} aria-label={listOnPhone ? (session ? 'Floor' : 'Back') : 'All settings'}>
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+        <button className="btn max-md:hidden" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" /> {session ? 'Floor' : 'Back'}
         </button>
-        <h1 className="font-display text-xl font-semibold">Settings</h1>
-        <div className="ml-auto hidden sm:block">
+        <h1 className="min-w-0 truncate font-display text-xl font-semibold md:ml-1">
+          <span className={listOnPhone ? '' : 'max-md:hidden'}>Settings</span>
+          <span className={listOnPhone ? 'hidden' : 'md:hidden'}>{current.label}</span>
+        </h1>
+        <div className="ml-auto hidden sm:block [&_.text-muted-foreground]:text-primary-foreground/80">
           <UserBadge />
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
-        <nav className={`w-full shrink-0 flex-col gap-2 overflow-y-auto border-border bg-background p-3 md:flex md:w-64 md:border-r ${listOnPhone ? 'flex' : 'hidden'}`} aria-label="Settings sections">
-          {visible.map(({ key, label, hint, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => {
-                setActive(key);
-                setListOnPhone(false);
-              }}
-              aria-current={key === current.key ? 'page' : undefined}
-              className={`flex w-full shrink-0 items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${key === current.key ? 'border-primary bg-accent' : 'border-border bg-card hover:border-primary'}`}
-            >
-              <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${key === current.key ? 'text-primary' : 'text-muted-foreground'}`} />
-              <span>
-                <span className="block text-sm font-semibold">{label}</span>
-                <span className="block text-xs text-muted-foreground">{hint}</span>
-              </span>
-            </button>
-          ))}
+        <nav className={`w-full shrink-0 flex-col overflow-y-auto border-border bg-card px-3 py-3 md:flex md:w-72 md:border-r md:bg-background ${listOnPhone ? 'flex' : 'hidden'}`} aria-label="Settings sections">
+          {visible.map(({ key, label, hint, icon: Icon }) => {
+            const on = key === current.key;
+            const terminal = key === 'terminal';
+            return (
+              <button
+                key={key}
+                onClick={() => {
+                  setActive(key);
+                  setListOnPhone(false);
+                }}
+                aria-current={on ? 'page' : undefined}
+                className={`flex w-full shrink-0 items-center gap-3.5 px-3 py-3 text-left transition-colors ${
+                  terminal ? 'mb-2 rounded-xl border border-primary/25 bg-accent py-4' : 'border-b border-border last:border-b-0 md:mb-1 md:rounded-xl md:border md:border-transparent'
+                } ${on ? 'md:!border-primary md:bg-accent' : 'hover:bg-secondary'}`}
+              >
+                <Icon className={`h-6 w-6 shrink-0 ${terminal || on ? 'text-primary' : 'text-foreground/80'}`} />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold">{label}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{hint}</span>
+                </span>
+                <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+              </button>
+            );
+          })}
         </nav>
         {/* a phone: form fields side by side on a PC stack in one column */}
         <main className={`min-w-0 flex-1 overflow-y-auto px-4 py-4 md:block md:px-8 md:py-6 max-md:[&_.grid]:!grid-cols-1 ${listOnPhone ? 'hidden' : 'block'}`}>
-          <button className="btn mb-4 h-9 md:hidden" onClick={() => setListOnPhone(true)}>
-            <ArrowLeft className="h-4 w-4" /> All settings
-          </button>
           {current.key === 'outlet' ? <OutletSettings /> : null}
           {current.key === 'bill' ? <BillDesignSettings /> : null}
           {current.key === 'coupons' ? <CouponSettings /> : null}

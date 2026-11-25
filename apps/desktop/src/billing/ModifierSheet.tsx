@@ -82,10 +82,10 @@ export function ModifierSheet({
               role={o.single ? 'radio' : 'checkbox'}
               aria-checked={on}
               onClick={() => pick(o)}
-              className={`flex h-11 items-center justify-between gap-2 rounded-lg border-2 px-3 text-left text-sm font-semibold ${on ? 'border-primary bg-primary/10' : 'border-border bg-card hover:bg-secondary'}`}
+              className={`flex h-11 items-center justify-between gap-2 rounded-lg border-2 px-3 text-left text-sm font-semibold ${on ? 'border-primary bg-primary/10' : 'border-primary/20 bg-accent/40 hover:bg-accent'}`}
             >
               <span className="flex items-center gap-2">
-                {o.hotkey ? <kbd className="rounded border border-border bg-background px-1.5 text-xs">{o.hotkey}</kbd> : null}
+                {o.hotkey ? <kbd className="rounded bg-primary/15 px-1.5 text-xs font-bold text-accent-foreground">{o.hotkey}</kbd> : null}
                 {o.name}
               </span>
               {o.pricePaise ? <span className="text-xs tabular-nums text-muted-foreground">{o.kind === 'addon' ? '+' : ''}{formatINR(o.pricePaise)}</span> : null}
@@ -118,11 +118,11 @@ export function ModifierSheet({
 
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2" aria-label="Quantity">
-          <button type="button" className="btn h-10 w-10 px-0" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="Less">
+          <button type="button" className="btn btn-outline h-10 w-10 px-0" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="Less">
             <Minus className="h-4 w-4" />
           </button>
           <span className="w-8 text-center text-lg font-bold tabular-nums" data-testid="sheet-qty">{qty}</span>
-          <button type="button" className="btn h-10 w-10 px-0" onClick={() => setQty((q) => Math.min(999, q + 1))} aria-label="More">
+          <button type="button" className="btn btn-outline h-10 w-10 px-0" onClick={() => setQty((q) => Math.min(999, q + 1))} aria-label="More">
             <Plus className="h-4 w-4" />
           </button>
         </div>

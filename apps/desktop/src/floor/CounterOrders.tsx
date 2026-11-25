@@ -22,7 +22,7 @@ export function CounterOrders({ orders, now, onOpen }: { orders: CounterOrder[] 
         <h2 className="mr-1 font-display text-base font-semibold">Takeaway &amp; delivery</h2>
         <span className="flex gap-1" role="radiogroup" aria-label="Show">
           {(['all', 'takeaway', 'delivery'] as const).map((f) => (
-            <button key={f} role="radio" aria-checked={filter === f} aria-selected={filter === f} className="tab h-7" onClick={() => setFilter(f)}>
+            <button key={f} role="radio" aria-checked={filter === f} aria-selected={filter === f} className="pill" onClick={() => setFilter(f)}>
               {f === 'all' ? `All ${all.length}` : `${COUNTER_TYPE_LABEL[f]} ${count(f)}`}
             </button>
           ))}

@@ -1,6 +1,6 @@
 import { formatINR, REJECT_REASONS, type HubOrder, type OnlineOrderView, type OnlineStatus, type OutletConfig, type RejectReason } from '@dinepos/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlarmClock, ArrowLeft, Bike, CheckCircle2, ChefHat, CircleAlert, Clock, Inbox, Map as MapIcon, PackageCheck, Printer, ReceiptText, Wifi, WifiOff } from 'lucide-react';
+import { AlarmClock, Bike, CheckCircle2, ChefHat, CircleAlert, Clock, Inbox, Map as MapIcon, PackageCheck, Printer, ReceiptText, Wifi, WifiOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApp } from '../app-context.js';
@@ -9,6 +9,7 @@ import { SettleDialog } from '../billing/SettleDialog.js';
 import { ChannelBadge, channelStripe } from './ChannelBadge.js';
 import { DeliveryMap } from './DeliveryMap.js';
 import { board, nextSteps, prepClock, REJECT_LABEL, STATE_LABEL, timeLeft, type Column } from './online-model.js';
+import { ScreenBar } from '../components/ScreenBar.js';
 
 const COLUMNS: Array<[Column, string, typeof Inbox]> = [
   ['new', 'New', Inbox],
@@ -285,12 +286,7 @@ export function OnlineScreen({ onBack, onOpenOrder }: { onBack: () => void; onOp
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-3 border-b border-border bg-card px-4 py-2.5">
-        <button className="btn" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4" /> Floor
-        </button>
-        <h1 className="font-display text-xl font-semibold">Online orders</h1>
-      </header>
+      <ScreenBar title="Online orders" onBack={onBack} />
       <div className="flex flex-wrap items-center gap-2 px-4 pt-3 text-sm">
         {s ? (
           <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${live ? 'bg-ok/15 text-ok' : 'bg-danger/10 text-danger'}`} data-testid="hub-status">

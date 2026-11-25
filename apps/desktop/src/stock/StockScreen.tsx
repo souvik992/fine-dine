@@ -1,10 +1,10 @@
-import { ArrowLeft, BarChart3, BookOpen, Boxes, Truck } from 'lucide-react';
+import { BarChart3, BookOpen, Boxes, Truck } from 'lucide-react';
 import { useState, type ComponentType } from 'react';
-import { UserBadge } from '../components/UserBadge.js';
 import { MaterialsTab } from './MaterialsTab.js';
 import { PurchasesTab } from './PurchasesTab.js';
 import { RecipesTab } from './RecipesTab.js';
 import { UsageTab } from './UsageTab.js';
+import { ScreenBar } from '../components/ScreenBar.js';
 
 type Tab = 'materials' | 'purchases' | 'recipes' | 'usage';
 
@@ -38,22 +38,15 @@ export function StockScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-3 border-b border-border bg-card px-4 py-2.5">
-        <button className="btn" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4" /> Floor
-        </button>
-        <h1 className="font-display text-xl font-semibold">Stock</h1>
-        <nav role="tablist" aria-label="Stock sections" className="ml-4 flex gap-1">
+      <ScreenBar title="Stock" onBack={onBack}>
+        <nav role="tablist" aria-label="Stock sections" className="flex min-w-0 gap-1 overflow-x-auto">
           {TABS.map(({ key, label, icon: Icon }) => (
-            <button key={key} role="tab" className="tab inline-flex items-center gap-1.5" aria-selected={tab === key} onClick={() => setTab(key)}>
+            <button key={key} role="tab" className="tab inline-flex shrink-0 items-center gap-1.5" aria-selected={tab === key} onClick={() => setTab(key)}>
               <Icon className="h-4 w-4" /> {label}
             </button>
           ))}
         </nav>
-        <div className="ml-auto">
-          <UserBadge />
-        </div>
-      </header>
+      </ScreenBar>
       <main className="min-h-0 flex-1 overflow-y-auto p-6">
         <div className="mx-auto max-w-6xl">
           {tab === 'materials' ? <MaterialsTab /> : null}

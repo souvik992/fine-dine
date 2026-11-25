@@ -110,8 +110,10 @@ export function OrderScreen({ orderId, areaId, onBack, onAttention }: { orderId:
 
   return (
     <div className="flex min-h-full flex-col pb-28">
-      <header className="sticky top-0 z-10 border-b border-border bg-card px-3 pb-2 pt-3">
-        <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-10 border-b border-border bg-card px-3 pb-2">
+        {/* the brand-coloured bar, as on the tables screen */}
+        <div className="appbar -mx-3 mb-3">
+
           <button className="btn h-11 w-11 px-0" onClick={onBack} aria-label="Back to tables">
             <ChevronLeft className="h-6 w-6" />
           </button>
@@ -119,7 +121,7 @@ export function OrderScreen({ orderId, areaId, onBack, onAttention }: { orderId:
           <button className="btn ml-auto h-11 px-3" onClick={() => setSheet('guests')} disabled={!order} aria-label={`Guests: ${order?.covers ?? 0}`}>
             <Users className="h-5 w-5" /> {order?.covers ?? '–'}
           </button>
-          <span className="min-w-20 text-right text-lg font-bold tabular-nums" data-testid="order-total">
+          <span className="min-w-20 text-right text-lg font-bold tabular-nums text-primary-foreground" data-testid="order-total">
             {order ? formatINR(order.totals.totalPaise) : ''}
           </span>
         </div>

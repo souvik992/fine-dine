@@ -9,8 +9,11 @@ interface PrinterInfo {
   lastError?: string;
 }
 
-/** Server-link and printer health (docs/09 top bar). Each dot also has a text label. */
-export function HealthDots() {
+/**
+ * Server-link and printer health (docs/09 top bar). Each dot also has a text label. `onBar`: as light pills on the
+ * brand-coloured top bar; `brief` (phones): the link, plus printers or backup only when something is wrong.
+ */
+export function HealthDots({ onBar = false, brief = false }: { onBar?: boolean; brief?: boolean } = {}) {
   const { api, streamStatus } = useApp();
   const printers = useQuery({
     queryKey: ['printers'],
@@ -24,17 +27,19 @@ export function HealthDots() {
   const link = { live: ['bg-ok', 'Live'], connecting: ['bg-warn', 'Connecting'], offline: ['bg-danger', 'Offline'] }[streamStatus];
   const printerTitle = bad.length ? bad.map((p) => `${p.name}: ${p.lastError ?? p.status}`).join('\n') : 'All printers OK';
 
+  const printersBad = printers.isError || bad.length > 0;
+  const item = onBar ? 'flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full bg-card px-2.5 text-foreground shadow-sm' : 'flex items-center gap-1.5';
   return (
-    <div className="flex items-center gap-4 text-xs font-semibold text-muted-foreground">
-      <span className="flex items-center gap-1.5" data-testid="link-status" title="Connection to the outlet server">
+    <div className={`flex items-center text-xs font-semibold ${onBar ? 'gap-1.5' : 'gap-4 text-muted-foreground'}`}>
+      <span className={item} data-testid="link-status" title="Connection to the outlet server">
         <span className={`dot ${link[0]}`} aria-hidden /> {link[1]}
       </span>
-      <span className="flex items-center gap-1.5" title={printerTitle}>
+      <span className={`${item} ${brief && !printersBad ? 'hidden' : ''}`} title={printerTitle}>
         <span className={`dot ${printers.isError ? 'bg-muted-foreground' : bad.length ? 'bg-danger' : 'bg-ok'}`} aria-hidden />
         {printers.isError ? 'Printers ?' : bad.length ? `${bad.length} printer${bad.length > 1 ? 's' : ''} down` : 'Printers OK'}
       </span>
       {backup && !backup.ok ? (
-        <span className="flex items-center gap-1.5 text-danger" title={backup.error ?? 'No backup in the last hour. Check Settings, Backups.'} data-testid="backup-warning">
+        <span className={`${item} text-danger`} title={backup.error ?? 'No backup in the last hour. Check Settings, Backups.'} data-testid="backup-warning">
           <span className="dot bg-danger" aria-hidden /> {backup.ageMin === null ? 'No backup yet' : 'Backup late'}
         </span>
       ) : null}

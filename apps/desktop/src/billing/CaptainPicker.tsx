@@ -10,10 +10,11 @@ export function CaptainPicker({ order, disabled, run }: { order: OrderSnapshot; 
   const staff = useQuery({ queryKey: ['setup-state'], queryFn: () => api.get<SetupState>('/v1/setup-state'), staleTime: 60_000 });
   const people = staff.data?.users ?? [];
   return (
-    <label className="flex items-center gap-1 text-sm text-muted-foreground" title="Captain looking after this table">
-      <UserRound className="h-4 w-4" />
+    <label className="flex min-w-0 max-w-full items-center gap-1 text-sm text-muted-foreground" title="Captain looking after this table">
+      <UserRound className="h-4 w-4 shrink-0 max-[399px]:hidden" />
+      {/* shrinks on a narrow phone so the table actions stay on its line */}
       <select
-        className="h-8 rounded-md border border-border bg-card px-1 text-sm text-foreground"
+        className="h-10 min-w-0 max-w-48 rounded-lg max-[399px]:w-28 border border-border bg-card px-2 text-sm text-foreground"
         aria-label="Captain"
         disabled={disabled}
         value={order.captainId ?? ''}

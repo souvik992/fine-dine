@@ -67,7 +67,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // a phone shows the menu or the order (tabs); a tablet or PC shows both side by side
   const [pane, setPane] = useState<'menu' | 'order'>('menu');
-  const { compact } = useScreen();
+  const { compact, width } = useScreen();
   const [pending, setPending] = useState(0);
   const [toast, setToast] = useState<Toast | null>(null);
   const [dialog, setDialog] = useState<'bill' | 'settle' | null>(null);
@@ -275,20 +275,22 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-3 py-2.5 lg:px-4">
-        <button className="btn" onClick={onBack} title="Back to floor (Esc)">
-          <ArrowLeft className="h-4 w-4" /> Floor
+      {/* the brand-coloured top bar, as on the floor; its buttons and the captain list stay light */}
+      <header className="appbar flex-wrap gap-x-3 gap-y-2 py-2 short:min-h-12 short:py-1.5 lg:px-4 [&_.text-muted-foreground]:text-primary-foreground/80">
+        {/* a phone: just the arrow (its name stays "Floor"), so the title and time fit on the first line */}
+        <button className={`btn ${compact ? 'w-10 px-0' : ''}`} onClick={onBack} title="Back to floor (Esc)" aria-label={compact ? 'Floor' : undefined}>
+          <ArrowLeft className="h-4 w-4" /> {compact ? null : 'Floor'}
         </button>
-        <h1 className="font-display text-xl font-semibold" data-testid="order-title">
+        <h1 className="min-w-0 truncate font-display text-xl font-semibold" data-testid="order-title">
           {tableTitle}
         </h1>
-        <span className="text-sm text-muted-foreground">
+        <span className="min-w-0 truncate text-sm text-muted-foreground">
           {counter ? [order.customer?.name, order.customer?.phone].filter(Boolean).join(' · ') || 'Walk-in' : `${order.covers} covers`}
           {elapsed ? ` · ${elapsed}` : ''}
           <span className="hidden sm:inline"> · v{order.version}</span>
         </span>
         {order.customer?.address ? (
-          <span className="flex max-w-xs items-center gap-1 truncate rounded-full bg-muted px-3 py-1 text-xs font-semibold" title={order.customer.address} data-testid="delivery-address">
+          <span className="flex max-w-xs items-center gap-1 truncate rounded-full bg-card px-3 py-1 text-xs font-semibold text-foreground" title={order.customer.address} data-testid="delivery-address">
             <Bike className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{order.customer.address}</span>
           </span>
         ) : null}
@@ -304,7 +306,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
           </button>
         ) : null}
         {order.state === 'open' || order.state === 'billed' ? (
-          <div className={`flex flex-wrap gap-1 lg:ml-4 ${compact ? '[&_.btn]:gap-0 [&_.btn]:px-3 [&_.btn]:text-[0px]' : ''}`} aria-label="Table actions">
+          <div className={`flex flex-wrap gap-1 lg:ml-4 ${compact ? 'icon-only ml-auto [&_.btn]:h-10 max-[399px]:[&_.btn]:w-9' : ''}`} aria-label="Table actions">
             {!counter && can('table.move', true) ? (
               <button className="btn h-9" onClick={() => setTableAction('move')}>
                 <MoveRight className="h-4 w-4" /> Move
@@ -333,7 +335,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
           </div>
         ) : null}
         <div className={`ml-auto items-center gap-4 ${compact ? 'hidden' : 'flex'}`}>
-          <HealthDots />
+          <HealthDots onBar />
           <UserBadge />
         </div>
       </header>
@@ -351,7 +353,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
 
       <div className={`border-b border-border bg-card ${compact ? 'flex' : 'hidden'}`} role="tablist" aria-label="Menu or order">
         {(['menu', 'order'] as const).map((p) => (
-          <button key={p} role="tab" aria-selected={pane === p} onClick={() => setPane(p)} className={`flex-1 py-3 text-sm font-bold ${pane === p ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`}>
+          <button key={p} role="tab" aria-selected={pane === p} onClick={() => setPane(p)} className={`flex-1 py-3 text-sm font-bold short:py-2 ${pane === p ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`}>
             {p === 'menu' ? 'Menu' : `Order${order.items.length ? ` · ${order.items.filter((i) => i.status !== 'cancelled').length}` : ''}${held.length ? ` (${held.length} to send)` : ''}`}
           </button>
         ))}
@@ -361,7 +363,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
           {menu.categories.map((c) => (
             <button
               key={c.id}
-              className={`mb-1 block w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${!query && c.id === activeCategory ? 'bg-foreground text-background' : 'hover:bg-secondary'}`}
+              className={`mb-1 block w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${!query && c.id === activeCategory ? 'bg-primary-strong text-primary-foreground' : 'hover:bg-secondary'}`}
               onClick={() => {
                 setCategoryId(c.id);
                 setQuery('');
@@ -374,11 +376,11 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
 
         <main className={`min-w-0 flex-1 flex-col ${compact && pane === 'order' ? 'hidden' : 'flex'}`}>
           {/* phones and tablets in portrait: the categories as a row of chips */}
-          <div className={`flex shrink-0 gap-2 overflow-x-auto border-b border-border px-3 py-2 ${compact ? '' : 'lg:hidden'}`} aria-label="Categories (row)">
+          <div className={`flex shrink-0 gap-2 overflow-x-auto border-b border-border px-3 py-2 short:py-1.5 ${compact ? '' : 'lg:hidden'}`} aria-label="Categories (row)">
             {menu.categories.map((c) => (
               <button
                 key={c.id}
-                className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold ${!query && c.id === activeCategory ? 'border-foreground bg-foreground text-background' : 'border-border bg-card'}`}
+                className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold short:py-1.5 ${!query && c.id === activeCategory ? 'border-primary-strong bg-primary-strong text-primary-foreground' : 'border-border bg-card'}`}
                 onClick={() => {
                   setCategoryId(c.id);
                   setQuery('');
@@ -389,7 +391,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
             ))}
           </div>
           <form
-            className="flex items-center gap-2 border-b border-border px-3 py-2 lg:gap-3 lg:px-4 lg:py-3"
+            className="flex items-center gap-2 border-b border-border px-3 py-2 short:py-1.5 lg:gap-3 lg:px-4 lg:py-3"
             onSubmit={(e) => {
               e.preventDefault();
             }}
@@ -398,8 +400,8 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
               <input
                 ref={searchBox}
-                className="input h-11 pl-10 text-base"
-                placeholder="Short code or name — e.g. pt2 then Enter (Shift+Enter for options)"
+                className="input h-11 pl-10 text-base short:h-9"
+                placeholder={compact ? 'Code or name, e.g. pt2' : 'Short code or name — e.g. pt2 then Enter (Shift+Enter for options)'}
                 aria-label="Add item"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -411,7 +413,7 @@ export function BillingScreen({ orderId, onBack }: { orderId: string; onBack: ()
                 }}
               />
             </div>
-            <MenuViewSwitch view={menuView} onChange={setMenuView} />
+            <MenuViewSwitch view={menuView} onChange={setMenuView} iconsOnly={compact && width < 480} />
           </form>
           <div
             // auto-rows-max: rows keep their tiles' full height and the list scrolls. Without it a photo tile

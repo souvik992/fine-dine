@@ -22,11 +22,13 @@ interface Props {
   focused: boolean;
   onOpen: (t: FloorTable) => void;
   onFocus: () => void;
+  /** List view: one line per table. */
+  row?: boolean;
   /** Position and size in the saved floor layout (layout view). */
   style?: CSSProperties;
 }
 
-export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile({ table, now, focused, onOpen, onFocus, style }, ref) {
+export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile({ table, now, focused, onOpen, onFocus, style, row = false }, ref) {
   const meta = STATE_META[table.state];
   const Icon = ICONS[meta.icon];
   const elapsed = formatElapsed(elapsedMinutes(table.since, now));
@@ -38,11 +40,54 @@ export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile
   const kitchenText = k ? [k.cooking ? `${k.cooking} cooking${waiting !== null ? ` for ${waiting} min` : ''}` : '', k.ready ? `${k.ready} ready to serve` : ''].filter(Boolean).join(', ') : '';
   const label = [table.label, meta.label, table.covers ? `${table.covers} covers` : '', elapsed, amount, table.captainName ? `captain ${table.captainName}` : '', table.billRequest ? 'bill asked' : '', kitchenText, table.booking ? `booked ${bookingTime(table.booking.startsAt)} for ${table.booking.guestName}` : '', ...(table.badges ?? []).map((b) => b.label)].filter(Boolean).join(', ');
 
+  const extras = (
+    <>
+      {table.booking && !table.orderId ? (
+        <div className="flex items-center gap-1 text-xs font-semibold" data-testid="booking">
+          <CalendarClock className="h-3.5 w-3.5" aria-hidden /> {bookingTime(table.booking.startsAt)} · {table.booking.guestName} ({table.booking.partySize})
+        </div>
+      ) : null}
+      {table.billRequest ? (
+        <div className="flex w-fit items-center gap-1 rounded bg-[var(--bill)] px-1.5 text-xs font-bold text-[var(--bill-ink)]" data-testid="bill-asked">
+          <ReceiptText className="h-3.5 w-3.5" aria-hidden /> Bill asked
+        </div>
+      ) : null}
+      {table.badges?.length ? (
+        <div className="flex flex-wrap items-center gap-1" data-testid="table-badges">
+          {table.badges.map((b) => (
+            <span key={`${b.addonId}:${b.key}`} className={`rounded px-1.5 text-xs font-bold ${b.tone === 'alert' ? 'animate-pulse bg-danger text-white' : b.tone === 'warn' ? 'bg-warn text-black' : 'bg-black/10'}`} data-badge={`${b.addonId}:${b.key}`}>
+              {b.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {k ? (
+        <div className="flex flex-wrap items-center gap-1" data-testid="kitchen-status">
+          {k.cooking ? (
+            <span
+              className={`flex items-center gap-1 rounded px-1.5 text-xs font-bold ${level === 'red' ? 'bg-danger text-white' : level === 'amber' ? 'bg-warn text-black' : 'bg-black/10'}`}
+              title={`Kitchen: ${k.cooking} ticket${k.cooking === 1 ? '' : 's'} cooking${waiting !== null ? `, oldest ${waiting} min` : ''}`}
+              data-testid="kitchen-cooking"
+            >
+              <ChefHat className="h-3.5 w-3.5" aria-hidden /> Cooking {k.cooking}
+              {waiting !== null ? <span className="tabular-nums">· {waiting}m</span> : null}
+            </span>
+          ) : null}
+          {k.ready ? (
+            <span className="flex items-center gap-1 rounded bg-ok px-1.5 text-xs font-bold text-white" title="Food is ready at the pass: serve it" data-testid="kitchen-ready">
+              <BellRing className="h-3.5 w-3.5" aria-hidden /> Ready {k.ready}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  );
+
   return (
     <button
       ref={ref}
       type="button"
-      className={`tile ${meta.className}`}
+      className={`tile ${meta.className}${row ? ' tile-row' : ''}`}
       data-table={table.label}
       data-state={table.state}
       aria-label={label}
@@ -51,6 +96,37 @@ export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile
       onClick={() => onOpen(table)}
       style={style}
     >
+      {row ? (
+        <>
+          <span className="w-12 shrink-0 font-display text-xl font-semibold leading-none">{table.label}</span>
+          <span className="min-w-0 flex-1 space-y-1">
+            <span className="flex items-center gap-1.5 text-sm font-semibold">
+              <Icon className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="truncate">{meta.label}</span>
+              {table.captainName ? (
+                <span className="rounded-full bg-black/10 px-1.5 py-0.5 text-[11px] font-bold" title={`Captain: ${table.captainName}`} data-testid="captain-initials">
+                  {initials(table.captainName)}
+                </span>
+              ) : null}
+            </span>
+            {extras}
+          </span>
+          <span className="shrink-0 text-right text-xs">
+            {table.orderId ? (
+              <>
+                <span className="block text-sm font-semibold tabular-nums">{amount}</span>
+                <span className="flex items-center justify-end gap-1 opacity-80">
+                  <Users className="h-3.5 w-3.5" aria-hidden /> {table.covers ?? 0}
+                  {elapsed ? <span>· {elapsed}</span> : null}
+                </span>
+              </>
+            ) : table.seats ? (
+              <span className="opacity-70">{table.seats} seats</span>
+            ) : null}
+          </span>
+        </>
+      ) : (
+        <>
       <div className="flex items-start justify-between gap-2">
         <span className="font-display text-2xl font-semibold leading-none">{table.label}</span>
         <span className="flex items-center gap-1">
@@ -67,47 +143,11 @@ export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile
           <Icon className="h-4 w-4" aria-hidden />
           <span>{meta.label}</span>
         </div>
-        {table.booking && !table.orderId ? (
-          <div className="flex items-center gap-1 text-xs font-semibold" data-testid="booking">
-            <CalendarClock className="h-3.5 w-3.5" aria-hidden /> {bookingTime(table.booking.startsAt)} · {table.booking.guestName} ({table.booking.partySize})
-          </div>
-        ) : null}
-        {table.billRequest ? (
-          <div className="flex w-fit items-center gap-1 rounded bg-[var(--bill)] px-1.5 text-xs font-bold text-[var(--bill-ink)]" data-testid="bill-asked">
-            <ReceiptText className="h-3.5 w-3.5" aria-hidden /> Bill asked
-          </div>
-        ) : null}
-        {table.badges?.length ? (
-          <div className="flex flex-wrap items-center gap-1" data-testid="table-badges">
-            {table.badges.map((b) => (
-              <span key={`${b.addonId}:${b.key}`} className={`rounded px-1.5 text-xs font-bold ${b.tone === 'alert' ? 'animate-pulse bg-danger text-white' : b.tone === 'warn' ? 'bg-warn text-black' : 'bg-black/10'}`} data-badge={`${b.addonId}:${b.key}`}>
-                {b.label}
-              </span>
-            ))}
-          </div>
-        ) : null}
-        {k ? (
-          <div className="flex flex-wrap items-center gap-1" data-testid="kitchen-status">
-            {k.cooking ? (
-              <span
-                className={`flex items-center gap-1 rounded px-1.5 text-xs font-bold ${level === 'red' ? 'bg-danger text-white' : level === 'amber' ? 'bg-warn text-black' : 'bg-black/10'}`}
-                title={`Kitchen: ${k.cooking} ticket${k.cooking === 1 ? '' : 's'} cooking${waiting !== null ? `, oldest ${waiting} min` : ''}`}
-                data-testid="kitchen-cooking"
-              >
-                <ChefHat className="h-3.5 w-3.5" aria-hidden /> Cooking {k.cooking}
-                {waiting !== null ? <span className="tabular-nums">· {waiting}m</span> : null}
-              </span>
-            ) : null}
-            {k.ready ? (
-              <span className="flex items-center gap-1 rounded bg-ok px-1.5 text-xs font-bold text-white" title="Food is ready at the pass: serve it" data-testid="kitchen-ready">
-                <BellRing className="h-3.5 w-3.5" aria-hidden /> Ready {k.ready}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
+        {extras}
         {table.orderId ? (
-          <div className="flex items-center justify-between gap-2 text-xs opacity-80">
-            <span className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center justify-between gap-x-2 text-xs opacity-80">
+            {/* covers and time stay on one line (a long time used to break as "1h" over "54m"); a narrow tile puts the amount on its own line */}
+            <span className="flex items-center gap-1 whitespace-nowrap">
               <Users className="h-3.5 w-3.5" aria-hidden /> {table.covers ?? 0}
               {elapsed ? <span className="ml-2">{elapsed}</span> : null}
             </span>
@@ -115,6 +155,8 @@ export const TableTile = forwardRef<HTMLButtonElement, Props>(function TableTile
           </div>
         ) : null}
       </div>
+        </>
+      )}
     </button>
   );
 });

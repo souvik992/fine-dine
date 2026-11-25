@@ -4,22 +4,24 @@
 @font-face { font-family: 'Manrope'; font-style: normal; font-weight: 400 800; font-display: swap; src: url('./assets/fonts/manrope-latin.woff2') format('woff2'); }
 @font-face { font-family: 'Fraunces'; font-style: normal; font-weight: 400 700; font-display: swap; src: url('./assets/fonts/fraunces-latin.woff2') format('woff2'); }
 
-/* Design tokens (docs/09-ui-screens.md). Warm neutrals from the Tiffin POS palette + table-state colours. */
+/* Design tokens (docs/09-ui-screens.md). Red brand on near-white neutrals (product owner 2026-11-25) + table-state colours. */
 :root {
   --radius: .875rem;
-  --background: oklch(96.5% .008 80);
-  --foreground: oklch(26% .03 50);
-  --card: oklch(99.8% .003 80);
-  --primary: oklch(62% .19 42);
-  --primary-foreground: oklch(99% .01 80);
-  --secondary: oklch(94.5% .015 75);
-  --muted: oklch(93.5% .015 75);
-  --muted-foreground: oklch(52% .03 55);
-  --accent: oklch(93% .05 60);
-  --accent-foreground: oklch(35% .08 45);
-  --border: oklch(90% .015 70);
-  --ring: oklch(62% .19 42);
-  --danger: oklch(55% .22 27);
+  --background: oklch(97.8% .003 20);
+  --foreground: oklch(23% .02 20);
+  --card: oklch(100% 0 0);
+  --primary: oklch(56% .215 26);
+  /* the chosen menu category: a deep maroon beside the red */
+  --primary-strong: oklch(36% .13 24);
+  --primary-foreground: oklch(99.5% .003 20);
+  --secondary: oklch(95.5% .005 20);
+  --muted: oklch(94.5% .006 20);
+  --muted-foreground: oklch(50% .015 20);
+  --accent: oklch(95.5% .025 18);
+  --accent-foreground: oklch(42% .15 25);
+  --border: oklch(91% .006 20);
+  --ring: oklch(56% .215 26);
+  --danger: oklch(48% .2 27);
   --ok: oklch(58% .14 150);
   --warn: oklch(72% .16 75);
   --veg: oklch(55% .15 145);
@@ -48,6 +50,7 @@
   --color-card: var(--card);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-strong: var(--primary-strong);
   --color-secondary: var(--secondary);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
@@ -62,6 +65,10 @@
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
 }
+
+/* Same rule as useScreen() (components/use-screen.ts): a phone, upright or sideways. `short`: a phone sideways. */
+@custom-variant compact (@media (max-width: 767px), (max-height: 499px));
+@custom-variant short (@media (max-height: 499px));
 
 @layer base {
   html, body, #root { height: 100%; }
@@ -81,9 +88,21 @@
   .btn-primary { @apply border-transparent bg-primary text-primary-foreground enabled:hover:bg-primary enabled:hover:opacity-90; }
   .input { @apply h-10 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus:border-ring; }
   .tab { @apply h-9 rounded-full px-4 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary; }
-  .tab[aria-selected="true"] { @apply bg-foreground text-background; }
+  .tab[aria-selected="true"] { @apply bg-primary text-primary-foreground; }
+
+  /* the brand-coloured top bar (floor, settings); its plain buttons stay light cards */
+  .appbar { @apply flex shrink-0 items-center gap-2 bg-primary px-3 text-primary-foreground; min-height: 3.5rem; }
+  .appbar .btn:not(.btn-primary) { @apply border-transparent text-foreground; }
+  .btn-outline { @apply border-primary text-primary enabled:hover:bg-accent; }
+  /* filters and counts: round, light; chosen = brand colour */
+  .pill { @apply inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 text-xs font-semibold; }
+  .pill[aria-checked="true"] { @apply border-primary bg-primary text-primary-foreground; }
+  /* buttons inside keep only their icon (and any count badge, which sets its own size); the name stays for screen readers */
+  .icon-only .btn { @apply w-10 gap-0 px-0 text-[0px]; }
 
   .tile { @apply relative flex min-h-28 flex-col justify-between rounded-xl border-2 p-3 text-left transition-shadow hover:shadow-md; }
+  /* list view: one table per line */
+  .tile.tile-row { @apply min-h-0 flex-row items-center gap-3 py-2.5; }
   .tile-free { @apply border-border bg-card; }
   .tile-seated { background: var(--seated); border-color: transparent; color: var(--seated-ink); }
   .tile-kot { background: var(--kot); border-color: transparent; color: var(--kot-ink); }

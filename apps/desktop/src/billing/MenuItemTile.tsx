@@ -27,7 +27,8 @@ export function useMenuView(): [MenuView, (v: MenuView) => void] {
   return [view, set];
 }
 
-export function MenuViewSwitch({ view, onChange }: { view: MenuView; onChange: (v: MenuView) => void }) {
+/** `iconsOnly` (phones): the names stay for screen readers only, so the search box keeps its width. */
+export function MenuViewSwitch({ view, onChange, iconsOnly = false }: { view: MenuView; onChange: (v: MenuView) => void; iconsOnly?: boolean }) {
   return (
     <div className="flex shrink-0 rounded-lg border border-border bg-card p-0.5" role="radiogroup" aria-label="Menu view">
       {(
@@ -42,7 +43,7 @@ export function MenuViewSwitch({ view, onChange }: { view: MenuView; onChange: (
           role="radio"
           aria-checked={view === v}
           onClick={() => onChange(v)}
-          className={`flex h-9 items-center gap-1.5 rounded-md px-3 text-sm font-semibold ${view === v ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-secondary'}`}
+          className={`flex h-9 items-center gap-1.5 rounded-md px-3 text-sm font-semibold ${iconsOnly ? 'gap-0 px-2.5 text-[0px]' : ''} ${view === v ? 'bg-primary-strong text-primary-foreground' : 'text-muted-foreground hover:bg-secondary'}`}
         >
           <Icon className="h-4 w-4" /> {label}
         </button>

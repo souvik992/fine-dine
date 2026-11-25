@@ -1,7 +1,8 @@
 # 09 — UI screens (original design)
 
 Design goals: fast for a biller with a keyboard, big touch targets for captains, readable at a glance in a
-dim dining room. Our own visual identity — do not imitate another vendor's layout, colours or icons.
+dim dining room. Our own visual identity — do not imitate another vendor's logo, names or icons. Brand colour: red on near-white
+neutrals, chosen by the product owner (2026-11-25).
 
 ## Design tokens (starting point, change freely)
 | Token | Value | Use |
@@ -20,7 +21,7 @@ Every state also has a text label and icon — colour is never the only signal.
 ## Desktop app (Electron)
 ### 1. Floor (built in P1-08: area tabs, table search, health dots, clock, tiles, seat dialog, arrow keys)
 - Top bar: area tabs, search table (type `T7` + Enter), **+ Takeaway** and **+ Delivery** (at the right end of the top bar, on the same line as the modules; start a counter order; the strip of open ones shows above the tables only while any is open), clock, sync/print health dots.
-- Layout / Grid switch (remembered per terminal): Layout shows tables where they were placed in Settings ›
+- Layout / Grid / List switch (icons, remembered per terminal; List is one table a line): Layout shows tables where they were placed in Settings ›
   Floor & tables; areas without a saved layout fall back to the grid.
 - Tile: label, covers, elapsed min, amount, captain initials, state label.
 - Kitchen status on the tile (and on the captain's tables): **Cooking n · m min** (plain, then amber / red at the
@@ -197,20 +198,42 @@ The button shows how many materials are low or need a count. Tabs:
 ## Phones, tablets and POS machines (DinePOS for Android, `apps/android`; product owner 2026-11-23)
 The billing screens (the same `/pos` pages as the browser) fit every screen. `useScreen()` (`components/use-screen.ts`)
 calls a screen **compact** when it is under 768 px wide or under 500 px tall (a phone, upright or sideways).
+CSS has the same rule as the `compact:` variant, and `short:` (under 500 px tall: a phone held sideways), in `styles.css`.
+Checked at 320 × 640, 360 × 760, 412 × 900, 600 × 960, 780 × 360 and 1280 × 800 with no sideways scrolling (2026-11-25).
+- Look (product owner 2026-11-25): red brand colour (`--primary`; deep maroon `--primary-strong` for the chosen
+  menu category; Android `@color/brand` and the launcher icon match), the DinePOS mark (the app icon's fork and knife, `components/Brand.tsx`) and
+  wordmark; every screen opened from the floor has a top bar in the brand colour (Floor, Settings, the order screen,
+  and Reports / Stock / Bookings / Online orders through `components/ScreenBar.tsx`: back, title, staff badge; their
+  tabs or filters on a light row below), and so does the DinePOS Server window; chosen tabs, filters and views are
+  filled in the brand colour, the chosen menu category in maroon. Windows/Mac app icon (`build/icon.png`,
+  `build/icon.ico`, also DinePOS Kitchen's) = the mark in red.
+- Phones: Reports picks the report from a list at the top (the side list from 768 px); Bookings puts the waitlist
+  under the day's bookings.
+- Before sign-in (setup, staff, PIN, lock): logo top left, terminal settings top right. Staff are cards with a role icon
+  and the role; the PIN pad has big keys and sits beside the heading on a phone held sideways.
 - Order screen: compact → **Menu / Order** tabs (the Order tab says how many lines and how many to send), category
-  chips in a row, Move / Merge / Move items / Release as icons, no status dots or staff badge. 768–1023 px (a tablet
-  upright) → category chips above the menu, the order beside it (340 px). 1024 px and wider (tablet sideways, POS
-  machines such as 1024 × 600, PCs) → as before.
-- Floor: the room plan (Layout) only where it fits at 90 % or more; otherwise the Grid, and Layout says it shows on a
-  wider screen. Under 640 px the tool buttons are icons (their names stay for screen readers); + Takeaway and
-  + Delivery keep their words.
-- Settings under 768 px: the list of sections, then the chosen one full screen with **All settings**; fields side by side
+  chips in a row, the back arrow, Move / Merge / Move items / Release and List / Photos as icons (names kept for
+  screen readers), a shorter search hint, no status dots or staff badge; the captain list narrows so the actions stay
+  on its line. 768–1023 px (a tablet upright) → category chips above the menu, the order beside it (340 px). 1024 px
+  and wider (tablet sideways, POS machines such as 1024 × 600, PCs) → as before.
+- Floor: top bar = logo, outlet name, Live (and printers or backup only when something is wrong on a phone); wider
+  screens add printers, clock, staff badge and Settings. Below it one row when it fits (areas, search, Reservation,
+  Online Orders, tools, + Takeaway, + Delivery), else two. Compact: search and Online Orders are icons, Reservation
+  an icon with its count, and Bills / Cash / Stock / Reports / Day end / add-on screens / Settings are in **More**;
+  the outlet name opens who is signed in with Lock and Sign out. Tiles are at least two a row. Views: Layout (the room
+  plan, only where it fits at 90 % or more; not offered on a phone), Grid, and **List** (one table a line).
+- Settings under 768 px: the list of sections (**This terminal** first, then the rest with a chevron), then the chosen
+  one full screen; the top bar's arrow goes back to the list (**All settings**), then to the floor. Fields side by side
   on a PC stack in one column.
 - The Android app runs the outlet server on the device (Node 24 for Android, `node:sqlite`, data in the app's own
   storage) and shows `http://127.0.0.1:7420/pos/`; captain phones and kitchen screens connect to the device on the
   Wi-Fi. USB and Bluetooth printers (and a POS machine's built-in one) print through the app.
 
 ## Captain PWA (phone/tablet)
+- Same look as the terminal (2026-11-25): red brand colour, Manrope / Fraunces bundled, the DinePOS mark as the app
+  icon (`public/icon.svg`, theme colour, DinePOS Captain for Android's colours). Pairing, staff, PIN and lock come from
+  `packages/web-shell` (logo top left, staff cards with role icons, big PIN pad; the kitchen display shares them in
+  its own colours). Tables and the order screen have the red top bar.
 - Login with PIN → My tables (assigned areas first) → table → order screen.
 - Order screen: category chips, item list with + buttons, held basket at bottom with course tags.
 - Actions: Send all / Send course N, Request bill (notifies desk), Add note, Covers.
@@ -258,6 +281,6 @@ calls a screen **compact** when it is under 768 px wide or under 500 px tall (a 
   settle UPI / Not received); tile marks **QR order**, **Waiter called** (red, pulsing), **Paid? ₹…** (amber), also on the
   captain app; Settings › Table QR (switch on, accepting, UPI, address in the codes, welcome line, codes per table, New
   code, Print codes on A4).
-- Guest page (phone, `/a/tableqr/?t=`): menu with photos, search and categories; dish sheet (size, extras, note,
+- Guest page (phone, `/a/tableqr/?t=`; the red DinePOS palette since 1.1.2): menu with photos, search and categories; dish sheet (size, extras, note,
   quantity); cart with the number of guests when the table is not seated; **My table**: requests and their state, the
   running bill with tax, Call waiter, Ask for bill, and once printed Pay with a UPI app / I have paid.

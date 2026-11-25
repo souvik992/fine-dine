@@ -1,6 +1,7 @@
 import qrcode from 'qrcode-generator';
-import { AlertTriangle, CircleCheck, Cloud, DatabaseBackup, FolderOpen, Monitor, Play, Power, Printer, QrCode, RotateCcw, Server, Smartphone, Square, TabletSmartphone } from 'lucide-react';
+import { AlertTriangle, CircleCheck, Cloud, DatabaseBackup, FolderOpen, Monitor, Play, Power, Printer, QrCode, RotateCcw, Smartphone, Square, TabletSmartphone } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { BrandMark } from '../components/Brand.js';
 
 type Phase = 'starting' | 'running' | 'stopping' | 'stopped' | 'crashed' | 'external';
 interface LogLine {
@@ -145,8 +146,8 @@ export function ServerPanel({ bridge }: { bridge: Bridge }) {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex flex-wrap items-center gap-3 border-b border-border bg-card px-5 py-3">
-        <Server className="h-6 w-6 text-primary" />
+      <header className="appbar flex-wrap gap-3 px-5 py-3 [&_.text-muted-foreground]:text-primary-foreground/80">
+        <BrandMark size={34} inverse />
         <h1 className="font-display text-2xl font-semibold">DinePOS Server</h1>
         <span className={`rounded-full px-3 py-1 text-sm font-bold ${PHASE[s.phase].tone}`} data-testid="server-phase">
           {PHASE[s.phase].label}

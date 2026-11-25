@@ -6,7 +6,7 @@
   "scope": "/captain/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f7f4ef",
-  "theme_color": "#d4622a",
+  "background_color": "#faf9f9",
+  "theme_color": "#d42a2f",
   "icons": [{ "src": "/captain/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
 }

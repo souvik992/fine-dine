@@ -1,10 +1,10 @@
 import { formatINR, reportToCsv, type ReportColumn, type ReportInfo, type ReportRow, type ReportTable } from '@dinepos/shared';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Download } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { useState } from 'react';
 import { useApp } from '../app-context.js';
-import { UserBadge } from '../components/UserBadge.js';
 import { AuditList, LeakageDashboard } from './LeakageViews.js';
+import { ScreenBar } from '../components/ScreenBar.js';
 
 type Preset = 'today' | 'yesterday' | 'week' | 'month' | 'custom';
 const PRESETS: Array<[Preset, string]> = [
@@ -60,17 +60,31 @@ export function ReportsScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-3 border-b border-border bg-card px-4 py-2.5">
-        <button className="btn" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4" /> Floor
-        </button>
-        <h1 className="font-display text-xl font-semibold">Reports</h1>
-        <div className="ml-auto">
-          <UserBadge />
-        </div>
-      </header>
+      <ScreenBar title="Reports" onBack={onBack}>
+        {/* a phone: the reports as a list to pick from (the side list is for wider screens) */}
+        <label className="flex w-full items-center gap-2 text-sm font-semibold md:hidden">
+          Report
+          <select className="input h-10 min-w-0 flex-1" value={key} onChange={(e) => setKey(e.target.value)} aria-label="Report">
+            <optgroup label="Owner's view">
+              <option value="leakage">Leakage dashboard</option>
+              <option value="audit">Audit log</option>
+            </optgroup>
+            {groups.map((g) => (
+              <optgroup key={g} label={g}>
+                {list.data!.reports
+                  .filter((r) => r.group === g)
+                  .map((r) => (
+                    <option key={r.key} value={r.key}>
+                      {r.title}
+                    </option>
+                  ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+      </ScreenBar>
       <div className="flex min-h-0 flex-1">
-        <nav className="w-64 shrink-0 overflow-y-auto border-r border-border bg-card p-3" aria-label="Reports">
+        <nav className="w-64 shrink-0 overflow-y-auto border-r border-border bg-card p-3 max-md:hidden" aria-label="Reports">
           <div className="mb-4">
             <p className="mb-1 px-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Owner's view</p>
             {(
@@ -79,7 +93,7 @@ export function ReportsScreen({ onBack }: { onBack: () => void }) {
                 ['audit', 'Audit log'],
               ] as const
             ).map(([k, label]) => (
-              <button key={k} className={`block w-full rounded-lg px-2 py-1.5 text-left text-sm ${key === k ? 'bg-foreground font-semibold text-background' : 'hover:bg-secondary'}`} onClick={() => setKey(k)}>
+              <button key={k} className={`block w-full rounded-lg px-2 py-1.5 text-left text-sm ${key === k ? 'bg-primary font-semibold text-primary-foreground' : 'hover:bg-secondary'}`} onClick={() => setKey(k)}>
                 {label}
               </button>
             ))}
@@ -90,14 +104,14 @@ export function ReportsScreen({ onBack }: { onBack: () => void }) {
               {list.data!.reports
                 .filter((r) => r.group === g)
                 .map((r) => (
-                  <button key={r.key} className={`block w-full rounded-lg px-2 py-1.5 text-left text-sm ${key === r.key ? 'bg-foreground font-semibold text-background' : 'hover:bg-secondary'}`} onClick={() => setKey(r.key)}>
+                  <button key={r.key} className={`block w-full rounded-lg px-2 py-1.5 text-left text-sm ${key === r.key ? 'bg-primary font-semibold text-primary-foreground' : 'hover:bg-secondary'}`} onClick={() => setKey(r.key)}>
                     {r.title}
                   </button>
                 ))}
             </div>
           ))}
         </nav>
-        <main className="min-w-0 flex-1 overflow-y-auto p-6">
+        <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
           <div className="mb-4 flex flex-wrap items-end gap-3">
             <div className="flex gap-1" role="tablist" aria-label="Dates">
               {PRESETS.map(([p, label]) => (
